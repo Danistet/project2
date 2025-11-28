@@ -11,6 +11,10 @@ createApp({
       error.value = '';
       response.value = '';
 
+        if (!username.value.trim() || !password.value.trim()) {
+          error.value = 'Логин и пароль обязательны для заполнения';
+          return;
+        }   
       try {
         const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
         const res = await fetch(url);

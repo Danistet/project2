@@ -8,8 +8,8 @@
 <body>
   <div id="app">
     <h2>Вход</h2>
-    <input v-model="username" placeholder="Логин" />
-    <input v-model="password" type="password" placeholder="Пароль" />
+    <input v-model="username" placeholder="Логин" required type="text"/>
+    <input v-model="password" type="password" placeholder="Пароль" required/>
     <button @click="login">Войти</button>
     <p v-if="response">{{ response }}</p>
     <p v-if="error" style="color: red;">{{ error }}</p>
