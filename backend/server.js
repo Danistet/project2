@@ -22,7 +22,7 @@ app.get('/auth', async (req, res) => {
       return res.status(500).send('Database connection error');
     }
 
-    const query = 'SELECT * FROM USERS WHERE USERNAME = ? AND USERPSWD = ?';
+    const query = 'SELECT * FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
     db.query(query, [username, userpswd], (err, result) => {
       db.detach();
 
