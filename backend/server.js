@@ -1,6 +1,7 @@
 const express = require('express');
 const firebird = require('node-firebird');
 const cors = require('cors');
+const crypto = require('crypto');
 const config = require('./config');
 
 const app = express();
@@ -30,7 +31,12 @@ app.get('/auth', async (req, res) => {
         console.error('error:', err);
         return res.status(500).send('error');
       }
-
+      function generatetoken(length = 32) 
+      {
+        return crypto.randomBytes(length).toString('hex');
+      }
+      const token = generatetoken(32);
+      console.log(token);
       if (result.length > 0) {
         const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
         res.status(200).send(`Ответ: OK\nДата ответа: ${now}`);
