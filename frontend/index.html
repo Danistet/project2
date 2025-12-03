@@ -2,14 +2,17 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Логин</title>
+  <title>Логин</title><br>
+    <h1>регистрация
+      <input v-model="reg" name="checkbox" type="checkbox"/>
+    </h1>    
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 <body>
-  <div id="app">
+  <div id="app" >
     <h2>Вход</h2>
-    <input v-model="username" placeholder="Логин" required type="text"/>
-    <input v-model="password" type="password" placeholder="Пароль" required/>
+    <input v-model="username" placeholder="Логин" required type="text"><br>
+    <input v-model="password" type="password" placeholder="Пароль" required/><br>
     <button @click="login">Войти</button>
     <p v-if="response">{{ response }}</p>
     <p v-if="error" style="color: red;">{{ error }}</p>
@@ -17,4 +20,31 @@
 
   <script src="./app.js"></script>
 </body>
+
+<style>
+  body {
+  margin: 0;
+  font-family: PTSans;
+  color: goldenrod;
+  background-color: rgb(56, 54, 54);
+  font-size: 24px;
+  justify-content: center;
+  justify-items: center;
+}
+button {
+  background-color: aqua;
+  width: 177px;
+}
+p{
+  font-size: 24px;
+  color: greenyellow;
+}
+input{
+background-color: aquamarine;
+color: rgb(0, 0, 0);
+}
+h2{
+ color: chocolate;
+}
+</style>
 </html>

@@ -6,6 +6,7 @@ createApp({
     const password = ref('');
     const response = ref('');
     const error = ref('');
+    const reg = ref(false);
 
     const login = async () => {
       error.value = '';
