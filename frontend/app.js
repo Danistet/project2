@@ -17,13 +17,31 @@ createApp({
           return;
         }   
       try {
-        const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
-        const res = await fetch(url);
+        if (reg.value) {
+          const res = await fetch('http://localhost:3000/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: username.value,
+              userpswd: password.value
+            })
+          });
 
-        if (res.ok) {
-          response.value = await res.text();
+          if (res.ok) {
+            response.value = 'Пользователь зарегистрирован';
+          } else {
+            const msg = await res.text();
+            error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
+          }
         } else {
-          error.value = `Ошибка: ${res.status} ${res.statusText}`;
+          const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
+          const res = await fetch(url);
+
+          if (res.ok) {
+            response.value = await res.text();
+          } else {
+            error.value = `Ошибка входа: ${res.status} ${res.statusText}`;
+          }
         }
       } catch (err) {
         error.value = 'Не удалось подключиться к серверу';
@@ -31,6 +49,6 @@ createApp({
       }
     };
 
-    return { username, password, login, response, error };
+    return { username, password, reg, login, response, error };
   }
 }).mount('#app');
