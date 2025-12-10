@@ -6,7 +6,6 @@ const config = require('./config');
 
 const app = express();
 const PORT = 3000;
-
 app.use(cors());
 app.use(express.json());
 
@@ -23,20 +22,51 @@ app.get('/auth', async (req, res) => {
       return res.status(500).send('Database connection error');
     }
 
-    const query = 'SELECT * FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
+    const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
     db.query(query, [username, userpswd], (err, result) => {
-      db.detach();
-
       if (err) {
+        db.detach();
         console.error('error:', err);
         return res.status(500).send('error');
       }
-      if (result.length > 0) {
-        const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
-        res.status(200).send(`Ответ: OK\nДата ответа: ${now}`);
-      } else {
+      if (result.length === 0) {
+        db.detach();
         res.status(401).send('Invalid username or password');
       }
+        const row = result[0];
+        let token = row.TOKEN;
+        const authDate = row.AUTHDATE;
+        //const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
+        const now = Date.now();
+        const minute = 60 * 1000;
+        if (now - authDate > minute)
+        {
+          const newToken = crypto.randomBytes(32).toString('hex');
+          const newDate = now;
+
+          const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';
+          db.query(updateQuery, [newToken, newDate, username], (upderr) =>{
+            db.detach();
+            if (upderr)
+            {
+              console.log("update error", upderr);
+              return res.status(500).send('update error');
+            }
+            else
+            {
+              const text = `Ответ: OK \n Дата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\n Токен: ${newToken}`;
+               res.set('Content-Type', 'text/plain; charset=utf-8');
+               res.status(200).send(text);
+            }
+          });
+        }
+        else
+        {
+          db.detach();
+          const text = `Ответ: OK \n Дата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\n Токен: ${token}`;
+          res.set('Content-Type', 'text/plain; charset=utf-8');
+          res.status(200).send(text);
+        }
     });
   });
 });
@@ -66,14 +96,17 @@ app.post('/register', (req, res) => {
         db.detach();
         return res.status(409).send('Пользователь уже существует');
       }
+      
       function generatetoken(length = 32) 
       {
         return crypto.randomBytes(length).toString('hex');
       }
-      const token = generatetoken(32);
+       const token = generatetoken(32);
+       const RegDateTIme =  Date.now();
       //console.log(token);
-      const insertQuery = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN) VALUES (?, ?, ?)';
-      db.query(insertQuery, [username, userpswd, token], (err) => {
+
+      const insert = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
+      db.query(insert, [username, userpswd, token, RegDateTIme], (err) => {
         db.detach();
 
         if (err) {

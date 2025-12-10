@@ -17,7 +17,7 @@ createApp({
           return;
         }   
       try {
-        if (reg.value) {
+        if (reg.value) {    //true      
           const res = await fetch('http://localhost:3000/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -33,6 +33,8 @@ createApp({
             const msg = await res.text();
             error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
           }
+
+
         } else {
           const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
           const res = await fetch(url);

@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <title>Логин</title><br>
-    <h1>регистрация
+    <h1>регистрация\вход
     </h1>    
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 <body>
-  <div id="app" >
+  <div id="app" class="server-response">
     <h2>Вход</h2>
     <input v-model="username" placeholder="Логин" required type="text"><br>
     <input v-model="password" type="password" placeholder="Пароль" required/><br>
@@ -38,8 +38,14 @@ button {
   background-color: aqua;
   width: 177px;
 }
+.server-response {
+  white-space: pre-line;
+  color: goldenrod;
+  padding: 16px;
+  border-radius: 6px;
+}
 p{
-  font-size: 24px;
+  font-size: 14px;
   color: greenyellow;
 }
 input{
