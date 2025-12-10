@@ -40,7 +40,7 @@ app.get('/auth', async (req, res) => {
         const authDate = row.AUTHDATE;
         //const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
         const now = Date.now();
-        const minute = 60 * 1000;
+        const minute = 60000;
 
         if (now - authDate > minute)
         {

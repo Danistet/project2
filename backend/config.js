@@ -5,7 +5,6 @@ module.exports = {
  // database: 'C:\\Program Files (x86)\\Firebird\\security2.fdb',
   user: 'SYSDBA',
   password: 'masterkey',
-  charset: 'WIN1251',
   lowercase_keys: false,
   role: null,
   pageSize: 4096
