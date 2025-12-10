@@ -29,42 +29,47 @@ app.get('/auth', async (req, res) => {
         console.error('error:', err);
         return res.status(500).send('error');
       }
+
       if (result.length === 0) {
         db.detach();
         res.status(401).send('Invalid username or password');
       }
+
         const row = result[0];
         let token = row.TOKEN;
         const authDate = row.AUTHDATE;
         //const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
         const now = Date.now();
         const minute = 60 * 1000;
+
         if (now - authDate > minute)
         {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newDate = now;
-
           const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';
           db.query(updateQuery, [newToken, newDate, username], (upderr) =>{
             db.detach();
+
             if (upderr)
             {
               console.log("update error", upderr);
               return res.status(500).send('update error');
             }
+
             else
             {
-              const text = `Ответ: OK \n Дата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\n Токен: ${newToken}`;
-               res.set('Content-Type', 'text/plain; charset=utf-8');
+              const text = `Ответ: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${newToken}`;
+               res.set('Content-Type', 'text/plain; charset=win1251');
                res.status(200).send(text);
             }
           });
         }
+
         else
         {
           db.detach();
-          const text = `Ответ: OK \n Дата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\n Токен: ${token}`;
-          res.set('Content-Type', 'text/plain; charset=utf-8');
+          const text = `Ответ: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
+          res.set('Content-Type', 'text/plain; charset=win1251');
           res.status(200).send(text);
         }
     });
@@ -97,9 +102,9 @@ app.post('/register', (req, res) => {
         return res.status(409).send('Пользователь уже существует');
       }
       
-      function generatetoken(length = 32) 
+      function generatetoken() 
       {
-        return crypto.randomBytes(length).toString('hex');
+        return crypto.randomBytes(32).toString('hex');
       }
        const token = generatetoken(32);
        const RegDateTIme =  Date.now();
