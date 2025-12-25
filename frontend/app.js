@@ -28,7 +28,15 @@ createApp({
           });
 
           if (res.ok) {
-            response.value = 'Пользователь зарегистрирован';
+           // response.value = 'Пользователь зарегистрирован';
+            const text = await res.text(); 
+            const tokenMatch = text.match(/Токен:\s*(\S+)/);
+            const token = tokenMatch ? tokenMatch[1] : '';
+            const params = new URLSearchParams({
+            username: username.value,
+            token: token
+            });
+            window.location.href = `main.html?${params.toString()}`;
           } else {
             const msg = await res.text();
             error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
@@ -40,7 +48,16 @@ createApp({
           const res = await fetch(url);
 
           if (res.ok) {
-            response.value = await res.text();
+           // response.value = await res.text();
+            //window.location.href = "main.html";
+            const text = await res.text(); 
+            const tokenMatch = text.match(/Токен:\s*(\S+)/);
+            const token = tokenMatch ? tokenMatch[1] : '';
+            const params = new URLSearchParams({
+            username: username.value,
+            token: token
+            });
+            window.location.href = `main.html?${params.toString()}`;
           } else {
             error.value = `Ошибка входа: ${res.status} ${res.statusText}`;
           }

@@ -1,9 +1,37 @@
-<html>
+<!DOCTYPE html>
+<html lang="ru">
     <head>
         <title>mainpage</title>
     </head>
     <body>
         <h1>MAIN PAGE</h1>
+        <div >
+            <p id="username"></p>
+            <p id="token"></p>
+            <p id="error" style="color: red;"></p>           
+        </div>
+        <button onclick="logout()">Выход</button>
+        <script>
+            const urlparams = new URLSearchParams(window.location.search);
+            const username = urlparams.get('username');
+            const token = urlparams.get('token');
+            const usernameElement = document.getElementById('username');
+            const tokenElement = document.getElementById('token');
+            const errorElement = document.getElementById('error');
+            if (username && token) {
+                usernameElement.textContent = `Polzovatel: ${username}`;
+                tokenElement.textContent = `Token: ${token}`;
+
+            }else{
+                errorElement.textContent = 'nodata';
+                usernameElement.style.display= 'none';
+                tokenElement.style.display = 'none';
+            }
+            function logout() {
+                window.location.href = 'index.html';
+            }
+        </script>
+        
     </body>
     <style>
     body {

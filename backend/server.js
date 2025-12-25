@@ -118,7 +118,9 @@ app.post('/register', (req, res) => {
           console.error('Ошибка вставки:', err);
           return res.status(500).send('Не удалось создать пользователя');
         }
-        res.status(201).send('Пользователь зарегистрирован');
+        const text = `Ответ: OK\nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
+        res.set('Content-Type', 'text/plain; charset=win1251');
+        res.status(201).send(text);
       });
     });
   });
