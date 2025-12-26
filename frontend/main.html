@@ -12,20 +12,37 @@
         </div>
         <button onclick="logout()">Выход</button>
         <script>
+
             const urlparams = new URLSearchParams(window.location.search);
             const username = urlparams.get('username');
             const token = urlparams.get('token');
+            const authDatestr = urlparams.get('authDate');
+
             const usernameElement = document.getElementById('username');
             const tokenElement = document.getElementById('token');
             const errorElement = document.getElementById('error');
-            if (username && token) {
-                usernameElement.textContent = `Polzovatel: ${username}`;
-                tokenElement.textContent = `Token: ${token}`;
 
-            }else{
-                errorElement.textContent = 'nodata';
+            if (!username || !token || !authDatestr || token.trim() === '') {
+                errorElement.textContent = 'nodata'
                 usernameElement.style.display= 'none';
                 tokenElement.style.display = 'none';
+                setTimeout(() => window.location.href = 'index.html', 3000);
+            }else{
+                 const authDate = Number(authDatestr);
+                 const now = Date.now();
+                 const minute = 6000;
+                 console.log('Parsed authDate:', authDate, 'Now:', now, 'Diffirence:', now-authDate);
+                 if (isNaN(authDate) || now - authDate > minute)
+                 {
+                    errorElement.textContent = "срок действия токена истёк";
+                    usernameElement.style.display= 'none';
+                    tokenElement.style.display = 'none';
+                    console.log('expired')
+                    setTimeout(() => window.location.href = 'index.html', 3000);
+                 } else{
+                    usernameElement.textContent = `Polzovatel: ${username}`;
+                    tokenElement.textContent = `token ${token}`;
+                 }
             }
             function logout() {
                 window.location.href = 'index.html';

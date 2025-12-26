@@ -58,8 +58,9 @@ app.get('/auth', async (req, res) => {
 
             else
             {
-              const text = `Ответ: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${newToken}`;
-               res.set('Content-Type', 'text/plain; charset=win1251');
+              //const text = `Status: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${newToken}`;
+              const text = `Status: OK\nToken: ${newToken}\nAuthDate: ${newDate}`;
+               res.set('Content-Type', 'text/plain; charset=utf-8');
                res.status(200).send(text);
             }
           });
@@ -68,8 +69,8 @@ app.get('/auth', async (req, res) => {
         else
         {
           db.detach();
-          const text = `Ответ: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
-          res.set('Content-Type', 'text/plain; charset=win1251');
+          const text = `Status: OK\nToken: ${row.TOKEN}\nAuthDate: ${row.AUTHDATE}`;
+          res.set('Content-Type', 'text/plain; charset=utf-8');
           res.status(200).send(text);
         }
     });
@@ -107,19 +108,20 @@ app.post('/register', (req, res) => {
         return crypto.randomBytes(32).toString('hex');
       }
        const token = generatetoken(32);
-       const RegDateTIme =  Date.now();
+       const authDate =  Date.now();
       //console.log(token);
 
       const insert = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
-      db.query(insert, [username, userpswd, token, RegDateTIme], (err) => {
+      db.query(insert, [username, userpswd, token, authDate], (err) => {
         db.detach();
 
         if (err) {
           console.error('Ошибка вставки:', err);
           return res.status(500).send('Не удалось создать пользователя');
         }
-        const text = `Ответ: OK\nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
-        res.set('Content-Type', 'text/plain; charset=win1251');
+        //const text = `Status: OK\nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
+        const text = `Status: OK\nToken: ${token}\nAuthDate: ${authDate}`;
+        res.set('Content-Type', 'text/plain; charset=utf-8');
         res.status(201).send(text);
       });
     });

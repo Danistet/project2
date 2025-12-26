@@ -28,13 +28,16 @@ createApp({
           });
 
           if (res.ok) {
-           // response.value = 'Пользователь зарегистрирован';
+            response.value = 'Пользователь зарегистрирован';
             const text = await res.text(); 
-            const tokenMatch = text.match(/Токен:\s*(\S+)/);
+            const tokenMatch = text.match(/Token:\s*(\S+)/);
+            const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
             const token = tokenMatch ? tokenMatch[1] : '';
+            const authDate = authDateMatch ? authDateMatch[1] : '';
             const params = new URLSearchParams({
             username: username.value,
-            token: token
+            token: token,
+            authDate: authDate
             });
             window.location.href = `main.html?${params.toString()}`;
           } else {
@@ -42,20 +45,20 @@ createApp({
             error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
           }
 
-
         } else {
           const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
           const res = await fetch(url);
 
           if (res.ok) {
-           // response.value = await res.text();
-            //window.location.href = "main.html";
             const text = await res.text(); 
-            const tokenMatch = text.match(/Токен:\s*(\S+)/);
+            const tokenMatch = text.match(/Token:\s*(\S+)/);
+            const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
             const token = tokenMatch ? tokenMatch[1] : '';
+            const authDate = authDateMatch ? authDateMatch[1] : '';
             const params = new URLSearchParams({
             username: username.value,
-            token: token
+            token: token,
+            authDate: authDate
             });
             window.location.href = `main.html?${params.toString()}`;
           } else {
