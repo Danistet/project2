@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Истёк срок сессии</title>
+    </head>
+    <body>
+        <h1>Срок сессии истёк</h1>
+        <div>
+            <p id="username"></p>
+            <p id="token"></p>
+            <button onclick="logout()">Выход</button>
+        </div>
+
+        <script>
+            const urlparams = new URLSearchParams(window.location.search);
+            const username = urlparams.get('username');
+            const token = urlparams.get('token');
+            const authDatestr = urlparams.get('authDate');
+
+            const usernameElement = document.getElementById('username');
+            const tokenElement = document.getElementById('token');
+            const errorElement = document.getElementById('error');
+
+
+
+            function logout()
+            {
+                window.location.href = 'index.html';
+            }
+        </script>
+
+        <style>
+         body {
+            margin: 0;
+            color: goldenrod;
+            background-color: rgb(56, 54, 54);
+            font-size: 32px;
+            justify-content: center;
+            justify-items: center;
+         }
+         button {
+          background-color: aqua;
+          width: 177px;
+          justify-content: center;
+          justify-items: center;
+         }
+        </style>
+    </body>
+</html>
