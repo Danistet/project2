@@ -32,13 +32,12 @@ app.get('/auth', async (req, res) => {
 
       if (result.length === 0) {
         db.detach();
-        res.status(401).send('Invalid username or password');
+       return res.status(401).send('Invalid username or password');//
       }
 
         const row = result[0];
         let token = row.TOKEN;
         const authDate = row.AUTHDATE;
-        //const now = new Date().toISOString().replace('T', ' ').substring(0, 23);
         const now = Date.now();
         const minute = 60000;
 
@@ -58,7 +57,6 @@ app.get('/auth', async (req, res) => {
 
             else
             {
-              //const text = `Status: OK \nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${newToken}`;
               const text = `Status: OK\nToken: ${newToken}\nAuthDate: ${newDate}`;
                res.set('Content-Type', 'text/plain; charset=utf-8');
                res.status(200).send(text);
@@ -119,7 +117,6 @@ app.post('/register', (req, res) => {
           console.error('Ошибка вставки:', err);
           return res.status(500).send('Не удалось создать пользователя');
         }
-        //const text = `Status: OK\nДата ответа: ${new Date().toISOString().replace('T', ' ').substring(0, 23)}\nТокен: ${token}`;
         const text = `Status: OK\nToken: ${token}\nAuthDate: ${authDate}`;
         res.set('Content-Type', 'text/plain; charset=utf-8');
         res.status(201).send(text);

@@ -6,9 +6,8 @@ createApp({
     const password = ref('');
     const response = ref('');
     const error = ref('');
-    const reg = ref(false);
 
-    const login = async () => {
+    const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
 
@@ -17,7 +16,7 @@ createApp({
           return;
         }   
       try {
-        if (reg.value) {    //true      
+        if (mode === 'register') {    
           const res = await fetch('http://localhost:3000/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -71,6 +70,6 @@ createApp({
       }
     };
 
-    return { username, password, reg, login, response, error };
+    return { username, password, login, response, error };
   }
 }).mount('#app');

@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <meta charset="UTF-8" />
         <title>Регистрация</title>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
     <body>
         <h1>Регистрация</h1>
@@ -9,12 +11,18 @@
             <input v-model="username" placeholder="Логин" required type="text"><br>
             <input v-model="password" type="password" placeholder="Пароль" required/><br>
             <br>
-            <button>Создать аккаунт</button><br>
-            <button>Обратно на страницу входа</button>
+            <button @click="login('register')">Создать аккаунт</button><br>
+            <button onclick="tologin()">Обратно на страницу входа</button>
             <p v-if="response">{{ response }}</p>
             <p v-if="error" style="color: red;">{{ error }}</p>
         </div>
         <script src="./app.js"></script>
+        <script>
+            function tologin()
+            {
+                window.location.href = 'index.html';
+            }
+        </script>
     </body>
     <style>
         body {
