@@ -26,7 +26,7 @@
                 errorElement.textContent = 'nodata'
                 usernameElement.style.display= 'none';
                 tokenElement.style.display = 'none';
-                setTimeout(() => window.location.href = 'oldtokenwindow.html', 3000);
+                setTimeout(() => window.location.href = 'oldtokenwindow.html', 6000);
             }else{
                  const authDate = Number(authDatestr);
                  const now = Date.now();
@@ -38,7 +38,7 @@
                     usernameElement.style.display= 'none';
                     tokenElement.style.display = 'none';
                     console.log('expired')
-                    setTimeout(() => window.location.href = 'oldtokenwindow.html', 3000);
+                    setTimeout(() => window.location.href = 'oldtokenwindow.html', 6000);
                  } else{
                     usernameElement.textContent = `User: ${username}`;
                     tokenElement.textContent = `token ${token}`;
