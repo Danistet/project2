@@ -8,19 +8,22 @@
         <div>
             <p id="username"></p>
             <p id="token"></p>
+            <h2>Время последнего входа:</h2>
+            <p id="authDatestr"></p>
+
             <button onclick="logout()">Войти в аккаунт</button>
         </div>
 
         <script>
             const urlparams = new URLSearchParams(window.location.search);
+
             const username = urlparams.get('username');
             const token = urlparams.get('token');
-            const authDatestr = urlparams.get('authDate');
+            const authDatestr = urlparams.get('authDatestr');
 
-            const usernameElement = document.getElementById('username');
-            const tokenElement = document.getElementById('token');
-            const errorElement = document.getElementById('error');
-
+            document.getElementById('username').textContent = username ? `user: ${username}` : 'none';
+            document.getElementById('token').textContent = token ? `token: ${token}` : 'none';
+            document.getElementById('authDatestr').textContent = authDatestr ? new Date(Number(authDatestr)).toLocaleString() : '-';
 
 
             function logout()
@@ -39,10 +42,17 @@
             justify-items: center;
          }
          button {
-          background-color: aqua;
-          width: 177px;
-          justify-content: center;
-          justify-items: center;
+            background-color: aqua;
+            width: 177px;
+            justify-content: center;
+            justify-items: center;
+         }
+         h2 {
+            color: blueviolet;
+            font-size: 24px;
+         }
+         p {
+            font-size: 24px;
          }
         </style>
     </body>

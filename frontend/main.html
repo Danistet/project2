@@ -26,7 +26,15 @@
                 errorElement.textContent = 'nodata'
                 usernameElement.style.display= 'none';
                 tokenElement.style.display = 'none';
-                setTimeout(() => window.location.href = 'oldtokenwindow.html', 6000);
+
+                const urlparams = new URLSearchParams({
+                    username: username,
+                    token: token,
+                    authDatestr: authDatestr
+                });
+                setTimeout(() => {
+                    window.location.href = `oldtokenwindow.html?${urlparams.tostring()}`;                    
+                }, 6000);
             }else{
                  const authDate = Number(authDatestr);
                  const now = Date.now();
@@ -38,7 +46,17 @@
                     usernameElement.style.display= 'none';
                     tokenElement.style.display = 'none';
                     console.log('expired')
-                    setTimeout(() => window.location.href = 'oldtokenwindow.html', 6000);
+
+                    const urlparams = new URLSearchParams({
+                        username: username,
+                        token: token,
+                        authDatestr: authDatestr
+                    });
+                    setTimeout(() => {
+                        window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
+                    }, 6000);
+
+                    //setTimeout(() => window.location.href = `oldtokenwindow.html?${usernameElement,tokenElement,authDatestr}`, 6000);
                  } else{
                     usernameElement.textContent = `User: ${username}`;
                     tokenElement.textContent = `token ${token}`;

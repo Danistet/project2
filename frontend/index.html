@@ -11,7 +11,7 @@
     <input v-model="username" placeholder="Логин" required type="text"><br>
     <input v-model="password" type="password" placeholder="Пароль" required/><br>
     <br>
-    <button v-model="log" @click="login">Войти</button><br>
+    <button @click="login">Войти</button><br>
     <button onclick="registerw()">Регистрация</button>
     <p v-if="response">{{ response }}</p>
     <p v-if="error" style="color: red;">{{ error }}</p>
