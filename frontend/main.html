@@ -12,6 +12,7 @@
             <p id="error" style="color: red;"></p>           
         </div>
         <button onclick="logout()">Выход</button>
+
         <script>
             const urlparams = new URLSearchParams(window.location.search);
             const username = urlparams.get('username');
@@ -53,7 +54,7 @@
                     }, 6000);
                 } else{
                     usernameElement.textContent = `User: ${username}`;
-                    tokenElement.textContent = `token ${token}`;
+                    tokenElement.textContent = `token: ${token}`;
                 }
             }
             function logout() 

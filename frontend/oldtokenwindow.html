@@ -2,6 +2,7 @@
 <html>
     <head>
         <title>Истёк срок сессии</title>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
 
     <body>
@@ -11,26 +12,78 @@
             <p id="token"></p>
             <h2>Время последнего входа:</h2>
             <p id="authDatestr"></p>
-            <div>
+            <div id="app">
                 <h2>Войти через пароль</h2>
-                <input v-model="password"><br>
+                <input v-model="password" type="password" placeholder="пароль"><br>
                 <button @click="login">Подтвердить</button>
             </div>
             <br>
             <button onclick="logout()">Выход</button>
         </div>
+
+        <script>
+            const { createApp, ref } = Vue;
+            createApp({
+                setup() {                   
+                    const password = ref('');
+                    const login = async () => {                                      
+                        const urlparams = new URLSearchParams(window.location.search);
+                        const username = urlparams.get('username');
+                        const passwd = password.value.trim();
+                        if (!username || !passwd)
+                        {
+                            alert('error');
+                            return;
+                        }
+                        try 
+                        {
+                            const url = `http://localhost:3000/auth?username=${encodeURIComponent(username)}&userpswd=${encodeURIComponent(passwd)}`;
+                            const res = await fetch(url);
+                            const text = await res.text();
+                            if (res.ok)
+                            {
+                                const tokenMatch = text.match(/Token:\s*(\S+)/);
+                                const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
+                                const token = tokenMatch ? tokenMatch[1] : '';
+                                const authDate = authDateMatch ? authDateMatch[1] : '';
+                                if (token && authDate) {
+                                    const params = new URLSearchParams({
+                                        username: username,
+                                        token: token,
+                                        authDate: authDate
+                                        });
+                                    window.location.href = `main.html?${params.toString()}`;                                
+                                }
+                                else
+                                {
+                                    alert('responce error');
+                                } 
+                            }
+                            else
+                            {
+                                alert(`error ${res.status} - ${text || res.statusText}`);
+                            }
+                        } catch (err) {
+                            console.error('error', err);
+                            alert('no conection');
+                        }
+                    };
+                    return {password, login};
+                }
+            }).mount('#app');
+        </script>
         <script>
             const urlparams = new URLSearchParams(window.location.search);
             const username = urlparams.get('username');
             const token = urlparams.get('token');
             const authDatestr = urlparams.get('authDatestr');
             document.getElementById('username').textContent = username ? `user: ${username}` : 'none';
-            document.getElementById('token').textContent = token ? `token: ${token}` : 'none';
+            document.getElementById('token').textContent = token ? `token: ${token}`: 'none';
             document.getElementById('authDatestr').textContent = authDatestr ? new Date(Number(authDatestr)).toLocaleString() : '-';
             function logout()
-            {
-                window.location.href = 'index.html';
-            }
+                {
+                    window.location.href = 'index.html';
+                }
         </script>
     </body>
 
