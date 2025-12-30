@@ -56,7 +56,6 @@
                         window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
                     }, 6000);
 
-                    //setTimeout(() => window.location.href = `oldtokenwindow.html?${usernameElement,tokenElement,authDatestr}`, 6000);
                  } else{
                     usernameElement.textContent = `User: ${username}`;
                     tokenElement.textContent = `token ${token}`;
@@ -81,6 +80,7 @@
         color: blueviolet;
         justify-content: center;
         justify-items: center;
+        word-break: break-all;
     }
     button {
         background-color: aqua;

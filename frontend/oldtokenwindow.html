@@ -10,8 +10,13 @@
             <p id="token"></p>
             <h2>Время последнего входа:</h2>
             <p id="authDatestr"></p>
-
-            <button onclick="logout()">Войти в аккаунт</button>
+            <div>
+            <h2>Войти через пароль</h2>
+            <input v-model="password"><br>
+            <button @click="login">Подтвердить</button>
+            </div>
+            <br>
+            <button onclick="logout()">Выход</button>
         </div>
 
         <script>
@@ -53,6 +58,11 @@
          }
          p {
             font-size: 24px;
+            word-break: break-all;
+         }
+         input{
+            background-color: aquamarine;
+            color: rgb(0, 0, 0);
          }
         </style>
     </body>
