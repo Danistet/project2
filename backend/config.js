@@ -2,7 +2,6 @@ module.exports = {
   host: 'localhost', 
   port: 3050,
   database: 'C:\\security2\\security2.fdb',
- // database: 'C:\\Program Files (x86)\\Firebird\\security2.fdb',
   user: 'SYSDBA',
   password: 'masterkey',
   lowercase_keys: false,

@@ -6,15 +6,13 @@ createApp({
     const password = ref('');
     const response = ref('');
     const error = ref('');
-
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
-
-        if (!username.value.trim() || !password.value.trim()) {
-          error.value = 'Логин и пароль обязательны для заполнения';
-          return;
-        }   
+      if (!username.value.trim() || !password.value.trim()) {
+        error.value = 'Логин и пароль обязательны для заполнения';
+        return;
+      }   
       try {
         if (mode === 'register') {    
           const res = await fetch('http://localhost:3000/register', {
@@ -25,7 +23,6 @@ createApp({
               userpswd: password.value
             })
           });
-
           if (res.ok) {
             response.value = 'Пользователь зарегистрирован';
             const text = await res.text(); 
@@ -34,20 +31,18 @@ createApp({
             const token = tokenMatch ? tokenMatch[1] : '';
             const authDate = authDateMatch ? authDateMatch[1] : '';
             const params = new URLSearchParams({
-            username: username.value,
-            token: token,
-            authDate: authDate
+              username: username.value,
+              token: token,
+              authDate: authDate
             });
             window.location.href = `main.html?${params.toString()}`;
           } else {
-            const msg = await res.text();
-            error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
+           const msg = await res.text();
+           error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
           }
-
         } else {
           const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
           const res = await fetch(url);
-
           if (res.ok) {
             const text = await res.text(); 
             const tokenMatch = text.match(/Token:\s*(\S+)/);
@@ -55,9 +50,9 @@ createApp({
             const token = tokenMatch ? tokenMatch[1] : '';
             const authDate = authDateMatch ? authDateMatch[1] : '';
             const params = new URLSearchParams({
-            username: username.value,
-            token: token,
-            authDate: authDate
+              username: username.value,
+              token: token,
+              authDate: authDate
             });
             window.location.href = `main.html?${params.toString()}`;
           } else {
@@ -69,7 +64,6 @@ createApp({
         console.error(err);
       }
     };
-
     return { username, password, login, response, error };
   }
 }).mount('#app');

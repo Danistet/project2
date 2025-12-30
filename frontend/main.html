@@ -3,6 +3,7 @@
     <head>
         <title>mainpage</title>
     </head>
+
     <body>
         <h1>MAIN PAGE</h1>
         <div >
@@ -12,21 +13,17 @@
         </div>
         <button onclick="logout()">Выход</button>
         <script>
-
             const urlparams = new URLSearchParams(window.location.search);
             const username = urlparams.get('username');
             const token = urlparams.get('token');
             const authDatestr = urlparams.get('authDate');
-
             const usernameElement = document.getElementById('username');
             const tokenElement = document.getElementById('token');
             const errorElement = document.getElementById('error');
-
             if (!username || !token || !authDatestr || token.trim() === '') {
                 errorElement.textContent = 'nodata'
                 usernameElement.style.display= 'none';
                 tokenElement.style.display = 'none';
-
                 const urlparams = new URLSearchParams({
                     username: username,
                     token: token,
@@ -36,53 +33,55 @@
                     window.location.href = `oldtokenwindow.html?${urlparams.tostring()}`;                    
                 }, 6000);
             }else{
-                 const authDate = Number(authDatestr);
-                 const now = Date.now();
-                 const minute = 6000;
-                 console.log('Parsed authDate:', authDate, 'Now:', now, 'Diffirence:', now-authDate);
-                 if (isNaN(authDate) || now - authDate > minute)
-                 {
+                const authDate = Number(authDatestr);
+                const now = Date.now();
+                const minute = 6000;
+                console.log('Parsed authDate:', authDate, 'Now:', now, 'Diffirence:', now-authDate);
+                if (isNaN(authDate) || now - authDate > minute)
+                {
                     errorElement.textContent = "срок действия токена истёк";
                     usernameElement.style.display= 'none';
                     tokenElement.style.display = 'none';
                     console.log('expired')
-
                     const urlparams = new URLSearchParams({
                         username: username,
                         token: token,
                         authDatestr: authDatestr
                     });
                     setTimeout(() => {
-                        window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
+                    window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
                     }, 6000);
-
-                 } else{
+                } else{
                     usernameElement.textContent = `User: ${username}`;
                     tokenElement.textContent = `token ${token}`;
-                 }
+                }
             }
-            function logout() {
+            function logout() 
+            {
                 window.location.href = 'index.html';
             }
-        </script>
-        
+        </script>      
     </body>
+
     <style>
-    body {
-     margin: 0;
-     color: goldenrod;
-     background-color: rgb(56, 54, 54);
-     font-size: 24px;
-     justify-content: center;
-     justify-items: center;
+    body 
+    {
+        margin: 0;
+        color: goldenrod;
+        background-color: rgb(56, 54, 54);
+        font-size: 24px;
+        justify-content: center;
+        justify-items: center;
     }
-    p{
+    p
+    {
         color: blueviolet;
         justify-content: center;
         justify-items: center;
         word-break: break-all;
     }
-    button {
+    button 
+    {
         background-color: aqua;
         width: 177px;
         justify-content: center;

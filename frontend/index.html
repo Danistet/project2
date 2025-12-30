@@ -1,60 +1,65 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <title>Вход</title><br>   
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-</head>
-<body>
-  <h1>Вход</h1> 
-  <div id="app" class="server-response">
-    <input v-model="username" placeholder="Логин" required type="text"><br>
-    <input v-model="password" type="password" placeholder="Пароль" required/><br>
-    <br>
-    <button @click="login">Войти</button><br>
-    <button onclick="registerw()">Регистрация</button>
-    <p v-if="response">{{ response }}</p>
-    <p v-if="error" style="color: red;">{{ error }}</p>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Вход</title><br>   
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
 
-  <script src="./app.js"></script>
-  <script>
-   function registerw()
-   {
-    window.location.href = 'registrationwindow.html'
-   }
-  </script>
-</body>
+  <body>
+    <h1>Вход</h1> 
+    <div id="app" class="server-response">
+      <input v-model="username" placeholder="Логин" required type="text"><br>
+      <input v-model="password" type="password" placeholder="Пароль" required/><br>
+      <br>
+      <button @click="login">Войти</button><br>
+      <button onclick="registerw()">Регистрация</button>
+      <p v-if="response">{{ response }}</p>
+      <p v-if="error" style="color: red;">{{ error }}</p>
+    </div>
+    <script src="./app.js"></script>
+    <script>
+      function registerw()
+      {
+        window.location.href = 'registrationwindow.html'
+      }
+    </script>
+  </body>
 
-<style>
-  body {
-  margin: 0;
-  color: goldenrod;
-  background-color: rgb(56, 54, 54);
-  font-size: 24px;
-  justify-content: center;
-  justify-items: center;
-}
-button {
-  background-color: aqua;
-  width: 177px;
-}
-.server-response {
-  white-space: pre-line;
-  color: goldenrod;
-  padding: 16px;
-  border-radius: 6px;
-  justify-content: center;
-  justify-items: center;
-}
-p{
-  font-size: 14px;
-  color: greenyellow;
-  word-break: break-all;
-}
-input{
-background-color: aquamarine;
-color: rgb(0, 0, 0);
-}
-</style>
+  <style>
+    body 
+    {
+      margin: 0;
+      color: goldenrod;
+      background-color: rgb(56, 54, 54);
+      font-size: 24px;
+      justify-content: center;
+      justify-items: center;
+    }
+    button 
+    {
+      background-color: aqua;
+      width: 177px;
+    }
+    .server-response 
+    {
+      white-space: pre-line;
+      color: goldenrod;
+      padding: 16px;
+      border-radius: 6px;
+      justify-content: center;
+      justify-items: center;
+    }
+    p
+    {
+      font-size: 14px;
+      color: greenyellow;
+      word-break: break-all;
+    }
+    input
+    {
+      background-color: aquamarine;
+      color: rgb(0, 0, 0);
+    }
+  </style>
 </html>
