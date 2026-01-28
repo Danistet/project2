@@ -3,7 +3,6 @@ const firebird = require('node-firebird');
 const cors = require('cors');
 const crypto = require('crypto');
 const config = require('./config');
-//const { use } = require('react');
 const app = express();
 const PORT = 3000;
 app.use(cors());
@@ -33,25 +32,8 @@ app.get('/auth', async (req, res) => {
       const row = result[0];
       let token = row.TOKEN;
       const authDate = row.AUTHDATE;
-      const existingToken = row.TOKEN;
-      const existingAuthDate = row.AUTHDATE;
       const now = Date.now();
       const minute = 60000;
-
-      const newAuthDate = now;
-      const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';
-      db.query(updateQuery, [newAuthDate, username], (upderr) => {
-        db.detach();
-
-        if (upderr) {
-          console.error('update error', upderr);
-          return res.status(500).send('update error');
-        }
-        const text = `status: OK\nToken: ${existingToken}\nAuthDate: ${existingAuthDate}`;
-        res.set('Content-Type', 'text/plain; charset=utf-8');
-        res.status(200).send(text);
-      });
-      
       if (now - authDate > minute)
       {
         const newToken = crypto.randomBytes(32).toString('hex');

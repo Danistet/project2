@@ -15,3 +15,49 @@
 409,Conflict,"Конфликт (например, email уже занят)"
 
 500,Internal Server Error,Необработанное исключение
+
+project2
+(
+    backend
+    (
+        {
+        "name": "backend",
+        "version": "1.0.0",
+        "main": "config.js",
+        "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node server.js"
+        },
+        "keywords": [],
+        "author": "",
+        "license": "ISC",
+        "description": "",
+        "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^5.1.0",
+        "node-firebird": "^1.1.9"
+        }
+        }
+    )
+    frontend
+    (
+
+    )
+    package.json
+    (
+        {
+        "name": "auth-firebird-api",
+        "version": "1.0.0",
+        "main": "server.js",
+        "scripts": {
+        "start": "node backend/server.js",
+        "dev": "nodemon backend/server.js"
+        },
+        "dependencies": {
+        "express": "^4.18.0",
+        "cors": "^2.8.5",
+        "body-parser": "^1.20.0"
+        }
+        }
+    )
+)
