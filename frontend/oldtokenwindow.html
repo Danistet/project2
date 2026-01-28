@@ -2,7 +2,6 @@
 <html>
     <head>
         <title>Истёк срок сессии</title>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
 
     <body>
@@ -12,9 +11,9 @@
             <p id="token"></p>
             <h2>Время последнего входа:</h2>
             <p id="authDatestr"></p>
-            <div id="app">
+            <div>
                 <h2>Войти через пароль</h2>
-                <input v-model="password" type="password" placeholder="пароль"><br>
+                <input v-model="password"><br>
                 <button @click="login">Подтвердить</button>
             </div>
             <br>
@@ -51,7 +50,7 @@
                                         username: username,
                                         token: token,
                                         authDate: authDate
-                                    });
+                                        });
                                     window.location.href = `main.html?${params.toString()}`;                                
                                 }
                                 else
@@ -78,12 +77,12 @@
             const token = urlparams.get('token');
             const authDatestr = urlparams.get('authDatestr');
             document.getElementById('username').textContent = username ? `user: ${username}` : 'none';
-            document.getElementById('token').textContent = token ? `token: ${token}`: 'none';
+            document.getElementById('token').textContent = token ? `token: ${token}` : 'none';
             document.getElementById('authDatestr').textContent = authDatestr ? new Date(Number(authDatestr)).toLocaleString() : '-';
             function logout()
-                {
-                    window.location.href = 'index.html';
-                }
+            {
+                window.location.href = 'index.html';
+            }
         </script>
     </body>
 

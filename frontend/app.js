@@ -11,7 +11,6 @@ createApp({
       response.value = '';
       if (!username.value.trim() || !password.value.trim()) {
         error.value = 'Логин и пароль обязательны для заполнения';
-        alert('Логин и пароль обязательны для заполнения');
         return;
       }   
       try {
@@ -40,7 +39,6 @@ createApp({
           } else {
            const msg = await res.text();
            error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
-           alert(`Ошибка регистрации: ${res.status} — ${msg}`);
           }
         } else {
           const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
@@ -59,12 +57,10 @@ createApp({
             window.location.href = `main.html?${params.toString()}`;
           } else {
             error.value = `Ошибка входа: ${res.status} ${res.statusText}`;
-            alert(`Ошибка входа: ${res.status} ${res.statusText}`);
           }
         }
       } catch (err) {
         error.value = 'Не удалось подключиться к серверу';
-        alert('Не удалось подключиться к серверу');
         console.error(err);
       }
     };
