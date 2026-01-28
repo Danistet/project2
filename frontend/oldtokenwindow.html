@@ -2,11 +2,12 @@
 <html>
     <head>
         <title>Истёк срок сессии</title>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
 
     <body>
         <h1>Срок сессии истёк</h1>
-        <div>
+        <div id="app">
             <p id="username"></p>
             <p id="token"></p>
             <h2>Время последнего входа:</h2>
@@ -17,7 +18,7 @@
                 <button @click="login">Подтвердить</button>
             </div>
             <br>
-            <button onclick="logout()">Выход</button>
+            <button @click="logout">Выход</button>
         </div>
 
         <script>
@@ -67,7 +68,10 @@
                             alert('no conection');
                         }
                     };
-                    return {password, login};
+                    const logout = async () => {   
+                        window.location.href = 'index.html';
+                    };
+                    return {password, login, logout};
                 }
             }).mount('#app');
         </script>
@@ -79,10 +83,6 @@
             document.getElementById('username').textContent = username ? `user: ${username}` : 'none';
             document.getElementById('token').textContent = token ? `token: ${token}` : 'none';
             document.getElementById('authDatestr').textContent = authDatestr ? new Date(Number(authDatestr)).toLocaleString() : '-';
-            function logout()
-            {
-                window.location.href = 'index.html';
-            }
         </script>
     </body>
 

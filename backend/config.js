@@ -6,5 +6,6 @@ module.exports = {
   password: 'masterkey',
   lowercase_keys: false,
   role: null,
-  pageSize: 4096
+  pageSize: 4096,
+  timeout: 30000
 };
