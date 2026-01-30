@@ -11,7 +11,11 @@
             <p id="token"></p>
             <p id="error" style="color: red;"></p>           
         </div>
-        <button onclick="logout()">Выход</button>
+        <div>
+            <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
+            <button onclick="info()" id="infbt">информация</button><br>
+            <button onclick="logout()">Выход</button>
+        </div>
         <script>
             const urlparams = new URLSearchParams(window.location.search);
             const username = urlparams.get('username');
@@ -31,15 +35,17 @@
                 });
                 setTimeout(() => {
                     window.location.href = `oldtokenwindow.html?${urlparams.tostring()}`;                    
-                }, 6000);
+                }, 200000);
             }else{
                 const authDate = Number(authDatestr);
                 const now = Date.now();
-                const minute = 6000;
+                const minute = 200000;
                 console.log('Parsed authDate:', authDate, 'Now:', now, 'Diffirence:', now-authDate);
                 if (isNaN(authDate) || now - authDate > minute)
                 {
                     errorElement.textContent = "срок действия токена истёк";
+                    document.getElementById('ContinueButton').style.visibility = 'visible';
+                    document.getElementById('infbt').style.visibility = 'collapse'; 
                     usernameElement.style.display= 'none';
                     tokenElement.style.display = 'none';
                     console.log('expired')
@@ -48,9 +54,10 @@
                         token: token,
                         authDatestr: authDatestr
                     });
-                    setTimeout(() => {
-                    window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
-                    }, 6000);
+                    function cont()
+                    {
+                        window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
+                    }
                 } else{
                     usernameElement.textContent = `User: ${username}`;
                     tokenElement.textContent = `token ${token}`;
@@ -60,32 +67,50 @@
             {
                 window.location.href = 'index.html';
             }
+            function info()
+            {
+                const params = new URLSearchParams({
+                    username: urlparams.get('username'),
+                    token: urlparams.get('token'),
+                    authDate: urlparams.get('authDate') 
+                });
+                window.location.href = `information.html?${params.toString()}`;
+            }
         </script>      
     </body>
 
     <style>
-    body 
-    {
-        margin: 0;
-        color: goldenrod;
-        background-color: rgb(56, 54, 54);
-        font-size: 24px;
-        justify-content: center;
-        justify-items: center;
-    }
-    p
-    {
-        color: blueviolet;
-        justify-content: center;
-        justify-items: center;
-        word-break: break-all;
-    }
-    button 
-    {
-        background-color: aqua;
-        width: 177px;
-        justify-content: center;
-        justify-items: center;
-    }
+        body 
+        {
+            margin: 0;
+            color: goldenrod;
+            background-color: rgb(56, 54, 54);
+            font-size: 24px;
+            justify-content: center;
+            justify-items: center;
+        }
+        p
+        {
+            color: blueviolet;
+            justify-content: center;
+            justify-items: center;
+            word-break: break-all;
+        }
+        button 
+        {
+            background-color: aqua;
+            width: 177px;
+            justify-content: center;
+            justify-items: center;
+        }
+        div
+        {
+            justify-content: center;
+            justify-items: center;
+        }
+        .ContinueButton
+        {
+            visibility: collapse;
+        }
     </style>
 </html>

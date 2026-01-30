@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>информация</title>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js  "></script>
+    </head>
+<body>
+    <div class="container">
+        <h1>Информация</h1>
+        <p id="token"></p>
+        <div id="error"></div>
+        <p id="text">
+            Never gonna give you up
+            Never gonna let you down
+            Never gonna run around and desert you
+            Never gonna make you cry
+            Never gonna say goodbye
+            Never gonna tell a lie and hurt you
+        </p>
+    </div>
+    <div>
+        <button onclick="main()">Выход</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+        let token = urlParams.get('token');
+        let authDate = urlParams.get('authDate');      
+        document.getElementById('text').style.fontSize = '8px';
+        document.getElementById('text').style.maxWidth = '150px';       
+        const tokenElement = document.getElementById('token');
+        if (token) {
+            tokenElement.textContent = `Токен: ${token}`;
+        } else {
+            tokenElement.textContent = 'Токен не найден';
+        }
+
+        async function updateTokenOnLoad() {
+            if (!username || !token) {
+                showError('Нет данных для обновления токена');
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `http://localhost:3000/update-token?username=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`
+                );
+
+                if (!response.ok) {
+                    const textResponse = await response.text();
+                    console.error('Server response:', textResponse);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();            
+                const newParams = new URLSearchParams({
+                    username: username,
+                    token: data.token,
+                    authDate: data.authDate
+                });
+                
+                window.history.replaceState({}, '', `?${newParams.toString()}`);            
+                token = data.token;
+                authDate = data.authDate;               
+                tokenElement.textContent = `Токен: ${data.token}`;
+            } catch (error) {
+                console.error('Ошибка обновления токена:', error);
+                showError('Не удалось обновить токен. Проверьте консоль.');
+            }
+        }
+
+        function main() {
+            if (!username || !token) {
+                showError('no data');
+                return;
+            }
+            const params = new URLSearchParams({
+                username: username,
+                token: token,
+                authDate: authDate || ''
+            });           
+            window.location.href = `main.html?${params.toString()}`;
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('error');
+            errorContainer.innerHTML = `<div class="error">${message}</div>`;
+            setTimeout(() => {
+                errorContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        window.addEventListener('DOMContentLoaded', updateTokenOnLoad);
+    </script>
+</body>
+    <style>
+        body 
+        {
+            margin: 0;
+            color: goldenrod;
+            background-color: rgb(56, 54, 54);
+            font-size: 24px;
+            justify-content: center;
+            justify-items: center;
+        }
+        button 
+        {
+            background-color: aqua;
+            width: 177px;
+        }
+        div
+        {
+            justify-content: center;
+            justify-items: center;
+        }
+        p
+        {
+            color: blueviolet;
+            justify-content: center;
+            justify-items: center;
+            word-break: break-all;
+        }
+    </style>
+</html>
