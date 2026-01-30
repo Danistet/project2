@@ -2,6 +2,7 @@
 <html lang="ru">
     <head>
         <title>Главная страница</title>
+        <script src="./api.js"></script>
     </head>
 
     <body>
@@ -16,67 +17,36 @@
             <button onclick="info()" id="infbt">информация</button><br>
             <button onclick="logout()">Выход</button>
         </div>
-        <script>
-            const urlparams = new URLSearchParams(window.location.search);
-            const username = urlparams.get('username');
-            const token = urlparams.get('token');
-            const authDatestr = urlparams.get('authDate');
-            const usernameElement = document.getElementById('username');
-            const tokenElement = document.getElementById('token');
-            const errorElement = document.getElementById('error');
-            if (!username || !token || !authDatestr || token.trim() === '') {
-                errorElement.textContent = 'nodata'
-                usernameElement.style.display= 'none';
-                tokenElement.style.display = 'none';
-                const urlparams = new URLSearchParams({
-                    username: username,
-                    token: token,
-                    authDatestr: authDatestr
-                });
-                setTimeout(() => {
-                    window.location.href = `oldtokenwindow.html?${urlparams.tostring()}`;                    
-                }, 200000);
-            }else{
-                const authDate = Number(authDatestr);
-                const now = Date.now();
-                const minute = 200000;
-                console.log('Parsed authDate:', authDate, 'Now:', now, 'Diffirence:', now-authDate);
-                if (isNaN(authDate) || now - authDate > minute)
-                {
-                    errorElement.textContent = "срок действия токена истёк";
-                    document.getElementById('ContinueButton').style.visibility = 'visible';
-                    document.getElementById('infbt').style.visibility = 'collapse'; 
-                    usernameElement.style.display= 'none';
-                    tokenElement.style.display = 'none';
-                    console.log('expired')
-                    const urlparams = new URLSearchParams({
-                        username: username,
-                        token: token,
-                        authDatestr: authDatestr
-                    });
-                    function cont()
-                    {
-                        window.location.href = `oldtokenwindow.html?${urlparams.toString()}`;
-                    }
-                } else{
-                    usernameElement.textContent = `User: ${username}`;
-                    tokenElement.textContent = `token ${token}`;
-                }
-            }
-            function logout() 
-            {
-                window.location.href = 'index.html';
-            }
-            function info()
-            {
-                const params = new URLSearchParams({
-                    username: urlparams.get('username'),
-                    token: urlparams.get('token'),
-                    authDate: urlparams.get('authDate') 
-                });
-                window.location.href = `information.html?${params.toString()}`;
-            }
-        </script>      
+<script>
+  const authData = JSON.parse(sessionStorage.getItem('authData'));
+  const errorElement = document.getElementById('error');
+  
+  if (!authData) {
+    errorElement.textContent = 'Сессия не найдена';
+    setTimeout(() => window.location.href = 'index.html', 2000);
+  } else {
+    const now = Date.now();
+    const EXPIRY_MS = 200000;
+    
+    if (now - authData.authDate > EXPIRY_MS) {
+      sessionStorage.setItem('reauthUsername', authData.username);
+      sessionStorage.removeItem('authData');
+      window.location.href = 'oldtokenwindow.html';
+    } else {
+      document.getElementById('username').textContent = `User: ${authData.username}`;
+      document.getElementById('token').textContent = `Token: ${authData.token}`;
+    }
+  }
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+  }
+
+  function info() {
+    window.location.href = 'information.html';
+  }
+</script>     
     </body>
 
     <style>

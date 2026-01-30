@@ -3,6 +3,7 @@
     <head>
         <title>Истёк срок сессии</title>
         <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="./api.js"></script>
     </head>
 
     <body>
@@ -19,67 +20,43 @@
             <button @click="logout">Выход</button>
         </div>
 
-        <script>
-            const { createApp, ref } = Vue;
-            createApp({
-                setup() {                   
-                    const password = ref('');
-                    const login = async () => {                                      
-                        const urlparams = new URLSearchParams(window.location.search);
-                        const username = urlparams.get('username');
-                        const passwd = password.value.trim();
-                        if (!username || !passwd)
-                        {
-                            alert('error');
-                            return;
-                        }
-                        try 
-                        {
-                            const url = `http://localhost:3000/auth?username=${encodeURIComponent(username)}&userpswd=${encodeURIComponent(passwd)}`;
-                            const res = await fetch(url);
-                            const text = await res.text();
-                            if (res.ok)
-                            {
-                                const tokenMatch = text.match(/Token:\s*(\S+)/);
-                                const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
-                                const token = tokenMatch ? tokenMatch[1] : '';
-                                const authDate = authDateMatch ? authDateMatch[1] : '';
-                                if (token && authDate) {
-                                    const params = new URLSearchParams({
-                                        username: username,
-                                        token: token,
-                                        authDate: authDate
-                                        });
-                                    window.location.href = `main.html?${params.toString()}`;                                
-                                }
-                                else
-                                {
-                                    alert('responce error');
-                                } 
-                            }
-                            else
-                            {
-                                alert(`error ${res.status} - ${text || res.statusText}`);
-                            }
-                        } catch (err) {
-                            console.error('error', err);
-                            alert('no conection');
-                        }
-                    };
-                    const logout = async () => {   
-                        window.location.href = 'index.html';
-                    };
-                    return {password, login, logout};
-                }
-            }).mount('#app');
-        </script>
-        <script>
-            const urlparams = new URLSearchParams(window.location.search);
-            const username = urlparams.get('username');
-            const token = urlparams.get('token');
-            const authDatestr = urlparams.get('authDatestr');
-            document.getElementById('authDatestr').textContent = authDatestr ? new Date(Number(authDatestr)).toLocaleString() : '-';
-        </script>
+<script>
+  const { createApp, ref } = Vue;
+  createApp({
+    setup() {
+      const password = ref('');
+      
+      const login = async () => {
+        const username = sessionStorage.getItem('reauthUsername');
+        if (!username || !password.value.trim()) {
+          alert('Данные утеряны. Повторите вход.');
+          window.location.href = 'index.html';
+          return;
+        }
+        
+        try {
+          const result = await apiRequest('/auth', {
+            username,
+            userpswd: password.value
+          });
+          
+          sessionStorage.setItem('authData', JSON.stringify(result));
+          sessionStorage.removeItem('reauthUsername');
+          window.location.href = 'main.html';
+        } catch (err) {
+          alert(`Ошибка: ${err.message}`);
+        }
+      };
+      
+      const logout = () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      };
+      
+      return { password, login, logout };
+    }
+  }).mount('#app');
+</script>
     </body>
 
     <style>

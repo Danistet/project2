@@ -14,56 +14,82 @@ createApp({
         return;
       }   
       try {
+        let result;
         if (mode === 'register') {    
-          const res = await fetch('http://localhost:3000/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: username.value,
-              userpswd: password.value
-            })
+          result = await apiRequest('/register', {
+            username: username.value,
+            userpswd: password.value
           });
-          if (res.ok) {
-            response.value = 'Пользователь зарегистрирован';
-            const text = await res.text(); 
-            const tokenMatch = text.match(/Token:\s*(\S+)/);
-            const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
-            const token = tokenMatch ? tokenMatch[1] : '';
-            const authDate = authDateMatch ? authDateMatch[1] : '';
-            const params = new URLSearchParams({
-              username: username.value,
-              token: token,
-              authDate: authDate
-            });
-            window.location.href = `main.html?${params.toString()}`;
-          } else {
-           const msg = await res.text();
-           error.value = `Ошибка регистрации: ${res.status} — ${msg}`;
-          }
+          response.value = 'Пользователь зарегистрирован';
+          //1
         } else {
-          const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const text = await res.text(); 
-            const tokenMatch = text.match(/Token:\s*(\S+)/);
-            const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
-            const token = tokenMatch ? tokenMatch[1] : '';
-            const authDate = authDateMatch ? authDateMatch[1] : '';
-            const params = new URLSearchParams({
-              username: username.value,
-              token: token,
-              authDate: authDate
-            });
-            window.location.href = `main.html?${params.toString()}`;
-          } else {
-            error.value = `Ошибка входа: ${res.status} ${res.statusText}`;
-          }
+          result = await apiRequest('/auth', {
+            username: username.value,
+            userpswd: password.value
+          });
+          //2
         }
+
+        console.log('=== Данные от сервера ===');
+        console.log('Ответ сервера:', result);
+
+        if (!result.username) {
+          throw new Error('Сервер не вернул username');
+        }
+        if (!result.token) {
+          throw new Error('Сервер не вернул token');
+        }
+        if (!result.authDate) {
+          throw new Error('Сервер не вернул authDate');
+        }
+        const authData = {
+          username: result.username,
+          token: result.token,
+          authDate: result.authDate
+        };
+        
+        console.log('Сохраняем в sessionStorage:', authData);
+        sessionStorage.setItem('authData', JSON.stringify(authData));        
+        const saved = sessionStorage.getItem('authData');
+        console.log('Проверка сохранения:', saved);     
+        window.location.href = 'main.html';
+        
       } catch (err) {
-        error.value = 'Не удалось подключиться к серверу';
+        error.value = `Ошибка: ${err.message}`;
         console.error(err);
       }
     };
     return { username, password, login, response, error };
   }
 }).mount('#app');
+
+
+
+            //const text = await res.text(); 
+            //const tokenMatch = text.match(/Token:\s*(\S+)/);
+            //const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
+            //const token = tokenMatch ? tokenMatch[1] : '';
+            //const authDate = authDateMatch ? authDateMatch[1] : '';
+            //const params = new URLSearchParams({
+              //username: username.value,
+              //token: token,
+              //authDate: authDate
+            //});
+            //window.location.href = `main.html?${params.toString()}`;
+
+
+
+          //const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
+          //const res = await fetch(url);
+            //const text = await res.text(); 
+            //const tokenMatch = text.match(/Token:\s*(\S+)/);
+            //const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
+            //const token = tokenMatch ? tokenMatch[1] : '';
+            //const authDate = authDateMatch ? authDateMatch[1] : '';
+            //const params = new URLSearchParams({
+              //username: username.value,
+              //token: token,
+              //authDate: authDate
+            //});
+            //window.location.href = `main.html?${params.toString()}`;
+
