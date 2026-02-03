@@ -23,9 +23,9 @@ function checkSession() {
   
   const data = JSON.parse(authData);
   const now = Date.now();
-  const EXPIRY_MS = 200000;
+  const minute = 20000;
   
-  return (now - data.authDate) <= EXPIRY_MS;
+  return (now - data.authDate) <= minute;
 }
 
 function getAuthData() {

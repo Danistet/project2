@@ -26,7 +26,7 @@
     setTimeout(() => window.location.href = 'index.html', 2000);
   } else {
     const now = Date.now();
-    const EXPIRY_MS = 200000;
+    const EXPIRY_MS = 20000;
     
     if (now - authData.authDate > EXPIRY_MS) {
       sessionStorage.setItem('reauthUsername', authData.username);

@@ -10,7 +10,7 @@ app.use(express.json());
 
 
 app.post('/update-token', (req, res) => {
-  const { username, token } = req.query;
+  const { username, token } = req.body;
   
   if (!username || !token) {
     return res.status(400).json({ error: 'Missing username or token' });
@@ -85,7 +85,7 @@ app.post('/auth', (req, res) => {
       
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = result[0];
       const now = Date.now();
-      const minute = 200000;
+      const minute = 20000;
       const respond = (token, authDate) => {
         db.detach();
         res.json({ 
