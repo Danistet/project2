@@ -30,7 +30,6 @@ createApp({
           //2
         }
 
-        console.log('=== Данные от сервера ===');
         console.log('Ответ сервера:', result);
 
         if (!result.username) {

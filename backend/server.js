@@ -85,7 +85,7 @@ app.post('/auth', (req, res) => {
       
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = result[0];
       const now = Date.now();
-      const minute = 20000;
+      const minute = 2000;
       const respond = (token, authDate) => {
         db.detach();
         res.json({ 

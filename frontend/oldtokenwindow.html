@@ -1,108 +1,106 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Истёк срок сессии</title>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-        <script src="./api.js"></script>
-    </head>
+  <head>
+    <title>Истёк срок сессии</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="./api.js"></script>
+  </head>
 
-    <body>
-        <h1>Срок сессии истёк</h1>
-        <div id="app">
-            <h2>Время последнего входа:</h2>
-            <p id="authDatestr"></p>
-            <div>
-                <h2>Войти через пароль</h2>
-                <input v-model="password"><br>
-                <button @click="login">Подтвердить</button>
-            </div>
-            <br>
-            <button @click="logout">Выход</button>
-        </div>
+  <body>
+    <h1>Срок сессии истёк</h1>
+    <div id="app">
+      <h2>Время последнего входа:</h2>
+      <p id="authDatestr"></p>
+      <div>
+        <h2>Войти через пароль</h2>
+        <input v-model="password"><br>
+        <button @click="login">Подтвердить</button>
+      </div>
+      <br>
+      <button @click="logout">Выход</button>
+    </div>
 
-<script>
-  const { createApp, ref } = Vue;
-  createApp({
-    setup() {
-      const password = ref('');
-      
-      const login = async () => {
-        const username = sessionStorage.getItem('reauthUsername');
-        if (!username || !password.value.trim()) {
-          alert('Данные утеряны. Повторите вход.');
-          window.location.href = 'index.html';
-          return;
-        }
+    <script>
+      const { createApp, ref } = Vue;
+      createApp({
+        setup() {
+          const password = ref('');      
+          const login = async () => {
+            const username = sessionStorage.getItem('reauthUsername');
+            if (!username || !password.value.trim()) {
+              alert('Данные утеряны. Повторите вход.');
+              window.location.href = 'index.html';
+              return;
+            }
         
-        try {
-          const result = await apiRequest('/auth', {
-            username,
-            userpswd: password.value
-          });        
-          sessionStorage.setItem('authData', JSON.stringify(result));
-          sessionStorage.removeItem('reauthUsername');
-          window.location.href = 'main.html';
-        } catch (err) {
-          alert(`Ошибка: ${err.message}`);
-        }
-      };
+            try {
+              const result = await apiRequest('/auth', {
+                username,
+                userpswd: password.value
+              });        
+              sessionStorage.setItem('authData', JSON.stringify(result));
+              sessionStorage.removeItem('reauthUsername');
+              window.location.href = 'main.html';
+            } catch (err) {
+              alert(`Ошибка: ${err.message}`);
+            }
+          };
       
-      const logout = () => {
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      };    
-      return { password, login, logout };
-    }
-  }).mount('#app');
+          const logout = () => {
+            sessionStorage.clear();
+            window.location.href = 'index.html';
+          };    
+          return { password, login, logout };
+        }
+      }).mount('#app');
   
-</script>
+    </script>
 
-<script>
- window.addEventListener('DOMContentLoaded', () => {
-    const lastAuthDate = sessionStorage.getItem('lastAuthDate');
-    const display = document.getElementById('authDatestr');
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const lastAuthDate = sessionStorage.getItem('lastAuthDate');
+        const display = document.getElementById('authDatestr');
     
-    if (lastAuthDate) {
-        display.textContent = new Date(Number(lastAuthDate)).toLocaleString('ru-RU');
-    } else {
-        display.textContent = '-';
+        if (lastAuthDate) {
+          display.textContent = new Date(Number(lastAuthDate)).toLocaleString('ru-RU');
+        } else {
+           display.textContent = '-';
+        }
+      });
+    </script>
+  </body>
+
+  <style>
+    body 
+    {
+      margin: 0;
+      color: goldenrod;
+      background-color: rgb(56, 54, 54);
+      font-size: 32px;
+      justify-content: center;
+      justify-items: center;
     }
-});
-</script>
-
-    </body>
-
-    <style>
-        body 
-        {
-            margin: 0;
-            color: goldenrod;
-            background-color: rgb(56, 54, 54);
-            font-size: 32px;
-            justify-content: center;
-            justify-items: center;
-        }
-        button 
-        {
-            background-color: aqua;
-            width: 177px;
-            justify-content: center;
-            justify-items: center;
-        }
-        h2 
-        {
-            color: blueviolet;
-            font-size: 24px;
-        }
-        p 
-        {
-            font-size: 24px;
-            word-break: break-all;
-        }
-        input
-        {
-            background-color: aquamarine;
-            color: rgb(0, 0, 0);
-        }
-    </style>
+    button 
+    {
+      background-color: aqua;
+      width: 177px;
+      justify-content: center;
+      justify-items: center;
+    }
+    h2 
+    {
+      color: blueviolet;
+       font-size: 24px;
+    }
+    p 
+    {
+      font-size: 24px;
+      word-break: break-all;
+    }
+    input
+    {
+      background-color: aquamarine;
+      color: rgb(0, 0, 0);
+    }
+  </style>
 </html>

@@ -5,84 +5,78 @@
         <title>информация</title>
         <script src="./api.js"></script>
     </head>
-<body>
-    <div class="container">
-        <h1>Информация</h1>
-        <p id="token"></p>
-        <div id="error"></div>
-        <p id="text">
+    <body>
+        <div class="container">
+            <h1>Информация</h1>
+            <p id="token"></p>
+            <div id="error"></div>
+            <p id="text">
             Never gonna give you up
             Never gonna let you down
             Never gonna run around and desert you
             Never gonna make you cry
             Never gonna say goodbye
             Never gonna tell a lie and hurt you
-        </p>
-    </div>
-    <div>
-        <button onclick="main()">Выход</button>
-    </div>
+            </p>
+        </div>
+        <div>
+            <button onclick="main()">Выход</button>
+        </div>
 
-    <script>
-        window.addEventListener('DOMContentLoaded', async () => {
-            const authData = getAuthData();
-            const usernameElement = document.getElementById('username');
-            const tokenElement = document.getElementById('token');
-            const errorContainer = document.getElementById('error');
-            document.getElementById('text').style.fontSize = '8px';
-            document.getElementById('text').style.maxWidth = '150px';
+        <script>
+            window.addEventListener('DOMContentLoaded', async () => {
+                const authData = getAuthData();
+                const usernameElement = document.getElementById('username');
+                const tokenElement = document.getElementById('token');
+                const errorContainer = document.getElementById('error');
+                document.getElementById('text').style.fontSize = '8px';
+                document.getElementById('text').style.maxWidth = '150px';
             
-            if (!authData) {
-                tokenElement.textContent = 'Токен не найден';
-                showError('Сессия не найдена');
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-                return;
-            }
+                if (!authData) {
+                    tokenElement.textContent = 'Токен не найден';
+                    showError('Сессия не найдена');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                    return;
+                }
             
-            console.log('Auth data from sessionStorage:', authData);            
-            if (!authData.username || !authData.token) {
-                showError('Некорректные данные сессии');
-                clearSession();
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-                return;
-            }
+                console.log('Auth data from sessionStorage:', authData);            
+                if (!authData.username || !authData.token) {
+                    showError('Некорректные данные сессии');
+                    clearSession();
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                    return;
+                }
             
-            tokenElement.textContent = `Токен: ${authData.token}`;
-            
-            try {
-                console.log('Request for update:', {
-                    username: authData.username,
-                    token: authData.token
-                });
+                try {
+                    console.log('Обновление:', authData.username);               
+                    const result = await apiRequest('/update-token', {
+                        username: authData.username,
+                        token: authData.token
+                    });
                 
-                const result = await apiRequest('/update-token', {
-                    username: authData.username,
-                    token: authData.token
-                });
-                
-                console.log('Server responce:', result);           
-                sessionStorage.setItem('authData', JSON.stringify(result));               
-                tokenElement.textContent = `Токен: ${result.token}`;
-            } catch (error) {
-                console.error('Update error:', error);
-                showError(`Не удалось обновить: ${error.message}`);
-            }                    
-        });
+                    console.log(result);           
+                    sessionStorage.setItem('authData', JSON.stringify(result));               
+                    tokenElement.textContent = `Токен: ${result.token}`;
+                } catch (error) {
+                    console.error('Ошибка обновления:', error);
+                    showError(`Ошибка обновлени: ${error.message}`);
+                }                    
+            });
 
-        function main() {
-            window.location.href = 'main.html';
-        }
+            function main() {
+                window.location.href = 'main.html';
+            }
 
-        function showError(message) {
-            const errorContainer = document.getElementById('error');
-            errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
-        }
-    </script>
-</body>
+            function showError(message) {
+                const errorContainer = document.getElementById('error');
+                errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
+            }
+        </script>
+    </body>
     <style>
         body {
             margin: 0;
