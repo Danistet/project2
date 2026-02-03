@@ -18,34 +18,52 @@
             <button onclick="logout()">Выход</button>
         </div>
 <script>
-  const authData = JSON.parse(sessionStorage.getItem('authData'));
-  const errorElement = document.getElementById('error');
+    const authData = JSON.parse(sessionStorage.getItem('authData'));
+    const errorElement = document.getElementById('error');
+    const usernameElement = document.getElementById('username');
+    const tokenElement = document.getElementById('token');
+    const continueButton = document.getElementById('ContinueButton');
+    const infoButton = document.getElementById('infbt');
   
-  if (!authData) {
-    errorElement.textContent = 'Сессия не найдена';
-    setTimeout(() => window.location.href = 'index.html', 2000);
-  } else {
-    const now = Date.now();
-    const EXPIRY_MS = 20000;
-    
-    if (now - authData.authDate > EXPIRY_MS) {
-      sessionStorage.setItem('reauthUsername', authData.username);
-      sessionStorage.removeItem('authData');
-      window.location.href = 'oldtokenwindow.html';
+    if (!authData) {
+        errorElement.textContent = 'Сессия не найдена';
+        usernameElement.style.display = 'none';
+        tokenElement.style.display = 'none';
+        continueButton.style.display = 'none';
+        infoButton.style.display = 'none';
+        setTimeout(() => window.location.href = 'index.html', 2000);
     } else {
-      document.getElementById('username').textContent = `User: ${authData.username}`;
-      document.getElementById('token').textContent = `Token: ${authData.token}`;
+        const now = Date.now();
+        const EXPIRY_MS = 20000;
+    
+        if (now - authData.authDate > EXPIRY_MS) {
+            errorElement.textContent = 'Срок действия токена истёк';
+            usernameElement.style.display = 'none';
+            tokenElement.style.display = 'none';
+            continueButton.style.display = 'block';
+            infoButton.style.display = 'none';                                      
+            sessionStorage.setItem('reauthUsername', authData.username);
+        } else {
+            usernameElement.textContent = `User: ${authData.username}`;
+            tokenElement.textContent = `Token: ${authData.token}`;
+            continueButton.style.display = 'none';
+            infoButton.style.display = 'block';
+        }
     }
-  }
 
-  function logout() {
-    sessionStorage.clear();
-    window.location.href = 'index.html';
-  }
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+    }
 
-  function info() {
-    window.location.href = 'information.html';
-  }
+    function info() {
+        window.location.href = 'information.html';
+    }
+
+    function cont() {
+        sessionStorage.removeItem('authData');
+        window.location.href = 'oldtokenwindow.html';
+    s}
 </script>     
     </body>
 

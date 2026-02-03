@@ -10,7 +10,7 @@
         <h1>Срок сессии истёк</h1>
         <div id="app">
             <h2>Время последнего входа:</h2>
-            <p id="authData"></p>
+            <p id="authDatestr"></p>
             <div>
                 <h2>Войти через пароль</h2>
                 <input v-model="password"><br>
@@ -57,6 +57,23 @@
     }
   }).mount('#app');
 </script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const authData = getAuthData();
+    console.log('authData: ', authData);
+    const display = document.getElementById('authDatestr');
+    console.log('authData@:', sessionStorage.getItem('authData'));
+    console.log('Все ключи:', Object.keys(sessionStorage));            
+    if (authData && authData.authDate) {
+      display.textContent = new Date(Number(authData.authDate)).toLocaleString('ru-RU');
+    } else {
+      display.textContent = '-';
+    }
+
+  });
+</script>
+
     </body>
 
     <style>
