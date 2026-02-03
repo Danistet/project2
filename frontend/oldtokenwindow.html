@@ -38,8 +38,7 @@
           const result = await apiRequest('/auth', {
             username,
             userpswd: password.value
-          });
-          
+          });        
           sessionStorage.setItem('authData', JSON.stringify(result));
           sessionStorage.removeItem('reauthUsername');
           window.location.href = 'main.html';
@@ -51,27 +50,24 @@
       const logout = () => {
         sessionStorage.clear();
         window.location.href = 'index.html';
-      };
-      
+      };    
       return { password, login, logout };
     }
   }).mount('#app');
+  
 </script>
 
 <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    const authData = getAuthData();
-    console.log('authData: ', authData);
+ window.addEventListener('DOMContentLoaded', () => {
+    const lastAuthDate = sessionStorage.getItem('lastAuthDate');
     const display = document.getElementById('authDatestr');
-    console.log('authData@:', sessionStorage.getItem('authData'));
-    console.log('Все ключи:', Object.keys(sessionStorage));            
-    if (authData && authData.authDate) {
-      display.textContent = new Date(Number(authData.authDate)).toLocaleString('ru-RU');
+    
+    if (lastAuthDate) {
+        display.textContent = new Date(Number(lastAuthDate)).toLocaleString('ru-RU');
     } else {
-      display.textContent = '-';
+        display.textContent = '-';
     }
-
-  });
+});
 </script>
 
     </body>

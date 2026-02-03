@@ -27,27 +27,24 @@
   
     if (!authData) {
         errorElement.textContent = 'Сессия не найдена';
-        usernameElement.style.display = 'none';
-        tokenElement.style.display = 'none';
         continueButton.style.display = 'none';
         infoButton.style.display = 'none';
         setTimeout(() => window.location.href = 'index.html', 2000);
     } else {
         const now = Date.now();
-        const EXPIRY_MS = 20000;
+        const EXPIRY_MS = 2000;
     
         if (now - authData.authDate > EXPIRY_MS) {
             errorElement.textContent = 'Срок действия токена истёк';
-            usernameElement.style.display = 'none';
-            tokenElement.style.display = 'none';
-            continueButton.style.display = 'block';
+            continueButton.style.display = 'visible';
             infoButton.style.display = 'none';                                      
             sessionStorage.setItem('reauthUsername', authData.username);
+            sessionStorage.setItem('lastAuthDate', authData.authDate);
         } else {
             usernameElement.textContent = `User: ${authData.username}`;
             tokenElement.textContent = `Token: ${authData.token}`;
             continueButton.style.display = 'none';
-            infoButton.style.display = 'block';
+            infoButton.style.display = 'visbles';
         }
     }
 
@@ -63,7 +60,7 @@
     function cont() {
         sessionStorage.removeItem('authData');
         window.location.href = 'oldtokenwindow.html';
-    s}
+    }
 </script>     
     </body>
 
@@ -98,7 +95,7 @@
         }
         .ContinueButton
         {
-            visibility: collapse;
+            visibility: visible;
         }
     </style>
 </html>
