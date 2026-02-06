@@ -25,7 +25,8 @@
 
         <script>
             window.addEventListener('DOMContentLoaded', async () => {
-                const authData = getAuthData();
+                //const authData = getAuthData();
+                const authData = JSON.parse(sessionStorage.getItem('authData'));
                 const usernameElement = document.getElementById('username');
                 const tokenElement = document.getElementById('token');
                 const errorContainer = document.getElementById('error');
@@ -67,7 +68,8 @@
                 }                    
             });
 
-            function main() {
+            function main() {                
+                const now = Date.now();                 
                 window.location.href = 'main.html';
             }
 

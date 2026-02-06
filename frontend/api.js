@@ -19,12 +19,10 @@ async function apiRequest(endpoint, data) {
 
 function checkSession() {
   const authData = sessionStorage.getItem('authData');
-  if (!authData) return false;
-  
+  if (!authData) return false;  
   const data = JSON.parse(authData);
   const now = Date.now();
-  const minute = 2000;
-  
+  const minute = 2000; 
   return (now - data.authDate) <= minute;
 }
 
