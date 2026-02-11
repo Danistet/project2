@@ -104,8 +104,7 @@ app.post('/auth', (req, res) => {
           db.detach();         
           if (upderr) {
             return res.status(500).json({ error: 'Update error'});
-          }
-          //1         
+          }       
           respond(newToken, now);
         });
       } else {
@@ -116,8 +115,7 @@ app.post('/auth', (req, res) => {
           if (upderr) {
             console.error('Update error', upderr);
             return res.status(500).json({ error: 'Update error'});
-          }
-          //2        
+          }     
           respond(existingToken, now);
         });
       }
@@ -158,8 +156,7 @@ app.post('/register', (req, res) => {
         if (err) {
           console.error('Error:', err);
           return res.status(500).json({ error: 'Unable to create user'});
-        } 
-        //3      
+        }      
         res.status(201).json({ 
           status: 'OK', 
           username, 
@@ -174,18 +171,5 @@ app.post('/register', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-
-          //const text = `Status: OK\nToken: ${newToken}\nAuthDate: ${newAuthDate}`;
-          //res.set('Content-Type', 'text/plain; charset=utf-8');
-          //res.status(200).send(text);
-
-          //const text = `Status: OK\nToken: ${existingToken}\nAuthDate: ${now}`;
-          //res.set('Content-Type', 'text/plain; charset=utf-8');
-          //res.status(200).send(text);
-
-          //const text = `Status: OK\nToken: ${token}\nAuthDate: ${authDate}`;
-          //res.set('Content-Type', 'text/plain; charset=utf-8');
-          //res.status(201).send(text);
 
 
