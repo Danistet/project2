@@ -1,15 +1,12 @@
 const { createApp, ref } = Vue;
-
 createApp({
   setup() {
     const username = ref('');
     const password = ref('');
     const response = ref('');
-    const error = ref('');
-    ////////
     const meternum = ref('');
     const mountdate = ref('');
-    ////////
+    const error = ref('');
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
@@ -50,15 +47,18 @@ createApp({
         };
         
         console.log('Сохраняем в sessionStorage:', authData);
-        sessionStorage.setItem('authData', JSON.stringify(authData));        
-        const saved = sessionStorage.getItem('authData');
-        console.log('Проверка сохранения:', saved);     
+        sessionStorage.setItem('authData', JSON.stringify(authData));
+        sessionStorage.setItem('meternum', meternum.value);
+        sessionStorage.setItem('mountdate', mountdate.value); 
+        console.log('authData:', sessionStorage.getItem('authData'));
+        console.log('meternum:', sessionStorage.getItem('meternum'));
+        console.log('mountdate:', sessionStorage.getItem('mountdate'));         
         window.location.href = 'main.html';              
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);
       }
     };
-    return { username, password, login, response, error };
+    return { username, password, login, response, error, meternum, mountdate };
   }
 }).mount('#app');

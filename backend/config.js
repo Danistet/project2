@@ -7,5 +7,6 @@ module.exports = {
   lowercase_keys: false,
   role: null,
   pageSize: 4096,
-  timeout: 30000
+  timeout: 30000,
+  charset: 'WIN1251'
 };

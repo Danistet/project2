@@ -55,18 +55,20 @@
                         tokenElement.textContent = `Token: ${authData.token}`;
                         continueButton.style.display = 'none';
                         infoButton.style.display = 'visble';
-                    }                    
+                    }
+                    loadMeterData();
                 }
-                loadMeterData();
             }
 
             async function loadMeterData() {
 
-                const meternum = sessionStorage.getItem('meternum');
-                const mountdate = sessionStorage.getItem('mountdate');
+                const meternumInput = document.getElementById('meternumInput').value;
+                const mountdateInput = document.getElementById('mountdateInput').value;  
+                const meternum = meternumInput || sessionStorage.getItem('meternum') || '';
+                const mountdate = mountdateInput || sessionStorage.getItem('mountdate') || '';
 
                 if (!meternum || !mountdate) {
-                    document.getElementById('error').textContent = 'Нет данных счётчика';
+                    document.getElementById('error').textContent = 'Введите meternum и mountdate';
                     return;
                 }
                 try {

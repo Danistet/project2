@@ -10,25 +10,49 @@ app.use(express.json());
 
 app.post('/test', (req, res) => {
   const { meternum, mountdate } = req.body;
+  
+  console.log('Запрос /test:', { meternum, mountdate });
 
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('Firebird connection error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }    
-    const query = 'SELECT METER_NUM, MOUNT_DATE FROM METERS WHERE METER_NUM = ? AND MOUNT_DATE = ?';
-    
-    db.query(query, [meternum, mountdate], (err, result) => {
+    const query = `
+      SELECT METER_NUM, MOUNT_DATE 
+      FROM METERS 
+      WHERE METER_NUM = ? 
+        AND CAST(MOUNT_DATE AS VARCHAR(10)) = ?
+    `;
+
+    let dateStr = mountdate;
+    if (mountdate instanceof Date) {
+      dateStr = mountdate.toISOString().split('T')[0];
+    } else if (typeof mountdate === 'string') {      
+      dateStr = mountdate.split('T')[0];
+    }
+
+    console.log('SQL:', query);
+    console.log('Параметры:', [meternum, dateStr]);
+
+    db.query(query, [meternum, dateStr], (err, result) => {
       if (err) {
         console.error('Query error:', err);
         db.detach();
         return res.status(500).json({ error: 'Query failed' });
-      }      
-      console.log('Query result:', result);
-      db.detach();  
+      }
+
+      console.log('Найдено записей:', result?.length || 0);
+      db.detach();
+
       return res.status(200).json({ 
         success: true, 
-        data: result 
+        data: result || [],
+        debug: {
+          received: { meternum, mountdate },
+          usedForQuery: { meternum, dateStr },
+          found: result?.length || 0
+        }
       });
     });
   });
