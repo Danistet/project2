@@ -6,6 +6,10 @@ createApp({
     const password = ref('');
     const response = ref('');
     const error = ref('');
+    ////////
+    const meternum = ref('');
+    const mountdate = ref('');
+    ////////
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
@@ -21,13 +25,11 @@ createApp({
             userpswd: password.value
           });
           response.value = 'Пользователь зарегистрирован';
-          //1
         } else {
           result = await apiRequest('/auth', {
             username: username.value,
             userpswd: password.value
           });
-          //2
         }
 
         console.log('Ответ сервера:', result);
@@ -51,8 +53,7 @@ createApp({
         sessionStorage.setItem('authData', JSON.stringify(authData));        
         const saved = sessionStorage.getItem('authData');
         console.log('Проверка сохранения:', saved);     
-        window.location.href = 'main.html';
-        
+        window.location.href = 'main.html';              
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);
@@ -61,34 +62,3 @@ createApp({
     return { username, password, login, response, error };
   }
 }).mount('#app');
-
-
-
-            //const text = await res.text(); 
-            //const tokenMatch = text.match(/Token:\s*(\S+)/);
-            //const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
-            //const token = tokenMatch ? tokenMatch[1] : '';
-            //const authDate = authDateMatch ? authDateMatch[1] : '';
-            //const params = new URLSearchParams({
-              //username: username.value,
-              //token: token,
-              //authDate: authDate
-            //});
-            //window.location.href = `main.html?${params.toString()}`;
-
-
-
-          //const url = `http://localhost:3000/auth?username=${encodeURIComponent(username.value)}&userpswd=${encodeURIComponent(password.value)}`;
-          //const res = await fetch(url);
-            //const text = await res.text(); 
-            //const tokenMatch = text.match(/Token:\s*(\S+)/);
-            //const authDateMatch = text.match(/AuthDate:\s*(\S+)/);
-            //const token = tokenMatch ? tokenMatch[1] : '';
-            //const authDate = authDateMatch ? authDateMatch[1] : '';
-            //const params = new URLSearchParams({
-              //username: username.value,
-              //token: token,
-              //authDate: authDate
-            //});
-            //window.location.href = `main.html?${params.toString()}`;
-

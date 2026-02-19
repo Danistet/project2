@@ -13,38 +13,77 @@
             <p id="error" style="color: red;"></p>           
         </div>
         <div>
+            <p>meternum:</p><br>
+            <p id="meternum"></p><br>
+            <p>mountdate: </p><br>
+            <p id="mountdate"></p>
+        </div>
+        <div>
             <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
             <button onclick="info()" id="infbt">информация</button><br>
             <button onclick="logout()">Выход</button>
         </div>
         <script>
-            const authData = JSON.parse(sessionStorage.getItem('authData'));
-            const errorElement = document.getElementById('error');
-            const usernameElement = document.getElementById('username');
-            const tokenElement = document.getElementById('token');
-            const continueButton = document.getElementById('ContinueButton');
-            const infoButton = document.getElementById('infbt');
-  
-            if (!authData) {
-                errorElement.textContent = 'Сессия не найдена';
-                continueButton.style.display = 'none';
-                infoButton.style.display = 'none';
-                setTimeout(() => window.location.href = 'index.html', 2000);
-            } else {
-                const now = Date.now();
-                const EXPIRY_MS = 2000;
-    
-                if (now - authData.authDate > EXPIRY_MS) {
-                    errorElement.textContent = 'Срок действия токена истёк';
-                    continueButton.style.display = 'visible';
-                    infoButton.style.display = 'none';                                      
-                    sessionStorage.setItem('reauthUsername', authData.username);
-                    sessionStorage.setItem('lastAuthDate', authData.authDate);
-                } else {    
-                    usernameElement.textContent = `User: ${authData.username}`;
-                    tokenElement.textContent = `Token: ${authData.token}`;
+            document.addEventListener('DOMContentLoaded', () => {
+            initPage();
+            });
+
+            function initPage() {
+                const authData = JSON.parse(sessionStorage.getItem('authData'));
+                const errorElement = document.getElementById('error');
+                const usernameElement = document.getElementById('username');
+                const tokenElement = document.getElementById('token');
+                const continueButton = document.getElementById('ContinueButton');
+                const infoButton = document.getElementById('infbt');
+                if (!authData) {
+                    errorElement.textContent = 'Сессия не найдена';
                     continueButton.style.display = 'none';
-                    infoButton.style.display = 'visble';
+                    infoButton.style.display = 'none';
+                    setTimeout(() => window.location.href = 'index.html', 2000);
+                } else {
+                    const now = Date.now();
+                    const EXPIRY_MS = 2000;
+    
+                    if (now - authData.authDate > EXPIRY_MS) {
+                        errorElement.textContent = 'Срок действия токена истёк';
+                        continueButton.style.display = 'visible';
+                        infoButton.style.display = 'none';                                      
+                        sessionStorage.setItem('reauthUsername', authData.username);
+                        sessionStorage.setItem('lastAuthDate', authData.authDate);
+                    } else {    
+                        usernameElement.textContent = `User: ${authData.username}`;
+                        tokenElement.textContent = `Token: ${authData.token}`;
+                        continueButton.style.display = 'none';
+                        infoButton.style.display = 'visble';
+                    }                    
+                }
+                loadMeterData();
+            }
+
+            async function loadMeterData() {
+
+                const meternum = sessionStorage.getItem('meternum');
+                const mountdate = sessionStorage.getItem('mountdate');
+
+                if (!meternum || !mountdate) {
+                    document.getElementById('error').textContent = 'Нет данных счётчика';
+                    return;
+                }
+                try {
+                    const result = await apiRequest('/test', { meternum, mountdate });
+                    console.log('API Response:', result);            
+                    if (result.success && result.data?.length > 0) {
+                        const row = result.data[0];
+                        document.getElementById('meternum').textContent = row.METER_NUM || 'N/A';
+                        document.getElementById('mountdate').textContent = row.MOUNT_DATE || 'N/A';                                
+                        sessionStorage.setItem('meternum', row.METER_NUM);
+                        sessionStorage.setItem('mountdate', row.MOUNT_DATE);
+                    } else {
+                        document.getElementById('error').textContent = 'Данные не найдены';
+                    }
+                } catch (error) {
+                    console.error('Failed to load meter data:', error);
+                    document.getElementById('error').textContent = 'Ошибка загрузки данных';
                 }
             }
 

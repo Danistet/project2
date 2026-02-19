@@ -8,6 +8,31 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
+app.post('/test', (req, res) => {
+  const { meternum, mountdate } = req.body;
+
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('Firebird connection error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }    
+    const query = 'SELECT METER_NUM, MOUNT_DATE FROM METERS WHERE METER_NUM = ? AND MOUNT_DATE = ?';
+    
+    db.query(query, [meternum, mountdate], (err, result) => {
+      if (err) {
+        console.error('Query error:', err);
+        db.detach();
+        return res.status(500).json({ error: 'Query failed' });
+      }      
+      console.log('Query result:', result);
+      db.detach();  
+      return res.status(200).json({ 
+        success: true, 
+        data: result 
+      });
+    });
+  });
+});
 
 app.post('/update-token', (req, res) => {
   const { username, token } = req.body;
@@ -71,7 +96,7 @@ app.post('/auth', (req, res) => {
     }
     
     const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
-    
+
     db.query(query, [username, userpswd], (err, result) => {
       if (err) {
         db.detach();
