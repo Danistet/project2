@@ -8,10 +8,10 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-app.post('/test', (req, res) => {
+app.post('/meters', (req, res) => {
   const { meternum, mountdate } = req.body;
   
-  console.log('Запрос /test:', { meternum, mountdate });
+  console.log('Запрос /meters:', { meternum, mountdate });
 
   firebird.attach(config, (err, db) => {
     if (err) {
@@ -120,7 +120,6 @@ app.post('/auth', (req, res) => {
     }
     
     const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
-
     db.query(query, [username, userpswd], (err, result) => {
       if (err) {
         db.detach();

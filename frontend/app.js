@@ -4,8 +4,6 @@ createApp({
     const username = ref('');
     const password = ref('');
     const response = ref('');
-    const meternum = ref('');
-    const mountdate = ref('');
     const error = ref('');
     const login = async (mode = 'login') => {
       error.value = '';
