@@ -5,6 +5,8 @@ createApp({
     const password = ref('');
     const response = ref('');
     const error = ref('');
+    const meternum = ref('');
+    const mountdate = ref('');
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
@@ -26,7 +28,16 @@ createApp({
             userpswd: password.value
           });
         }
-
+        sessionStorage.setItem('authData', JSON.stringify({
+          username: result.username,
+          token: result.token,
+          authDate: result.authDate
+        }));
+        if (meternum.value && mountdate.value) {
+          sessionStorage.setItem('meternum', meternum.value);
+          sessionStorage.setItem('mountdate', mountdate.value);
+          console.log('Saved:', meternum.value, mountdate.value);
+        }
         console.log('Ответ сервера:', result);
 
         if (!result.username) {
@@ -43,7 +54,8 @@ createApp({
           token: result.token,
           authDate: result.authDate
         };
-        
+                
+
         console.log('Сохраняем в sessionStorage:', authData);
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', meternum.value);
@@ -57,6 +69,6 @@ createApp({
         console.error(err);
       }
     };
-    return { username, password, login, response, error, meternum, mountdate };
+    return { username, password,  meternum, mountdate, login, response, error,};
   }
 }).mount('#app');

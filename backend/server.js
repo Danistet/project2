@@ -8,6 +8,21 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
+app.get('/debug/meters', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connect failed' });
+    
+    db.query('SELECT FIRST 20 METER_NUM, MOUNT_DATE FROM METERS', [], (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json({ count: result?.length || 0, sample: result || [] });
+    });
+  });
+});
+
+
+
+
 app.post('/meters', (req, res) => {
   const { meternum, mountdate } = req.body;
   
@@ -22,9 +37,8 @@ app.post('/meters', (req, res) => {
       SELECT METER_NUM, MOUNT_DATE 
       FROM METERS 
       WHERE METER_NUM = ? 
-        AND CAST(MOUNT_DATE AS VARCHAR(10)) = ?
+        AND MOUNT_DATE = CAST(? AS DATE)
     `;
-
     let dateStr = mountdate;
     if (mountdate instanceof Date) {
       dateStr = mountdate.toISOString().split('T')[0];
