@@ -8,20 +8,6 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-app.get('/debug/meters', (req, res) => {
-  firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connect failed' });
-    
-    db.query('SELECT FIRST 20 METER_NUM, MOUNT_DATE FROM METERS', [], (err, result) => {
-      db.detach();
-      if (err) return res.status(500).json({ error: 'Query failed' });
-      res.json({ count: result?.length || 0, sample: result || [] });
-    });
-  });
-});
-
-
-
 
 app.post('/meters', (req, res) => {
   const { meternum, mountdate } = req.body;
@@ -131,56 +117,61 @@ app.post('/auth', (req, res) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
-    }
+    }      
+    const authQuery = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
     
-    const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
-    db.query(query, [username, userpswd], (err, result) => {
+    db.query(authQuery, [username, userpswd], (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
       }
       
-      if (result.length === 0) {
+      if (authResult.length === 0) {
         db.detach();
         return res.status(401).json({ error: 'Invalid username or password'});
-      }
-      
-      const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = result[0];
-      const now = Date.now();
-      const minute = 2000;
-      const respond = (token, authDate) => {
-        db.detach();
-        res.json({ 
-          status: 'OK', 
-          username, 
-          token, 
-          authDate 
-        });
-      };
-
-      if (now - existingAuthDate > minute) {
-        const newToken = crypto.randomBytes(32).toString('hex');
-        const newAuthDate = now;        
-        const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';      
-        db.query(updateQuery, [newToken, newAuthDate, username], (upderr) => {
-          db.detach();         
-          if (upderr) {
-            return res.status(500).json({ error: 'Update error'});
-          }       
-          respond(newToken, now);
-        });
-      } else {
-        const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
-        db.query(updateQuery, [now, username], (upderr) => {
+      }      
+      const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
+      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS WHERE METER_NUM = ?';      
+      db.query(meterQuery, [username], (err, meterResult) => {        
+        const now = Date.now();
+        const minute = 2000;        
+        const finishResponse = (token, authDate, meterNum, mountDate) => {
           db.detach();
-          
-          if (upderr) {
-            console.error('Update error', upderr);
-            return res.status(500).json({ error: 'Update error'});
-          }     
-          respond(existingToken, now);
-        });
-      }
+          res.json({ 
+            status: 'OK', 
+            username, 
+            token, 
+            authDate,
+            meterNum,
+            mountDate
+          });
+        };        
+        const meterNum = meterResult?.[0]?.METER_NUM || null;
+        const mountDate = meterResult?.[0]?.MOUNT_DATE || null;                
+        if (now - existingAuthDate > minute) {
+          const newToken = crypto.randomBytes(32).toString('hex');
+          const newAuthDate = now;        
+          const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';      
+          db.query(updateQuery, [newToken, newAuthDate, username], (upderr) => {
+            if (upderr) {
+              db.detach();
+              console.error('Update error:', upderr);
+              return res.status(500).json({ error: 'Update error'});
+            }       
+            finishResponse(newToken, now, meterNum, mountDate);
+          });
+        } else {
+          const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
+          db.query(updateQuery, [now, username], (upderr) => {
+            if (upderr) {
+              db.detach();
+              console.error('Update error', upderr);
+              return res.status(500).json({ error: 'Update error'});
+            }     
+            finishResponse(existingToken, now, meterNum, mountDate);
+          });
+        }
+      });
     });
   });
 });

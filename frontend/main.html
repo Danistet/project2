@@ -60,8 +60,6 @@
             }
 
             async function loadMeterData() {                
-                //const meternum = JSON.parse(sessionStorage.getItem('meternum'));
-                //const mountdate = JSON.parse(sessionStorage.getItem('mountdate'));
                 const meternum = sessionStorage.getItem('meternum');
                 const mountdate = sessionStorage.getItem('mountdate');               
                 if (!meternum || !mountdate) {
@@ -79,7 +77,10 @@
                     if (result.success && result.data?.length > 0) {
                         const row = result.data[0];
                         document.getElementById('meternum').textContent = row.METER_NUM || 'N/A';
-                        document.getElementById('mountdate').textContent = row.MOUNT_DATE || 'N/A';                                
+                        const displayDate = row.MOUNT_DATE 
+                            ? new Date(row.MOUNT_DATE).toLocaleDateString('ru-RU') 
+                            : 'N/A';
+                        document.getElementById('mountdate').textContent = displayDate;                                
                         sessionStorage.setItem('meternum', row.METER_NUM);
                         sessionStorage.setItem('mountdate', row.MOUNT_DATE);
                     } else {

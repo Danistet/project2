@@ -32,12 +32,7 @@ createApp({
           username: result.username,
           token: result.token,
           authDate: result.authDate
-        }));
-        if (meternum.value && mountdate.value) {
-          sessionStorage.setItem('meternum', meternum.value);
-          sessionStorage.setItem('mountdate', mountdate.value);
-          console.log('Saved:', meternum.value, mountdate.value);
-        }
+        }));        
         console.log('Ответ сервера:', result);
 
         if (!result.username) {
@@ -58,6 +53,11 @@ createApp({
 
         console.log('Сохраняем в sessionStorage:', authData);
         sessionStorage.setItem('authData', JSON.stringify(authData));
+        if (meternum.value && mountdate.value) {
+          sessionStorage.setItem('meternum', meternum.value);
+          sessionStorage.setItem('mountdate', mountdate.value);
+          console.log('Saved:', meternum.value, mountdate.value);
+        }
         sessionStorage.setItem('meternum', meternum.value);
         sessionStorage.setItem('mountdate', mountdate.value); 
         console.log('authData:', sessionStorage.getItem('authData'));
