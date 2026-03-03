@@ -131,7 +131,7 @@ app.post('/auth', (req, res) => {
         return res.status(401).json({ error: 'Invalid username or password'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
-      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS WHERE METER_NUM = ?';      
+      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';      
       db.query(meterQuery, [username], (err, meterResult) => {        
         const now = Date.now();
         const minute = 2000;        

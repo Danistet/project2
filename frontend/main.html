@@ -14,9 +14,9 @@
         </div>
         <div>
             <p>meternum:</p>
-            <p id="meternum"></p>
+            <p id="meterNum"></p>
             <p>mountdate: </p>
-            <p id="mountdate"></p>
+            <p id="mountDate"></p>
         </div>
         <div>
             <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
@@ -60,35 +60,27 @@
             }
 
             async function loadMeterData() {                
-                const meternum = sessionStorage.getItem('meternum');
-                const mountdate = sessionStorage.getItem('mountdate');               
-                if (!meternum || !mountdate) {
-                    document.getElementById('error').textContent = 'no meternum or mountdate';
-                    console.log("MeterMerror:", meternum,"mounterrror:", mountdate); 
-                    return;
-                }
-                console.log("MM:", meternum, mountdate);             
-                try {
-                    const result = await apiRequest('/meters', { 
-                        meternum: meternum, 
-                        mountdate: mountdate 
-                    });
-                    console.log('API Response:', result);            
-                    if (result.success && result.data?.length > 0) {
-                        const row = result.data[0];
-                        document.getElementById('meternum').textContent = row.METER_NUM || 'N/A';
-                        const displayDate = row.MOUNT_DATE 
-                            ? new Date(row.MOUNT_DATE).toLocaleDateString('ru-RU') 
-                            : 'N/A';
-                        document.getElementById('mountdate').textContent = displayDate;                                
-                        sessionStorage.setItem('meternum', row.METER_NUM);
-                        sessionStorage.setItem('mountdate', row.MOUNT_DATE);
-                    } else {
-                        document.getElementById('error').textContent = 'Данные не найдены';
+                const storedMeterData = sessionStorage.getItem('meternum');
+                const storedMountData = sessionStorage.getItem('mountdate');
+                const meterNumElement = document.getElementById('meterNum');
+                const mountDateElement = document.getElementById('mountDate');
+                const errorElement = document.getElementById('error');
+
+                if (storedMeterData && storedMountData) {
+                    try {
+                        const meterObj = JSON.parse(storedMeterData);
+                        const mountObj = JSON.parse(storedMountData);
+                        const mNum = meterObj.meterNum || 'Не указан';
+                        const mDate = mountObj.mountDate ? new Date(mountObj.mountDate).toLocaleDateString('ru-RU') : 'Не указана';
+                        meterNumElement.textContent = mNum;
+                        mountDateElement.textContent = mDate;                
+                        console.log("Данные успешно выведены:", mNum, mDate);
+                    } catch (e) {
+                        console.error("Ошибка парсинга данных счетчика:", e);
+                        errorElement.textContent = 'Ошибка формата данных счетчика';
                     }
-                } catch (error) {
-                    console.error('Failed to load meter data:', error);
-                    document.getElementById('error').textContent = 'Ошибка загрузки данных';
+                } else {
+                    console.log("Данные счетчика не найдены в sessionStorage");
                 }
             }
 

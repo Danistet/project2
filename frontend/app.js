@@ -19,19 +19,27 @@ createApp({
         if (mode === 'register') {    
           result = await apiRequest('/register', {
             username: username.value,
-            userpswd: password.value
+            userpswd: password.value,
+            meternum: meternum.value
           });
           response.value = 'Пользователь зарегистрирован';
         } else {
           result = await apiRequest('/auth', {
             username: username.value,
-            userpswd: password.value
+            userpswd: password.value,
+            meternum: meternum.value
           });
         }
         sessionStorage.setItem('authData', JSON.stringify({
           username: result.username,
           token: result.token,
           authDate: result.authDate
+        }));
+        sessionStorage.setItem('meterNum', JSON.stringify({
+          meterNum: result.meterNum
+        }));
+        sessionStorage.setItem('mountDate', JSON.stringify({
+          mountDate: result.mountDate
         }));        
         console.log('Ответ сервера:', result);
 
@@ -44,25 +52,32 @@ createApp({
         if (!result.authDate) {
           throw new Error('Сервер не вернул authDate');
         }
+        if (!result.meterNum) {
+          throw new Error('Сервер не вернул meterNum');
+        }
+        if (!result.mountDate) {
+          throw new Error('Сервер не вернул mountDate');
+        }
         const authData = {
           username: result.username,
           token: result.token,
           authDate: result.authDate
         };
+        const meterNum = {
+          meterNum: result.meterNum
+        };
+        const mountDate = {
+          mountDate: result.mountDate
+        };
                 
 
-        console.log('Сохраняем в sessionStorage:', authData);
+        console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate);
         sessionStorage.setItem('authData', JSON.stringify(authData));
-        if (meternum.value && mountdate.value) {
-          sessionStorage.setItem('meternum', meternum.value);
-          sessionStorage.setItem('mountdate', mountdate.value);
-          console.log('Saved:', meternum.value, mountdate.value);
-        }
-        sessionStorage.setItem('meternum', meternum.value);
-        sessionStorage.setItem('mountdate', mountdate.value); 
+        sessionStorage.setItem('meternum', JSON.stringify(meterNum));
+        sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         console.log('authData:', sessionStorage.getItem('authData'));
-        console.log('meternum:', sessionStorage.getItem('meternum'));
-        console.log('mountdate:', sessionStorage.getItem('mountdate'));         
+        console.log('meterNum:', sessionStorage.getItem('meterNum'));
+        console.log('mountDate:', sessionStorage.getItem('mountDate'));         
         window.location.href = 'main.html';              
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
