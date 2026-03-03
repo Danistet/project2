@@ -10,8 +10,12 @@
     <body>
         <h1>Регистрация</h1>
         <div id="app" class="server-response">
-            <input v-model="username" placeholder="Логин" required type="text"><br>
-            <input v-model="password" type="password" placeholder="Пароль" required/><br>
+            <input v-model="fname" placeholder="напишите имя" required type="text" maxlength="30"><br>
+            <input v-model="sname" placeholder="напишите отчество" required type="text" maxlength="30"><br>
+            <input v-model="lname" placeholder="напишите фамилию" required type="text" maxlength="30"><br>
+            <br>
+            <input v-model="username" placeholder="Придумайте логин" required type="text" maxlength="10"><br>
+            <input v-model="password" type="password" placeholder="Придумайте пароль" required maxlength="15"/><br>
             <br>
             <button @click="login('register')">Создать аккаунт</button><br>
             <button onclick="tologin()">Обратно на страницу входа</button>

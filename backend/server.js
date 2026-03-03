@@ -32,17 +32,12 @@ app.post('/meters', (req, res) => {
       dateStr = mountdate.split('T')[0];
     }
 
-    console.log('SQL:', query);
-    console.log('Параметры:', [meternum, dateStr]);
-
     db.query(query, [meternum, dateStr], (err, result) => {
       if (err) {
         console.error('Query error:', err);
         db.detach();
         return res.status(500).json({ error: 'Query failed' });
       }
-
-      console.log('Найдено записей:', result?.length || 0);
       db.detach();
 
       return res.status(200).json({ 
