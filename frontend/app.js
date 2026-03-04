@@ -3,6 +3,9 @@ createApp({
   setup() {
     const username = ref('');
     const password = ref('');
+    const fname = ref('');
+    const sname = ref('');
+    const lname = ref('');
     const response = ref('');
     const error = ref('');
     const meternum = ref('');
@@ -20,7 +23,10 @@ createApp({
           result = await apiRequest('/register', {
             username: username.value,
             userpswd: password.value,
-            meternum: meternum.value
+            meternum: meternum.value,
+            fname: fname.value,
+            sname: sname.value,
+            lname: lname.value
           });
           response.value = 'Пользователь зарегистрирован';
         } else {
@@ -84,6 +90,6 @@ createApp({
         console.error(err);
       }
     };
-    return { username, password,  meternum, mountdate, login, response, error,};
+    return { username, password,  meternum, mountdate, login, response, error, fname, sname, lname};
   }
 }).mount('#app');

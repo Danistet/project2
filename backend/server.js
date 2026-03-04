@@ -172,45 +172,72 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { username, userpswd } = req.body;
+  const { username, userpswd, fname, sname, lname } = req.body;
+  
   if (!username || !userpswd) {
-    return res.status(400).json({ error: 'Missing username or userpswd'});
+    return res.status(400).json({ error: 'Missing username or userpswd' });
   }
   
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
-      return res.status(500).json({ error: 'DB connect error'});
+      return res.status(500).json({ error: 'DB connect error' });
     }
+
+    // 1. Проверка существования пользователя
     const checkQuery = 'SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?';
     db.query(checkQuery, [username], (err, result) => {
       if (err) {
+        console.error('Check user error:', err);
         db.detach();
-        console.error('Login error:', err);
-        return res.status(500).json({ error: 'Login error'});
+        return res.status(500).json({ error: 'Login error' });
       }
       
       if (result.length > 0) {
         db.detach();
-        return res.status(409).json({ error: 'User already exists'});
+        return res.status(409).json({ error: 'User already exists' });
       }   
       
+      // 2. Подготовка данных
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
-      const insert = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';     
-      db.query(insert, [username, userpswd, token, authDate], (err) => {
-        db.detach();
-        
+      
+      // 3. Последовательное выполнение INSERT-запросов
+      const insertUser = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
+      db.query(insertUser, [username, userpswd, token, authDate], (err) => {
         if (err) {
-          console.error('Error:', err);
-          return res.status(500).json({ error: 'Unable to create user'});
-        }      
-        res.status(201).json({ 
-          status: 'OK', 
-          username, 
-          token, 
-          authDate
-        });   
+          console.error('Insert user error:', err);
+          db.detach();
+          return res.status(500).json({ error: 'Unable to create user' });
+        }
+        
+        // Вспомогательная функция для цепочки запросов
+        const insertName = (query, value, next) => {
+          db.query(query, [value], (err) => {
+            if (err) {
+              console.error(`Insert ${value} error:`, err);
+              // Не прерываем регистрацию, логируем ошибку
+            }
+            if (next) next();
+          });
+        };
+        
+        // 4. Цепочка INSERT в таблицы имён
+        insertName('INSERT INTO FIRST_NAMES (NAME) VALUES (?)', fname, () => {
+          insertName('INSERT INTO SECOND_NAMES (NAME) VALUES (?)', sname, () => {
+            insertName('INSERT INTO LAST_NAMES (NAME) VALUES (?)', lname, () => {
+              // 5. Отключаемся и отправляем ОДИН ответ
+              db.detach();
+              res.status(201).json({ 
+                status: 'OK', 
+                username, 
+                token, 
+                authDate,
+                message: 'User registered successfully'
+              });
+            });
+          });
+        });
       });
     });
   });
