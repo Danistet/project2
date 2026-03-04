@@ -183,8 +183,6 @@ app.post('/register', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'DB connect error' });
     }
-
-    // 1. Проверка существования пользователя
     const checkQuery = 'SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?';
     db.query(checkQuery, [username], (err, result) => {
       if (err) {
@@ -197,36 +195,26 @@ app.post('/register', (req, res) => {
         db.detach();
         return res.status(409).json({ error: 'User already exists' });
       }   
-      
-      // 2. Подготовка данных
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
-      
-      // 3. Последовательное выполнение INSERT-запросов
       const insertUser = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
       db.query(insertUser, [username, userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
-        }
-        
-        // Вспомогательная функция для цепочки запросов
+        }        
         const insertName = (query, value, next) => {
           db.query(query, [value], (err) => {
             if (err) {
               console.error(`Insert ${value} error:`, err);
-              // Не прерываем регистрацию, логируем ошибку
             }
             if (next) next();
           });
-        };
-        
-        // 4. Цепочка INSERT в таблицы имён
+        };        
         insertName('INSERT INTO FIRST_NAMES (NAME) VALUES (?)', fname, () => {
           insertName('INSERT INTO SECOND_NAMES (NAME) VALUES (?)', sname, () => {
             insertName('INSERT INTO LAST_NAMES (NAME) VALUES (?)', lname, () => {
-              // 5. Отключаемся и отправляем ОДИН ответ
               db.detach();
               res.status(201).json({ 
                 status: 'OK', 
@@ -238,6 +226,7 @@ app.post('/register', (req, res) => {
             });
           });
         });
+        /////////////METERS
       });
     });
   });
