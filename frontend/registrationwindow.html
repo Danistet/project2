@@ -10,6 +10,24 @@
     <body>
         <h1>Регистрация</h1>
         <div id="app" class="server-response">
+            <div>
+                <label for="search">Город:</label>
+                <input type="search" id="search" list="resultsTown" placeholder="Введите Aдрес...">
+                <datalist id="resultsTown">
+                    <option value="testгород"></option>
+                </datalist><br>
+                <label for="search">Улица:</label>
+                <input type="search" id="search" list="resultsStreet" placeholder="Введите Aдрес...">
+                <datalist id="resultsStreet">
+                    <option value="testулица"></option>
+                </datalist><br>
+                <label for="search">Aдрес:</label>
+                <input type="search" id="search" list="resultsHome" placeholder="Введите Aдрес...">
+                <datalist id="resultsHome">
+                    <option value="testадрес"></option>
+                </datalist>
+                <!-- загрузка option из бд -->
+            </div>
             <input v-model="fname" placeholder="напишите имя" required type="text" maxlength="30"><br>
             <input v-model="sname" placeholder="напишите отчество" required type="text" maxlength="30"><br>
             <input v-model="lname" placeholder="напишите фамилию" required type="text" maxlength="30"><br>

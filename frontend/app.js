@@ -58,12 +58,6 @@ createApp({
         if (!result.authDate) {
           throw new Error('Сервер не вернул authDate');
         }
-        if (!result.meterNum) {
-          //throw new Error('Сервер не вернул meterNum');
-        }
-        if (!result.mountDate) {
-          //throw new Error('Сервер не вернул mountDate');
-        }
         const authData = {
           username: result.username,
           token: result.token,

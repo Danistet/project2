@@ -204,6 +204,7 @@ app.post('/register', (req, res) => {
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }        
+        
         const insertName = (query, value, next) => {
           db.query(query, [value], (err) => {
             if (err) {
@@ -212,21 +213,29 @@ app.post('/register', (req, res) => {
             if (next) next();
           });
         };        
+        
         insertName('INSERT INTO FIRST_NAMES (NAME) VALUES (?)', fname, () => {
           insertName('INSERT INTO SECOND_NAMES (NAME) VALUES (?)', sname, () => {
             insertName('INSERT INTO LAST_NAMES (NAME) VALUES (?)', lname, () => {
-              db.detach();
-              res.status(201).json({ 
-                status: 'OK', 
-                username, 
-                token, 
-                authDate,
-                message: 'User registered successfully'
+              const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
+              db.query(meterQuery, [username], (err, meterResult) => {
+                const meterNum = meterResult?.[0]?.METER_NUM || null;
+                const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
+                
+                db.detach();
+                res.status(201).json({ 
+                  status: 'OK', 
+                  username, 
+                  token, 
+                  authDate,
+                  meterNum,
+                  mountDate,
+                  message: 'User registered successfully'
+                });     
               });
             });
           });
         });
-        /////////////METERS
       });
     });
   });
