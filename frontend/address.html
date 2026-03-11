@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <title>Введите адрес</title>
+        <script src="./api.js"></script>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    </head>
+    <body>
+        <div>
+            <label>Город:</label><br>
+            <input type="search" id="townInput" list="resultsTown" placeholder="Введите город..." 
+                @input="onTownInput" @change="onTownChange">
+            <datalist id="resultsTown">
+            <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
+            </datalist><br>
+            <label>Улица:</label><br>
+            <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу..." 
+                @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId">
+            <datalist id="resultsStreet">
+            <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
+            </datalist><br>
+            <label>Дом:</label><br>
+            <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома..." 
+                @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId">
+            <datalist id="resultsHome">
+            <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
+            </datalist><br>
+            <!-- загрузка option из бд -->
+        </div><br>
+        <div>
+            <button @click="login">Подтвердить</button><br>
+            <button onclick="tologin()">Обратно на страницу входа</button>
+        </div>
+    </body>
+    <script src="./app.js"></script>
+    <script>
+        function tologin()
+        {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+    <style>
+    body 
+    {
+      margin: 0;
+      color: goldenrod;
+      background-color: rgb(56, 54, 54);
+      font-size: 24px;
+      justify-content: center;
+      justify-items: center;
+    }
+    button 
+    {
+      background-color: aqua;
+      width: 177px;
+    }
+    .server-response 
+    {
+      white-space: pre-line;
+      color: goldenrod;
+      padding: 16px;
+      border-radius: 6px;
+      justify-content: center;
+      justify-items: center;
+    }
+    p
+    {
+      font-size: 14px;
+      color: greenyellow;
+      word-break: break-all;
+    }
+    input
+    {
+      background-color: aquamarine;
+      color: rgb(0, 0, 0);
+    }
+  </style>
+</html>

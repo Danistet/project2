@@ -11,27 +11,26 @@
         <h1>Регистрация</h1>
         <div id="app" class="server-response">
             <div>
-                <label for="search">Город:</label>
-                <input type="search" id="search" list="resultsTown" placeholder="Введите Aдрес...">
+                <label>Город:</label>
+                <input type="search" id="townInput" list="resultsTown" placeholder="Введите город..." 
+                    @input="onTownInput" @change="onTownChange">
                 <datalist id="resultsTown">
-                    <option value="testгород"></option>
+                <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
                 </datalist><br>
-                <label for="search">Улица:</label>
-                <input type="search" id="search" list="resultsStreet" placeholder="Введите Aдрес...">
+                <label>Улица:</label>
+                <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу..." 
+                    @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId">
                 <datalist id="resultsStreet">
-                    <option value="testулица"></option>
+                <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
                 </datalist><br>
-                <label for="search">Aдрес:</label>
-                <input type="search" id="search" list="resultsHome" placeholder="Введите Aдрес...">
+                <label>Дом:</label>
+                <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома..." 
+                    @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId">
                 <datalist id="resultsHome">
-                    <option value="testадрес"></option>
-                </datalist>
+                <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
+                </datalist><br>
                 <!-- загрузка option из бд -->
             </div>
-            <input v-model="fname" placeholder="напишите имя" required type="text" maxlength="30"><br>
-            <input v-model="sname" placeholder="напишите отчество" required type="text" maxlength="30"><br>
-            <input v-model="lname" placeholder="напишите фамилию" required type="text" maxlength="30"><br>
-            <br>
             <input v-model="username" placeholder="Придумайте логин" required type="text" maxlength="10"><br>
             <input v-model="password" type="password" placeholder="Придумайте пароль" required maxlength="15"/><br>
             <br>

@@ -9,7 +9,64 @@ app.use(cors());
 app.use(express.json());
 
 
-app.post('/meters', (req, res) => {
+app.get('/cities', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    
+    db.query('SELECT ID, NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json(result.map(r => ({ id: r.ID, name: r.NAME })));
+    });
+  });
+});
+
+app.get('/streets', (req, res) => {
+  const townId = req.query.townId;
+  if (!townId) return res.status(400).json({ error: 'townId required' });
+  
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    
+    const query = `
+      SELECT ID, STREET, STREET_TYPE 
+      FROM RSTREETS 
+      WHERE TOWN_ID = ? 
+      ORDER BY STREET_TYPE, STREET
+    `;
+    db.query(query, [townId], (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json(result.map(r => ({ 
+        id: r.ID, 
+        name: `${r.STREET_TYPE} ${r.STREET}`.trim() 
+      })));
+    });
+  });
+});
+
+app.get('/buildings', (req, res) => {
+  const streetId = req.query.streetId;
+  if (!streetId) return res.status(400).json({ error: 'streetId required' });
+  
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    
+    const query = `
+      SELECT ID, HOUSE 
+      FROM BUILDINGS 
+      WHERE STREET_ID = ? 
+      ORDER BY HOUSE
+    `;
+    db.query(query, [streetId], (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json(result.map(r => ({ id: r.ID, house: r.HOUSE })));
+    });
+  });
+});
+
+app.post('/meters', (req, res) => {//////not using
   const { meternum, mountdate } = req.body;
   
   console.log('Запрос /meters:', { meternum, mountdate });
@@ -51,7 +108,7 @@ app.post('/meters', (req, res) => {
       });
     });
   });
-});
+});////////not using
 
 app.post('/update-token', (req, res) => {
   const { username, token } = req.body;
@@ -203,38 +260,21 @@ app.post('/register', (req, res) => {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
-        }        
-        
-        const insertName = (query, value, next) => {
-          db.query(query, [value], (err) => {
-            if (err) {
-              console.error(`Insert ${value} error:`, err);
-            }
-            if (next) next();
-          });
-        };        
-        
-        insertName('INSERT INTO FIRST_NAMES (NAME) VALUES (?)', fname, () => {
-          insertName('INSERT INTO SECOND_NAMES (NAME) VALUES (?)', sname, () => {
-            insertName('INSERT INTO LAST_NAMES (NAME) VALUES (?)', lname, () => {
-              const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
-              db.query(meterQuery, [username], (err, meterResult) => {
-                const meterNum = meterResult?.[0]?.METER_NUM || null;
-                const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
-                
-                db.detach();
-                res.status(201).json({ 
-                  status: 'OK', 
-                  username, 
-                  token, 
-                  authDate,
-                  meterNum,
-                  mountDate,
-                  message: 'User registered successfully'
-                });     
-              });
-            });
-          });
+        }                        
+        const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
+        db.query(meterQuery, [username], (err, meterResult) => {
+          const meterNum = meterResult?.[0]?.METER_NUM || null;
+          const mountDate = meterResult?.[0]?.MOUNT_DATE || null;       
+          db.detach();
+          res.status(201).json({ 
+            status: 'OK', 
+            username, 
+            token, 
+            authDate,
+            meterNum,
+            mountDate,
+            message: 'User registered successfully'
+          });     
         });
       });
     });

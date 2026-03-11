@@ -3,13 +3,89 @@ createApp({
   setup() {
     const username = ref('');
     const password = ref('');
-    const fname = ref('');
-    const sname = ref('');
-    const lname = ref('');
     const response = ref('');
     const error = ref('');
     const meternum = ref('');
     const mountdate = ref('');
+    ///////
+    const towns = ref([]);
+    const streets = ref([]);
+    const buildings = ref([]);
+    const selectedTownId = ref(null);
+    const selectedStreetId = ref(null);
+    const selectedBuildingId = ref(null);
+    const houseInput = ref('');
+    const { onMounted } = Vue;
+    ///////
+    const loadTowns = async () => {
+      try {
+        const result = await apiRequest('/cities', {}, 'GET');
+        towns.value = result;
+      } catch (err) {
+        console.error('Failed to load towns:', err);
+      }
+    };
+
+    const loadStreets = async (townId) => {
+      if (!townId) { streets.value = []; return; }
+      try {
+        const result = await apiRequest(`/streets?townId=${townId}`, {}, 'GET');
+        streets.value = result;
+      } catch (err) {
+        console.error('Failed to load streets:', err);
+      }
+    };
+
+    const loadBuildings = async (streetId) => {
+      if (!streetId) { buildings.value = []; return; }
+      try {
+        const result = await apiRequest(`/buildings?streetId=${streetId}`, {}, 'GET');
+        buildings.value = result;
+      } catch (err) {
+        console.error('Failed to load buildings:', err);
+      }
+    };
+    ///////
+
+    const onTownInput = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
+      if (option) selectedTownId.value = option.dataset.id;
+    };
+    const onTownChange = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
+      selectedTownId.value = option?.dataset.id || null;
+      if (selectedTownId.value) loadStreets(selectedTownId.value);
+      else { streets.value = []; buildings.value = []; }
+    };
+
+    const onStreetInput = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
+      if (option) selectedStreetId.value = option.dataset.id;
+    };
+    const onStreetChange = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
+      selectedStreetId.value = option?.dataset.id || null;
+      if (selectedStreetId.value) loadBuildings(selectedStreetId.value);
+      else buildings.value = [];
+    };
+
+    const onHouseInput = (e) => {
+      houseInput.value = e.target.value;
+      const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === e.target.value);
+      if (option) selectedBuildingId.value = option.dataset.id;
+    };
+    const onHouseChange = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === val);
+      selectedBuildingId.value = option?.dataset.id || null;
+      houseInput.value = val;
+    };
+    //////////
+
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
@@ -24,9 +100,12 @@ createApp({
             username: username.value,
             userpswd: password.value,
             meternum: meternum.value,
-            fname: fname.value,
-            sname: sname.value,
-            lname: lname.value
+            //////
+            townId: selectedTownId.value,
+            streetId: selectedStreetId.value,
+            buildingId: selectedBuildingId.value,
+            house: houseInput.value || null
+            //////
           });
           response.value = 'Пользователь зарегистрирован';
         } else {
@@ -70,7 +149,6 @@ createApp({
           mountDate: result.mountDate
         };
                 
-
         console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate);
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
@@ -84,6 +162,18 @@ createApp({
         console.error(err);
       }
     };
-    return { username, password,  meternum, mountdate, login, response, error, fname, sname, lname};
+    /////
+    onMounted(() => {
+      loadTowns();
+    });
+    /////
+    //return { username, password,  meternum, mountdate, login, response, error};
+    return { 
+      username, password, response, error, meternum, mountdate,
+      towns, streets, buildings,
+      selectedTownId, selectedStreetId, selectedBuildingId, houseInput,
+      onTownInput, onTownChange, onStreetInput, onStreetChange, onHouseInput, onHouseChange,
+      login 
+    };
   }
 }).mount('#app');
