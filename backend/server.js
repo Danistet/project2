@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 
-app.get('/cities', (req, res) => {
+app.post('/cities', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
     
@@ -21,7 +21,7 @@ app.get('/cities', (req, res) => {
   });
 });
 
-app.get('/streets', (req, res) => {
+app.post('/streets', (req, res) => {
   const townId = req.query.townId;
   if (!townId) return res.status(400).json({ error: 'townId required' });
   
@@ -45,7 +45,7 @@ app.get('/streets', (req, res) => {
   });
 });
 
-app.get('/buildings', (req, res) => {
+app.post('/buildings', (req, res) => {
   const streetId = req.query.streetId;
   if (!streetId) return res.status(400).json({ error: 'streetId required' });
   
@@ -229,7 +229,7 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { phone, userpswd, fname, sname, lname } = req.body;
+  const { phone, userpswd, fname, sname, lname, townId, streetId, buildingId, house  } = req.body;
   
   if (!phone || !userpswd) {
     return res.status(400).json({ error: 'Missing phone or userpswd' });

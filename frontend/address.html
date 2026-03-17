@@ -6,38 +6,35 @@
         <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
     <body>
-        <div>
+        <h1>Введите адрес</h1>
+        <div id="app">
             <label>Город:</label><br>
-            <input type="search" id="townInput" list="resultsTown" placeholder="Введите город..." 
-                @input="onTownInput" @change="onTownChange">
+            <input type="search" id="townInput" list="resultsTown" placeholder="Введите город" 
+                @input="onTownInput" @change="onTownChange" v-model="townSearch">
             <datalist id="resultsTown">
             <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
             </datalist><br>
             <label>Улица:</label><br>
-            <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу..." 
-                @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId">
+            <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу" 
+                @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId" v-model="streetSearch">
             <datalist id="resultsStreet">
             <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
             </datalist><br>
             <label>Дом:</label><br>
-            <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома..." 
-                @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId">
+            <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома" 
+                @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId" v-model="houseSearch">
             <datalist id="resultsHome">
             <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
             </datalist><br>
-            <!-- загрузка option из бд -->
+        
+            <div>
+                <button @click="saveAddressAndContinue">Подтвердить</button><br>
+                <button onclick="tologin()">Обратно на страницу входа</button>
+            </div>
         </div><br>
-        <div>
-            <button onclick="login()">Подтвердить</button><br>
-            <button onclick="tologin()">Обратно на страницу входа</button>
-        </div>
     </body>
     <script src="./app.js"></script>
     <script>
-        function login()
-        {
-            window.location.href = 'main.html';
-        }
         function tologin()
         {
             window.location.href = 'index.html';

@@ -7,9 +7,12 @@
 
     <body>
         <h1>Главная страница</h1>
-        <div >
-            <p id="error" style="color: red;"></p>           
-        </div>
+        <h2>
+            <span id="streettype"></span>
+            <span id="street"></span>           
+            <span id="house"></span>
+            <p id="error" style="color: red;"></p> 
+        </h2>          
         <div>
             <p>Серийный номер:</p>
             <p id="meterNum"></p>
@@ -22,8 +25,19 @@
             <button onclick="logout()">Выход</button>
         </div>
         <script>
+
+        function loadAddressDisplay() {
+        const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
+            if (addressData) {
+                document.getElementById('streettype').textContent = addressData.street?.split(' ')[0] || '';
+                document.getElementById('street').textContent = addressData.street?.split(' ').slice(1).join(' ') || addressData.street || '';
+                document.getElementById('house').textContent = addressData.house || '';
+            }
+        }
+
             document.addEventListener('DOMContentLoaded', () => {
             initPage();
+            loadAddressDisplay();
             });
             function initPage() {
                 const authData = JSON.parse(sessionStorage.getItem('authData'));
@@ -107,13 +121,16 @@
             font-size: 24px;
             justify-content: center;
             justify-items: center;
+            white-space: nowrap;
         }
         p
         {
             color: blueviolet;
-            justify-content: center;
-            justify-items: center;
-            word-break: break-all;
+            white-space: nowrap;
+        }
+        span
+        {
+            color: blueviolet;
         }
         button 
         {
@@ -133,6 +150,7 @@
         {
             justify-content: center;
             justify-items: center;
+            white-space: nowrap;
         }
         .ContinueButton
         {
@@ -144,6 +162,10 @@
             width: 177px;
             justify-content: center;
             justify-items: center;
+        }
+        h2
+        {
+            white-space: nowrap;
         }
     </style>
 </html>
