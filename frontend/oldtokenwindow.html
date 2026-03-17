@@ -26,8 +26,8 @@
         setup() {
           const password = ref('');      
           const login = async () => {
-            const username = sessionStorage.getItem('reauthUsername');
-            if (!username || !password.value.trim()) {
+            const phone = sessionStorage.getItem('reauthUsername');
+            if (!phone || !password.value.trim()) {
               alert('Данные утеряны. Повторите вход.');
               window.location.href = 'index.html';
               return;
@@ -35,7 +35,7 @@
         
             try {
               const result = await apiRequest('/auth', {
-                username,
+                phone,
                 userpswd: password.value
               });        
               sessionStorage.setItem('authData', JSON.stringify(result));

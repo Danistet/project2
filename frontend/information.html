@@ -26,7 +26,7 @@
         <script>
             window.addEventListener('DOMContentLoaded', async () => {
                 const authData = JSON.parse(sessionStorage.getItem('authData'));
-                const usernameElement = document.getElementById('username');
+                const usernameElement = document.getElementById('phone');
                 const tokenElement = document.getElementById('token');
                 const errorContainer = document.getElementById('error');
                 document.getElementById('text').style.fontSize = '8px';
@@ -42,7 +42,7 @@
                 }
             
                 console.log('Auth data from sessionStorage:', authData);            
-                if (!authData.username || !authData.token) {
+                if (!authData.phone || !authData.token) {
                     showError('Некорректные данные сессии');
                     clearSession();
                     setTimeout(() => {
@@ -52,9 +52,9 @@
                 }
             
                 try {
-                    console.log('Обновление:', authData.username);               
+                    console.log('Обновление:', authData.phone);               
                     const result = await apiRequest('/update-token', {
-                        username: authData.username,
+                        phone: authData.phone,
                         token: authData.token
                     });
                 

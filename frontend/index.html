@@ -10,12 +10,11 @@
   <body>
     <h1>Вход</h1> 
     <div id="app" class="server-response">
-      <input v-model="username" placeholder="Логин" required type="text"><br>
+      <input v-model="phone" placeholder="телефон. номер" required type="tel"><br>
       <input v-model="password" type="password" placeholder="Пароль" required/><br>
       <br>
       <button @click="login">Войти</button><br>
       <button onclick="registerw()">Регистрация</button><br>
-      <button onclick="TEST()">testtest</button>
       <p v-if="response">{{ response }}</p>
       <p v-if="error" style="color: red;">{{ error }}</p>
     </div>
@@ -24,10 +23,6 @@
       function registerw()
       {
         window.location.href = 'registrationwindow.html'
-      }
-      function TEST()
-      {
-        window.location.href = 'address.html'
       }
     </script>
   </body>

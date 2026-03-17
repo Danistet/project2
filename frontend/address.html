@@ -28,12 +28,16 @@
             <!-- загрузка option из бд -->
         </div><br>
         <div>
-            <button @click="login">Подтвердить</button><br>
+            <button onclick="login()">Подтвердить</button><br>
             <button onclick="tologin()">Обратно на страницу входа</button>
         </div>
     </body>
     <script src="./app.js"></script>
     <script>
+        function login()
+        {
+            window.location.href = 'main.html';
+        }
         function tologin()
         {
             window.location.href = 'index.html';

@@ -1,7 +1,7 @@
 const { createApp, ref } = Vue;
 createApp({
   setup() {
-    const username = ref('');
+    const phone = ref('');
     const password = ref('');
     const response = ref('');
     const error = ref('');
@@ -89,7 +89,7 @@ createApp({
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
-      if (!username.value.trim() || !password.value.trim()) {
+      if (!phone.value.trim() || !password.value.trim()) {
         error.value = 'Логин и пароль обязательны для заполнения';
         return;
       }   
@@ -97,7 +97,7 @@ createApp({
         let result;
         if (mode === 'register') {    
           result = await apiRequest('/register', {
-            username: username.value,
+            phone: phone.value,
             userpswd: password.value,
             meternum: meternum.value,
             //////
@@ -110,13 +110,13 @@ createApp({
           response.value = 'Пользователь зарегистрирован';
         } else {
           result = await apiRequest('/auth', {
-            username: username.value,
+            phone: phone.value,
             userpswd: password.value,
             meternum: meternum.value
           });
         }
         sessionStorage.setItem('authData', JSON.stringify({
-          username: result.username,
+          phone: result.phone,
           token: result.token,
           authDate: result.authDate
         }));
@@ -128,8 +128,8 @@ createApp({
         }));        
         console.log('Ответ сервера:', result);
 
-        if (!result.username) {
-          throw new Error('Сервер не вернул username');
+        if (!result.phone) {
+          throw new Error('Сервер не вернул phone');
         }
         if (!result.token) {
           throw new Error('Сервер не вернул token');
@@ -138,7 +138,7 @@ createApp({
           throw new Error('Сервер не вернул authDate');
         }
         const authData = {
-          username: result.username,
+          phone: result.phone,
           token: result.token,
           authDate: result.authDate
         };
@@ -155,8 +155,8 @@ createApp({
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         console.log('authData:', sessionStorage.getItem('authData'));
         console.log('meterNum:', sessionStorage.getItem('meterNum'));
-        console.log('mountDate:', sessionStorage.getItem('mountDate'));         
-        window.location.href = 'main.html';              
+        console.log('mountDate:', sessionStorage.getItem('mountDate')); 
+        window.location.href = 'address.html';                     
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);
@@ -167,9 +167,9 @@ createApp({
       loadTowns();
     });
     /////
-    //return { username, password,  meternum, mountdate, login, response, error};
+    //return { phone, password,  meternum, mountdate, login, response, error};
     return { 
-      username, password, response, error, meternum, mountdate,
+      phone, password, response, error, meternum, mountdate,
       towns, streets, buildings,
       selectedTownId, selectedStreetId, selectedBuildingId, houseInput,
       onTownInput, onTownChange, onStreetInput, onStreetChange, onHouseInput, onHouseChange,

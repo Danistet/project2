@@ -10,28 +10,7 @@
     <body>
         <h1>Регистрация</h1>
         <div id="app" class="server-response">
-            <div>
-                <label>Город:</label>
-                <input type="search" id="townInput" list="resultsTown" placeholder="Введите город..." 
-                    @input="onTownInput" @change="onTownChange">
-                <datalist id="resultsTown">
-                <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
-                </datalist><br>
-                <label>Улица:</label>
-                <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу..." 
-                    @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId">
-                <datalist id="resultsStreet">
-                <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
-                </datalist><br>
-                <label>Дом:</label>
-                <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома..." 
-                    @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId">
-                <datalist id="resultsHome">
-                <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
-                </datalist><br>
-                <!-- загрузка option из бд -->
-            </div>
-            <input v-model="username" placeholder="Придумайте логин" required type="text" maxlength="10"><br>
+            <input v-model="phone" placeholder="телефон. номер" required type="text" maxlength="10"><br>
             <input v-model="password" type="password" placeholder="Придумайте пароль" required maxlength="15"/><br>
             <br>
             <button @click="login('register')">Создать аккаунт</button><br>

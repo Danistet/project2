@@ -8,14 +8,12 @@
     <body>
         <h1>Главная страница</h1>
         <div >
-            <p id="username"></p>
-            <p id="token"></p>
             <p id="error" style="color: red;"></p>           
         </div>
         <div>
-            <p>meternum:</p>
+            <p>Серийный номер:</p>
             <p id="meterNum"></p>
-            <p>mountdate: </p>
+            <p>Дата установки: </p>
             <p id="mountDate"></p>
         </div>
         <div>
@@ -30,7 +28,7 @@
             function initPage() {
                 const authData = JSON.parse(sessionStorage.getItem('authData'));
                 const errorElement = document.getElementById('error');
-                const usernameElement = document.getElementById('username');
+                const usernameElement = document.getElementById('phone');
                 const tokenElement = document.getElementById('token');
                 const continueButton = document.getElementById('ContinueButton');
                 const infoButton = document.getElementById('infbt');
@@ -47,10 +45,10 @@
                         errorElement.textContent = 'Срок действия токена истёк';
                         continueButton.style.display = 'visible';
                         infoButton.style.display = 'none';                                      
-                        sessionStorage.setItem('reauthUsername', authData.username);
+                        sessionStorage.setItem('reauthUsername', authData.phone);
                         sessionStorage.setItem('lastAuthDate', authData.authDate);
                     } else {    
-                        usernameElement.textContent = `User: ${authData.username}`;
+                        usernameElement.textContent = `User: ${authData.phone}`;
                         tokenElement.textContent = `Token: ${authData.token}`;
                         continueButton.style.display = 'none';
                         infoButton.style.display = 'visible';

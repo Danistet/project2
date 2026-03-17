@@ -111,10 +111,10 @@ app.post('/meters', (req, res) => {//////not using
 });////////not using
 
 app.post('/update-token', (req, res) => {
-  const { username, token } = req.body;
+  const { phone, token } = req.body;
   
-  if (!username || !token) {
-    return res.status(400).json({ error: 'Missing username or token' });
+  if (!phone || !token) {
+    return res.status(400).json({ error: 'Missing phone or token' });
   }
   
   firebird.attach(config, (err, db) => {
@@ -124,7 +124,7 @@ app.post('/update-token', (req, res) => {
     }    
     const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?';
     
-    db.query(query, [username, token], (err, result) => {
+    db.query(query, [phone, token], (err, result) => {
       if (err) {
         db.detach();
         console.error('Query error:', err);
@@ -133,7 +133,7 @@ app.post('/update-token', (req, res) => {
       
       if (result.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'Invalid token or username' });
+        return res.status(401).json({ error: 'Invalid token or phone' });
       }
       
       const now = Date.now();
@@ -141,7 +141,7 @@ app.post('/update-token', (req, res) => {
       const newAuthDate = now;
       const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';
         
-      db.query(updateQuery, [newToken, newAuthDate, username], (upderr) => {
+      db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
         db.detach();         
         if (upderr) {
           console.error('Update error:', upderr);
@@ -149,7 +149,7 @@ app.post('/update-token', (req, res) => {
         }          
         res.json({ 
           status: 'OK', 
-          username, 
+          phone, 
           token, 
           authDate: now 
         });
@@ -159,10 +159,10 @@ app.post('/update-token', (req, res) => {
 });
 
 app.post('/auth', (req, res) => {
-  const { username, userpswd } = req.body;
+  const { phone, userpswd } = req.body;
   
-  if (!username || !userpswd) {
-    return res.status(400).json({ error: 'Missing username or password' });
+  if (!phone || !userpswd) {
+    return res.status(400).json({ error: 'Missing phone or password' });
   }
   
   firebird.attach(config, (err, db) => {
@@ -172,7 +172,7 @@ app.post('/auth', (req, res) => {
     }      
     const authQuery = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
     
-    db.query(authQuery, [username, userpswd], (err, authResult) => {
+    db.query(authQuery, [phone, userpswd], (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
@@ -180,18 +180,18 @@ app.post('/auth', (req, res) => {
       
       if (authResult.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'Invalid username or password'});
+        return res.status(401).json({ error: 'Invalid phone or password'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';      
-      db.query(meterQuery, [username], (err, meterResult) => {        
+      db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
         const minute = 2000;        
         const finishResponse = (token, authDate, meterNum, mountDate) => {
           db.detach();
           res.json({ 
             status: 'OK', 
-            username, 
+            phone, 
             token, 
             authDate,
             meterNum,
@@ -204,7 +204,7 @@ app.post('/auth', (req, res) => {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
           const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';      
-          db.query(updateQuery, [newToken, newAuthDate, username], (upderr) => {
+          db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error:', upderr);
@@ -214,7 +214,7 @@ app.post('/auth', (req, res) => {
           });
         } else {
           const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
-          db.query(updateQuery, [now, username], (upderr) => {
+          db.query(updateQuery, [now, phone], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error', upderr);
@@ -229,10 +229,10 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { username, userpswd, fname, sname, lname } = req.body;
+  const { phone, userpswd, fname, sname, lname } = req.body;
   
-  if (!username || !userpswd) {
-    return res.status(400).json({ error: 'Missing username or userpswd' });
+  if (!phone || !userpswd) {
+    return res.status(400).json({ error: 'Missing phone or userpswd' });
   }
   
   firebird.attach(config, (err, db) => {
@@ -241,7 +241,7 @@ app.post('/register', (req, res) => {
       return res.status(500).json({ error: 'DB connect error' });
     }
     const checkQuery = 'SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?';
-    db.query(checkQuery, [username], (err, result) => {
+    db.query(checkQuery, [phone], (err, result) => {
       if (err) {
         console.error('Check user error:', err);
         db.detach();
@@ -255,20 +255,20 @@ app.post('/register', (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
       const insertUser = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
-      db.query(insertUser, [username, userpswd, token, authDate], (err) => {
+      db.query(insertUser, [phone, userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }                        
         const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
-        db.query(meterQuery, [username], (err, meterResult) => {
+        db.query(meterQuery, [phone], (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
           const mountDate = meterResult?.[0]?.MOUNT_DATE || null;       
           db.detach();
           res.status(201).json({ 
             status: 'OK', 
-            username, 
+            phone, 
             token, 
             authDate,
             meterNum,
