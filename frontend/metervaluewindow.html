@@ -7,28 +7,30 @@
     </head>
     <body>
         <div class="container">
-            <h1>Информация</h1>
-            <p id="token"></p>
+            <h1>Передать показания</h1>
             <div id="error"></div>
-            <p id="text">
-                Never gonna give you up
-            </p>
         </div>
         <div>
+            <p>Серийный номер:</p>
+            <p id="meterNum"></p>
+            <p>Предыдущие показания:</p>
+            <p id="metervalue"></p>
+            <br>
+            <p>Текущее показание:</p>
+        </div>
+        <div>
+            <input v-model="newmetervalue"><br>
+            <button>Передать</button><br>
             <button onclick="main()">Выход</button>
         </div>
 
         <script>
             window.addEventListener('DOMContentLoaded', async () => {
                 const authData = JSON.parse(sessionStorage.getItem('authData'));
-                const usernameElement = document.getElementById('phone');
-                const tokenElement = document.getElementById('token');
+                const phoneElement = document.getElementById('phone');
                 const errorContainer = document.getElementById('error');
-                document.getElementById('text').style.fontSize = '8px';
-                document.getElementById('text').style.maxWidth = '150px';
             
                 if (!authData) {
-                    tokenElement.textContent = 'Токен не найден';
                     showError('Сессия не найдена');
                     setTimeout(() => {
                         window.location.href = 'index.html';
@@ -55,7 +57,6 @@
                 
                     console.log(result);           
                     sessionStorage.setItem('authData', JSON.stringify(result));               
-                    tokenElement.textContent = `Токен: ${result.token}`;
                 } catch (error) {
                     console.error('Ошибка обновления:', error);
                     showError(`Ошибка обновлени: ${error.message}`);
@@ -74,7 +75,8 @@
         </script>
     </body>
     <style>
-        body {
+        body 
+        {
             margin: 0;
             color: goldenrod;
             background-color: rgb(56, 54, 54);
@@ -82,19 +84,30 @@
             justify-content: center;
             justify-items: center;
         }
-        button {
+        button 
+        {
             background-color: aqua;
             width: 177px;
         }
-        div {
+        div 
+        {
             justify-content: center;
             justify-items: center;
         }
-        p {
+        p 
+        {
             color: blueviolet;
             justify-content: center;
             justify-items: center;
             word-break: break-all;
+            white-space: nowrap;
+        }
+        input
+        {
+            background-color: aquamarine;
+            color: rgb(0, 0, 0);
+            justify-content: center;
+            justify-items: center;
         }
     </style>
 </html>

@@ -114,10 +114,6 @@ createApp({
             phone: phone.value,
             userpswd: password.value,
             meternum: meternum.value,
-            //townId: selectedTownId.value,
-            //streetId: selectedStreetId.value,
-            //buildingId: selectedBuildingId.value,
-            //house: houseInput.value || null
           });
           response.value = 'Пользователь зарегистрирован';
         } else {
