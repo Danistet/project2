@@ -28,7 +28,7 @@
           const login = async () => {
             const phone = sessionStorage.getItem('reauthUsername');
             if (!phone || !password.value.trim()) {
-              alert('Данные утеряны. Повторите вход.');
+              alert('Повторите вход.');
               window.location.href = 'index.html';
               return;
             }
