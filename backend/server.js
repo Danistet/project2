@@ -2,7 +2,6 @@ const express = require('express');
 const firebird = require('node-firebird');
 const cors = require('cors');
 const crypto = require('crypto');
-const iconv = require('iconv-lite');
 const config = require('./config');
 const app = express();
 const PORT = 3000;
@@ -10,58 +9,13 @@ app.use(cors());
 app.use(express.json());
 
 
-function convertResult(result) {
-  if (!result || !Array.isArray(result)) return result;
-  
-  return result.map(row => {
-    const converted = {};
-    for (const key in row) {
-      const value = row[key];
-      if (typeof value === 'string') {
-        const buffer = Buffer.from(value, 'binary');
-        converted[key] = iconv.decode(buffer, 'win1251');
-      } else {
-        converted[key] = value;
-      }
-    }
-    return converted;
-  });
-}
-
-function queryWithConvert(db, query, params, callback) {
-  db.query(query, params, (err, result) => {
-    if (err) return callback(err, null);
-    const converted = convertResult(result);
-    callback(null, converted);
-  });
-}
-
 app.post('/cities', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
     
-    queryWithConvert(db,'SELECT ID, NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
+    db.query('SELECT ID, NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
-      const raw = result[1]?.NAME;
-      console.log('=== ОТЛАДКА КОДИРОВКИ ===');
-      console.log('1. Тип значения:', typeof raw);
-      console.log('2. Строка как есть:', raw);
-      console.log('3. Длина строки:', raw?.length);
-      
-      // Пробуем разные способы получить байты
-      if (raw) {
-        console.log('4. Buffer.from(str, "latin1"):', Buffer.from(raw, 'latin1'));
-        console.log('5. iconv.decode(latin1):', iconv.decode(Buffer.from(raw, 'latin1'), 'win1251'));
-        
-        console.log('6. Buffer.from(str, "utf8"):', Buffer.from(raw, 'utf8'));
-        console.log('7. iconv.decode(utf8):', iconv.decode(Buffer.from(raw, 'utf8'), 'win1251'));
-        
-        // Пробуем обратную конвертацию: если строка уже "испорчена"
-        console.log('8. iconv.encode(str, "win1251"):', iconv.encode(raw, 'win1251'));
-        console.log('9. decode(win1251 buffer):', iconv.decode(iconv.encode(raw, 'win1251'), 'win1251'));
-      }
-      console.log('==========================');
       res.json(result.map(r => ({ id: r.ID, name: r.NAME })));
     });
   });
@@ -80,7 +34,7 @@ app.post('/streets', (req, res) => {
       WHERE TOWN_ID = ? 
       ORDER BY STREET_TYPE, STREET
     `;
-    queryWithConvert(db,query, [townId], (err, result) => {
+    db.query(query, [townId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
       res.json(result.map(r => ({ 
@@ -104,7 +58,7 @@ app.post('/buildings', (req, res) => {
       WHERE STREET_ID = ? 
       ORDER BY HOUSE
     `;
-    queryWithConvert(db,query, [streetId], (err, result) => {
+    db.query(query, [streetId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
       res.json(result.map(r => ({ id: r.ID, house: r.HOUSE })));
@@ -135,7 +89,7 @@ app.post('/meters', (req, res) => {//////not using
       dateStr = mountdate.split('T')[0];
     }
 
-    queryWithConvert(db,query, [meternum, dateStr], (err, result) => {
+    db.query(query, [meternum, dateStr], (err, result) => {
       if (err) {
         console.error('Query error:', err);
         db.detach();
@@ -170,7 +124,7 @@ app.post('/update-token', (req, res) => {
     }    
     const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?';
     
-    queryWithConvert(db,query, [phone, token], (err, result) => {
+    db.query(query, [phone, token], (err, result) => {
       if (err) {
         db.detach();
         console.error('Query error:', err);
@@ -187,7 +141,7 @@ app.post('/update-token', (req, res) => {
       const newAuthDate = now;
       const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';
         
-      queryWithConvert(db,updateQuery, [newToken, newAuthDate, phone], (upderr) => {
+      db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
         db.detach();         
         if (upderr) {
           console.error('Update error:', upderr);
@@ -218,7 +172,7 @@ app.post('/auth', (req, res) => {
     }      
     const authQuery = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
     
-    queryWithConvert(db,authQuery, [phone, userpswd], (err, authResult) => {
+    db.query(authQuery, [phone, userpswd], (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
@@ -230,7 +184,7 @@ app.post('/auth', (req, res) => {
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';      
-      queryWithConvert(db,meterQuery, [phone], (err, meterResult) => {        
+      db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
         const minute = 2000;        
         const finishResponse = (token, authDate, meterNum, mountDate) => {
@@ -250,7 +204,7 @@ app.post('/auth', (req, res) => {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
           const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';      
-          queryWithConvert(db,updateQuery, [newToken, newAuthDate, phone], (upderr) => {
+          db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error:', upderr);
@@ -260,7 +214,7 @@ app.post('/auth', (req, res) => {
           });
         } else {
           const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
-          queryWithConvert(db,updateQuery, [now, phone], (upderr) => {
+          db.query(updateQuery, [now, phone], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error', upderr);
@@ -287,7 +241,7 @@ app.post('/register', (req, res) => {
       return res.status(500).json({ error: 'DB connect error' });
     }
     const checkQuery = 'SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?';
-    queryWithConvert(db,checkQuery, [phone], (err, result) => {
+    db.query(checkQuery, [phone], (err, result) => {
       if (err) {
         console.error('Check user error:', err);
         db.detach();
@@ -301,14 +255,14 @@ app.post('/register', (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
       const insertUser = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
-      queryWithConvert(db,insertUser, [phone, userpswd, token, authDate], (err) => {
+      db.query(insertUser, [phone, userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }                        
         const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
-        queryWithConvert(db,meterQuery, [phone], (err, meterResult) => {
+        db.query(meterQuery, [phone], (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
           const mountDate = meterResult?.[0]?.MOUNT_DATE || null;       
           db.detach();
