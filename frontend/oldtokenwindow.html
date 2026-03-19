@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="WIN1251">
     <title>Истёк срок сессии</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./api.js"></script>
@@ -11,7 +12,7 @@
     <div id="app">
       <h2>Время последнего входа:</h2>
       <p id="authDatestr"></p>
-      <div>
+      <div style="visibility: hidden;">
         <h2>Войти через пароль</h2>
         <input v-model="password"><br>
         <button @click="login">Подтвердить</button>

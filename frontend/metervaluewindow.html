@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
     <head>
-        <meta charset="UTF-8">
+        <meta charset="WIN1251">
         <title>информация</title>
         <script src="./api.js"></script>
     </head>
@@ -29,7 +29,9 @@
                 const authData = JSON.parse(sessionStorage.getItem('authData'));
                 const phoneElement = document.getElementById('phone');
                 const errorContainer = document.getElementById('error');
-            
+                //////////////////////////////////////
+                const meterValue = document.getElementById('metervalue');
+                console.log("brbrrb",meterValue);
                 if (!authData) {
                     showError('Сессия не найдена');
                     setTimeout(() => {

@@ -178,7 +178,7 @@ createApp({
       towns, streets, buildings,
       selectedTownId, selectedStreetId, selectedBuildingId, houseInput, townSearch, streetSearch, houseSearch,
       onTownInput, onTownChange, onStreetInput, onStreetChange, onHouseInput, onHouseChange,
-      login,
+      login, metervalue,
       saveAddressAndContinue 
     };
   }
