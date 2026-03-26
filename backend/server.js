@@ -66,50 +66,6 @@ app.post('/buildings', (req, res) => {
   });
 });
 
-app.post('/meters', (req, res) => {//////not using
-  const { meternum, mountdate } = req.body;
-  
-  console.log('Запрос /meters:', { meternum, mountdate });
-
-  firebird.attach(config, (err, db) => {
-    if (err) {
-      console.error('Firebird connection error:', err);
-      return res.status(500).json({ error: 'Database connection failed' });
-    }    
-    const query = `
-      SELECT METER_NUM, MOUNT_DATE 
-      FROM METERS 
-      WHERE METER_NUM = ? 
-        AND MOUNT_DATE = CAST(? AS DATE)
-    `;
-    let dateStr = mountdate;
-    if (mountdate instanceof Date) {
-      dateStr = mountdate.toISOString().split('T')[0];
-    } else if (typeof mountdate === 'string') {      
-      dateStr = mountdate.split('T')[0];
-    }
-
-    db.query(query, [meternum, dateStr], (err, result) => {
-      if (err) {
-        console.error('Query error:', err);
-        db.detach();
-        return res.status(500).json({ error: 'Query failed' });
-      }
-      db.detach();
-
-      return res.status(200).json({ 
-        success: true, 
-        data: result || [],
-        debug: {
-          received: { meternum, mountdate },
-          usedForQuery: { meternum, dateStr },
-          found: result?.length || 0
-        }
-      });
-    });
-  });
-});////////not using
-
 app.post('/update-token', (req, res) => {
   const { phone, token } = req.body;
   
@@ -183,11 +139,11 @@ app.post('/auth', (req, res) => {
         return res.status(401).json({ error: 'Invalid phone or password'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
-      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';      
+      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS';      
       db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
         const minute = 2000;        
-        const finishResponse = (token, authDate, meterNum, mountDate) => {
+        const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 
             status: 'OK', 
@@ -195,11 +151,13 @@ app.post('/auth', (req, res) => {
             token, 
             authDate,
             meterNum,
+            verifyDate,
             mountDate
           });
         };        
         const meterNum = meterResult?.[0]?.METER_NUM || null;
-        const mountDate = meterResult?.[0]?.MOUNT_DATE || null;                
+        const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
+        const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;                
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
@@ -210,7 +168,7 @@ app.post('/auth', (req, res) => {
               console.error('Update error:', upderr);
               return res.status(500).json({ error: 'Update error'});
             }       
-            finishResponse(newToken, now, meterNum, mountDate);
+            finishResponse(newToken, now, meterNum, mountDate, verifyDate);
           });
         } else {
           const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
@@ -220,7 +178,7 @@ app.post('/auth', (req, res) => {
               console.error('Update error', upderr);
               return res.status(500).json({ error: 'Update error'});
             }     
-            finishResponse(existingToken, now, meterNum, mountDate);
+            finishResponse(existingToken, now, meterNum, mountDate, verifyDate);
           });
         }
       });
@@ -264,7 +222,8 @@ app.post('/register', (req, res) => {
         const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
         db.query(meterQuery, [phone], (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
-          const mountDate = meterResult?.[0]?.MOUNT_DATE || null;       
+          const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
+          const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;        
           db.detach();
           res.status(201).json({ 
             status: 'OK', 
@@ -273,6 +232,7 @@ app.post('/register', (req, res) => {
             authDate,
             meterNum,
             mountDate,
+            verifyDate,
             message: 'User registered successfully'
           });     
         });

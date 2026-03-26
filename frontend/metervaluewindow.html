@@ -19,7 +19,7 @@
             <p>Текущее показание:</p>
         </div>
         <div>
-            <input v-model="newmetervalue"><br>
+            <input required type="number" v-model="newmetervalue"><br>
             <button>Передать</button><br>
             <button onclick="main()">Выход</button>
         </div>
@@ -108,8 +108,8 @@
         {
             background-color: aquamarine;
             color: rgb(0, 0, 0);
-            justify-content: center;
-            justify-items: center;
+            justify-content: right;
+            justify-items: right;
         }
     </style>
 </html>

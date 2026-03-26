@@ -7,6 +7,7 @@ createApp({
     const error = ref('');
     const meternum = ref('');
     const mountdate = ref('');
+    const verifydate = ref('');
     const towns = ref([]);
     const streets = ref([]);
     const buildings = ref([]);
@@ -133,6 +134,9 @@ createApp({
         }));
         sessionStorage.setItem('mountDate', JSON.stringify({
           mountDate: result.mountDate
+        }));
+        sessionStorage.setItem('verifyDate', JSON.stringify({
+          verifyDate: result.verifyDate
         }));        
         console.log('Ответ сервера:', result);
 
@@ -156,14 +160,22 @@ createApp({
         const mountDate = {
           mountDate: result.mountDate
         };
-                
-        console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate);
+        const verifyDate = {
+          verifyDate: result.verifyDate
+        };
+        ///        
+        console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate, "verifydate", verifyDate);
+        ///
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
+        sessionStorage.setItem('verifydate', JSON.stringify(verifydate));
+        ///
         console.log('authData:', sessionStorage.getItem('authData'));
         console.log('meterNum:', sessionStorage.getItem('meterNum'));
         console.log('mountDate:', sessionStorage.getItem('mountDate')); 
+        console.log('verifyDate', sessionStorage.getItem('verifyDate'));
+        ///
         window.location.href = 'address.html';                     
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
@@ -174,11 +186,11 @@ createApp({
       loadTowns();
     });
     return { 
-      phone, password, response, error, meternum, mountdate,
+      phone, password, response, error, meternum, mountdate, verifydate,
       towns, streets, buildings,
       selectedTownId, selectedStreetId, selectedBuildingId, houseInput, townSearch, streetSearch, houseSearch,
       onTownInput, onTownChange, onStreetInput, onStreetChange, onHouseInput, onHouseChange,
-      login, metervalue,
+      login,
       saveAddressAndContinue 
     };
   }

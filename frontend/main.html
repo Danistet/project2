@@ -19,6 +19,8 @@
             <p id="meterNum"></p>
             <p>Дата установки: </p>
             <p id="mountDate"></p>
+            <p>дата проверки счетчика:</p>
+            <p id="verifyDate"></p>
         </div>
         <div>
             <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
@@ -71,19 +73,24 @@
             async function loadMeterData() {                
                 const storedMeterData = sessionStorage.getItem('meternum');
                 const storedMountData = sessionStorage.getItem('mountdate');
+                const storedVerifyDate = sessionStorage.getItem('verifydate');
                 const meterNumElement = document.getElementById('meterNum');
                 const mountDateElement = document.getElementById('mountDate');
+                const verifyDateElement = document.getElementById('verifyDate');
                 const errorElement = document.getElementById('error');
 
                 if (storedMeterData && storedMountData) {
                     try {
                         const meterObj = JSON.parse(storedMeterData);
                         const mountObj = JSON.parse(storedMountData);
+                        const verifyObj = JSON.parse(storedVerifyDate);
                         const mNum = meterObj.meterNum || 'Не указан';
                         const mDate = mountObj.mountDate ? new Date(mountObj.mountDate).toLocaleDateString('ru-RU') : 'Не указана';
+                        const mVDate = mountObj.verifyDate ? new Date(verifyObj.verifyDate).toLocaleDateString('ru-RU') : 'Не указана';
                         meterNumElement.textContent = mNum;
-                        mountDateElement.textContent = mDate;                
-                        console.log("Данные успешно выведены:", mNum, mDate);
+                        mountDateElement.textContent = mDate; 
+                        verifyDateElement.textContent = mVDate;               
+                        console.log("Данные успешно выведены:", mNum, mDate, mVDate);
                     } catch (e) {
                         console.error("Ошибка парсинга данных счетчика:", e);
                         errorElement.textContent = 'Ошибка формата данных счетчика';
@@ -124,6 +131,7 @@
         {
             color: blueviolet;
             white-space: nowrap;
+            font-size: 19px;
         }
         span
         {
