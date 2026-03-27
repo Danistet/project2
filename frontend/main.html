@@ -92,7 +92,7 @@
                         verifyDateElement.textContent = mVDate;               
                         console.log("Данные успешно выведены:", mNum, mDate, mVDate);
                     } catch (e) {
-                        console.error("Ошибка парсинга данных счетчика:", e);
+                        console.error("Ошибка данных счетчика:", e);
                         errorElement.textContent = 'Ошибка формата данных счетчика';
                     }
                 } else {
@@ -102,7 +102,7 @@
 
             function logout() {
                 sessionStorage.clear();
-                window.location.href = 'index.html';
+                window.location.href = 'address.html';
             }
 
             function info() {

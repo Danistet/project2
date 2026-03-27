@@ -31,7 +31,7 @@
                 const errorContainer = document.getElementById('error');
                 //////////////////////////////////////
                 const meterValue = document.getElementById('metervalue');
-                console.log("brbrrb",meterValue);
+                console.log("METERVALUE:",meterValue);
                 if (!authData) {
                     showError('Сессия не найдена');
                     setTimeout(() => {
@@ -50,14 +50,12 @@
                     return;
                 }
             
-                try {
-                    console.log('Обновление:', authData.phone);               
+                try {               
                     const result = await apiRequest('/update-token', {
                         phone: authData.phone,
                         token: authData.token
                     });
-                
-                    console.log(result);           
+                    
                     sessionStorage.setItem('authData', JSON.stringify(result));               
                 } catch (error) {
                     console.error('Ошибка обновления:', error);

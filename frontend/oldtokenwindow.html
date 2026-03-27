@@ -12,50 +12,10 @@
     <div id="app">
       <h2>Время последнего входа:</h2>
       <p id="authDatestr"></p>
-      <div style="visibility: hidden;">
-        <h2>Войти через пароль</h2>
-        <input v-model="password"><br>
-        <button @click="login">Подтвердить</button>
-      </div>
+      <h2>Выполните повторный вход</h2>
       <br>
-      <button @click="logout">Выход</button>
+      <button @click="logout">продолжить</button>
     </div>
-
-    <script>
-      const { createApp, ref } = Vue;
-      createApp({
-        setup() {
-          const password = ref('');      
-          const login = async () => {
-            const phone = sessionStorage.getItem('reauthUsername');
-            if (!phone || !password.value.trim()) {
-              alert('Повторите вход.');
-              window.location.href = 'index.html';
-              return;
-            }
-        
-            try {
-              const result = await apiRequest('/auth', {
-                phone,
-                userpswd: password.value
-              });        
-              sessionStorage.setItem('authData', JSON.stringify(result));
-              sessionStorage.removeItem('reauthUsername');
-              window.location.href = 'main.html';
-            } catch (err) {
-              alert(`Ошибка: ${err.message}`);
-            }
-          };
-      
-          const logout = () => {
-            sessionStorage.clear();
-            window.location.href = 'index.html';
-          };    
-          return { password, login, logout };
-        }
-      }).mount('#app');
-  
-    </script>
 
     <script>
       window.addEventListener('DOMContentLoaded', () => {
@@ -65,10 +25,24 @@
         if (lastAuthDate) {
           display.textContent = new Date(Number(lastAuthDate)).toLocaleString('ru-RU');
         } else {
-           display.textContent = '-';
+           display.textContent = '---';
         }
       });
     </script>
+
+    <script>
+      const { createApp, ref } = Vue;
+      createApp({
+        setup() {    
+          const logout = () => {
+            sessionStorage.clear();
+            window.location.href = 'index.html';
+          };    
+          return { logout };
+        }
+      }).mount('#app'); 
+    </script>
+
   </body>
 
   <style>
