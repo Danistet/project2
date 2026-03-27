@@ -12,7 +12,7 @@
             <span id="streettype"></span>
             <span id="street"></span>           
             <span id="house"></span>
-            <p id="error" style="color: red;"></p> 
+            <p id="error" style="color: rgb(243, 66, 66);"></p> 
         </h2>          
         <div>
             <p>Серийный номер:</p>
@@ -86,7 +86,7 @@
                         const verifyObj = JSON.parse(storedVerifyDate);
                         const mNum = meterObj.meterNum || 'Не указан';
                         const mDate = mountObj.mountDate ? new Date(mountObj.mountDate).toLocaleDateString('ru-RU') : 'Не указана';
-                        const mVDate = mountObj.verifyDate ? new Date(verifyObj.verifyDate).toLocaleDateString('ru-RU') : 'Не указана';
+                        const mVDate = verifyObj.verifyDate ? new Date(verifyObj.verifyDate).toLocaleDateString('ru-RU') : 'Не указана';
                         meterNumElement.textContent = mNum;
                         mountDateElement.textContent = mDate; 
                         verifyDateElement.textContent = mVDate;               

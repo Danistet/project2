@@ -169,7 +169,7 @@ createApp({
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
-        sessionStorage.setItem('verifydate', JSON.stringify(verifydate));
+        sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
         ///
         console.log('authData:', sessionStorage.getItem('authData'));
         console.log('meterNum:', sessionStorage.getItem('meterNum'));

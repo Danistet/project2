@@ -8,5 +8,5 @@ module.exports = {
   role: null,
   pageSize: 4096,
   timeout: 30000,
-  charset: 'WIN1251'
+  charset: 'UTF8'
 };

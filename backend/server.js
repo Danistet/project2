@@ -219,7 +219,7 @@ app.post('/register', (req, res) => {
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }                        
-        const meterQuery = 'SELECT METER_NUM, MOUNT_DATE FROM METERS';
+        const meterQuery = 'SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS';
         db.query(meterQuery, [phone], (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
           const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
