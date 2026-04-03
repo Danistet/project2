@@ -37,8 +37,7 @@ app.post('/streets', (req, res) => {
     `;
     db.query(query, [townId], (err, result) => {
       db.detach();
-      if (err) return res.status(500).json({ error: 'Query failed' });
-      const decoded = decodeWin1251Result(result);     
+      if (err) return res.status(500).json({ error: 'Query failed' });     
       res.json(result.map(r => ({ 
         id: r.ID, 
         name: `${r.STREET_TYPE} ${r.STREET}`.trim() 

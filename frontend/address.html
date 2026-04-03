@@ -13,21 +13,28 @@
             <input type="search" id="townInput" list="resultsTown" placeholder="Введите город" 
                 @input="onTownInput" @change="onTownChange" v-model="townSearch">
             <datalist id="resultsTown">
-            <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
+                <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
             </datalist><br>
             <label>Улица:</label><br>
             <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу" 
                 @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId" v-model="streetSearch">
             <datalist id="resultsStreet">
-            <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
+                <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
             </datalist><br>
-            <label>Дом:</label><br>
+                <label>Дом:</label><br>
             <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома" 
                 @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId" v-model="houseSearch">
             <datalist id="resultsHome">
-            <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
+                <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
             </datalist><br>
-        
+            <div style="visibility: visible;">
+                <label>Квартира:</label><br>
+                <input type="search" id="appartsInput" list="reauthApparts" placeholder="Введите номер Квартиры"
+                @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
+                <datalist id="resultsHome">
+                    <option v-for="appr in apparts" :key="appr.id" :value="appr.house" :data-id="appr.id"></option>
+                </datalist>
+            </div><br>
             <div>
                 <button @click="saveAddressAndContinue">Подтвердить</button><br>
                 <button onclick="tologin()">Обратно на страницу входа</button>

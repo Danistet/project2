@@ -12,6 +12,7 @@
             <span id="streettype"></span>
             <span id="street"></span>           
             <span id="house"></span>
+            <span id="apparts"></span>
             <p id="error" style="color: rgb(243, 66, 66);"></p> 
         </h2>          
         <div>
@@ -57,7 +58,7 @@
                     const EXPIRY_MS = 20000;
     
                     if (now - authData.authDate > EXPIRY_MS) {
-                        errorElement.textContent = 'Срок действия токена истёк';
+                        errorElement.textContent = 'Истёк срок сессии';
                         continueButton.style.display = 'visible';
                         infoButton.style.display = 'none';                                      
                         sessionStorage.setItem('reauthPhone', authData.phone);
@@ -90,7 +91,6 @@
                         meterNumElement.textContent = mNum;
                         mountDateElement.textContent = mDate; 
                         verifyDateElement.textContent = mVDate;               
-                        console.log("Данные успешно выведены:", mNum, mDate, mVDate);
                     } catch (e) {
                         console.error("Ошибка данных счетчика:", e);
                         errorElement.textContent = 'Ошибка формата данных счетчика';

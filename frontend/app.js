@@ -1,4 +1,4 @@
-const { createApp, ref } = Vue;
+const { createApp, ref, watch } = Vue;
 createApp({
   setup() {
     const phone = ref('');
@@ -20,6 +20,25 @@ createApp({
     const houseSearch = ref('');
     const { onMounted } = Vue;
 
+    watch(townSearch, (newVal) => {
+      if (!newVal || newVal.trim() === '') {
+        streetSearch.value = '';
+        houseSearch.value = '';
+        selectedStreetId.value = null;
+        selectedBuildingId.value = null;
+        streets.value = [];
+        buildings.value = [];
+      }
+    });
+
+    watch(streetSearch, (newVal) => {
+      if (!newVal || newVal.trim() === '') {
+        houseSearch.value = '';
+        selectedBuildingId.value = null;
+        buildings.value = [];
+      }
+    });
+
     const saveAddressAndContinue = () => {
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
@@ -30,8 +49,15 @@ createApp({
         buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      console.log('Адрес сохранён:', addressData);
-      window.location.href = 'main.html';
+      //console.log('Адрес сохранён:', addressData);
+      if (townSearch.value != "" || streetSearch.value != "" || houseInput.value !="")
+      {
+        window.location.href = 'main.html';
+      }
+      else
+      {
+        alert("Введите данные");
+      }
     };
 
     const loadTowns = async () => {
@@ -44,12 +70,15 @@ createApp({
     };
 
     const loadStreets = async (townId) => {
-      if (!townId) { streets.value = []; return; }
       try {
-        const result = await apiRequest(`/streets?townId=${townId}`);
-        streets.value = result;
+        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        streets.value = data;
       } catch (err) {
-        console.error('Failed to load streets:', err);
+        console.error('Ошибка загрузки улиц:', err);
       }
     };
 
@@ -63,7 +92,7 @@ createApp({
       }
     };
 
-    const onTownInput = (e) => {
+    const onTownInput = async (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
       if (option) selectedTownId.value = option.dataset.id;
@@ -164,17 +193,17 @@ createApp({
           verifyDate: result.verifyDate
         };
         ///        
-        console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate, "verifydate", verifyDate);
+        //console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate, "verifydate", verifyDate);
         ///
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
         ///
-        console.log('authData:', sessionStorage.getItem('authData'));
-        console.log('meterNum:', sessionStorage.getItem('meterNum'));
-        console.log('mountDate:', sessionStorage.getItem('mountDate')); 
-        console.log('verifyDate', sessionStorage.getItem('verifyDate'));
+        //console.log('authData:', sessionStorage.getItem('authData'));
+        //console.log('meterNum:', sessionStorage.getItem('meterNum'));
+        //console.log('mountDate:', sessionStorage.getItem('mountDate')); 
+        //console.log('verifyDate', sessionStorage.getItem('verifyDate'));
         ///
         window.location.href = 'address.html';                     
       } catch (err) {
@@ -189,7 +218,11 @@ createApp({
       phone, password, response, error, meternum, mountdate, verifydate,
       towns, streets, buildings,
       selectedTownId, selectedStreetId, selectedBuildingId, houseInput, townSearch, streetSearch, houseSearch,
-      onTownInput, onTownChange, onStreetInput, onStreetChange, onHouseInput, onHouseChange,
+      onTownInput, onTownChange, 
+      onStreetInput,
+      onStreetChange,
+      onHouseInput,
+      onHouseChange,
       login,
       saveAddressAndContinue 
     };
