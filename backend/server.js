@@ -8,14 +8,12 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-
 app.post('/cities', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
-    
-    db.query('SELECT ID, NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
+    db.query('SELECT ID, CAST(NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
       db.detach();
-      if (err) return res.status(500).json({ error: 'Query failed' });
+      if (err) return res.status(500).json({ error: 'Query failed' });     
       res.json(result.map(r => ({ id: r.ID, name: r.NAME })));
     });
   });
@@ -29,7 +27,10 @@ app.post('/streets', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
     
     const query = `
-      SELECT ID, STREET, STREET_TYPE 
+      SELECT 
+        ID, 
+        CAST(STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET,
+        CAST(STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE
       FROM RSTREETS 
       WHERE TOWN_ID = ? 
       ORDER BY STREET_TYPE, STREET
@@ -37,6 +38,7 @@ app.post('/streets', (req, res) => {
     db.query(query, [townId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
+      const decoded = decodeWin1251Result(result);     
       res.json(result.map(r => ({ 
         id: r.ID, 
         name: `${r.STREET_TYPE} ${r.STREET}`.trim() 
@@ -133,7 +135,7 @@ app.post('/auth', (req, res) => {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
       }
-      
+
       if (authResult.length === 0) {
         db.detach();
         return res.status(401).json({ error: 'Invalid phone or password'});
