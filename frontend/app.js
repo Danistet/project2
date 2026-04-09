@@ -18,6 +18,11 @@ createApp({
     const townSearch = ref('');
     const streetSearch = ref('');
     const houseSearch = ref('');
+
+    const apparts = ref([]);
+    const appartsSearch = ref('');
+    const selectedAppartId = ref(null);
+    const showApparts = ref(true); 
     const { onMounted } = Vue;
 
     watch(townSearch, (newVal) => {
@@ -39,6 +44,14 @@ createApp({
       }
     });
 
+    watch(houseSearch, (newVal) => {
+      if (!newVal || newVal.trim() === '') {
+        appartsSearch.value = '';
+        selectedAppartId.value = null;
+        apparts.value = [];
+      }
+    });
+
     const saveAddressAndContinue = () => {
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
@@ -46,12 +59,15 @@ createApp({
         street: streetSearch.value || document.getElementById('streetInput')?.value || '',
         streetId: selectedStreetId.value,
         house: houseInput.value || document.getElementById('houseInput')?.value || '',
-        buildingId: selectedBuildingId.value
+        buildingId: selectedBuildingId.value,
+        apparts: showApparts.value ? appartsSearch.value : null,
+        appartsId: showApparts.value ? selectedAppartId.value : null
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      //console.log('Адрес сохранён:', addressData);
       if (townSearch.value != "" || streetSearch.value != "" || houseInput.value !="")
       {
+        console.log("address",addressData);
+        console.log("session",sessionStorage);
         window.location.href = 'main.html';
       }
       else
@@ -92,6 +108,16 @@ createApp({
       }
     };
 
+    const loadApparts = async (buildingId) => {
+      if (!buildingId) { apparts.value = []; return; }
+      try {
+        const result = await apiRequest(`/apparts?buildingId=${buildingId}`);
+        apparts.value = result;
+      } catch (err) {
+        console.error('Failed to load apartments:', err);
+      }
+    };
+
     const onTownInput = async (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
@@ -128,6 +154,27 @@ createApp({
       const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === val);
       selectedBuildingId.value = option?.dataset.id || null;
       houseInput.value = val;
+
+      if (selectedBuildingId.value) {
+        loadApparts(selectedBuildingId.value);
+      } else {
+        apparts.value = [];
+      }
+    };
+
+    const onAppartsInput = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsApparts option')]
+        .find(o => o.value === val);
+      if (option) selectedAppartId.value = option.dataset.id;
+    };
+
+    const onAppartsChange = (e) => {
+      const val = e.target.value;
+      const option = [...document.querySelectorAll('#resultsApparts option')]
+        .find(o => o.value === val);
+      selectedAppartId.value = option?.dataset.id || null;
+      appartsSearch.value = val;
     };
 
     const login = async (mode = 'login') => {
@@ -192,19 +239,10 @@ createApp({
         const verifyDate = {
           verifyDate: result.verifyDate
         };
-        ///        
-        //console.log('Сохраняем в sessionStorage:',"authData", authData,"meternum", meterNum,"mountdate", mountDate, "verifydate", verifyDate);
-        ///
         sessionStorage.setItem('authData', JSON.stringify(authData));
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
-        ///
-        //console.log('authData:', sessionStorage.getItem('authData'));
-        //console.log('meterNum:', sessionStorage.getItem('meterNum'));
-        //console.log('mountDate:', sessionStorage.getItem('mountDate')); 
-        //console.log('verifyDate', sessionStorage.getItem('verifyDate'));
-        ///
         window.location.href = 'address.html';                     
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
@@ -216,13 +254,15 @@ createApp({
     });
     return { 
       phone, password, response, error, meternum, mountdate, verifydate,
-      towns, streets, buildings,
-      selectedTownId, selectedStreetId, selectedBuildingId, houseInput, townSearch, streetSearch, houseSearch,
-      onTownInput, onTownChange, 
+      towns, streets, buildings, apparts,
+      selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
+      houseInput, townSearch, streetSearch, houseSearch, appartsSearch,
+      onTownInput, onTownChange, showApparts,
       onStreetInput,
       onStreetChange,
       onHouseInput,
       onHouseChange,
+      onAppartsInput, onAppartsChange,
       login,
       saveAddressAndContinue 
     };

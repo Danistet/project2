@@ -28,9 +28,9 @@ app.post('/streets', (req, res) => {
     
     const query = `
       SELECT 
-        ID, 
-        CAST(STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET,
-        CAST(STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE
+      ID, 
+      CAST(STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET,
+      CAST(STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE
       FROM RSTREETS 
       WHERE TOWN_ID = ? 
       ORDER BY STREET_TYPE, STREET
@@ -52,9 +52,10 @@ app.post('/buildings', (req, res) => {
   
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
-    
+    /////////////////////////////////add CORPS
     const query = `
-      SELECT ID, HOUSE 
+      SELECT 
+      ID, HOUSE 
       FROM BUILDINGS 
       WHERE STREET_ID = ? 
       ORDER BY HOUSE
@@ -63,6 +64,31 @@ app.post('/buildings', (req, res) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
       res.json(result.map(r => ({ id: r.ID, house: r.HOUSE })));
+    });
+  });
+});
+
+///////////////////////////add LETTER
+app.post('/apparts', (req, res) => {
+  const buildingId = req.query.buildingId;
+  if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    const query = `
+      SELECT 
+        A.ID, 
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS
+      FROM ABONENTS A
+      WHERE A.BUILDINGS_ID = ?
+      ORDER BY A.APPARTS
+    `; 
+    db.query(query, [buildingId], (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json(result.map(r => ({ 
+        id: r.ID, 
+        house: r.APPARTS
+      })));
     });
   });
 });

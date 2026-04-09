@@ -36,6 +36,7 @@
                 document.getElementById('streettype').textContent = addressData.street?.split(' ')[0] || '';
                 document.getElementById('street').textContent = addressData.street?.split(' ').slice(1).join(' ') || addressData.street || '';
                 document.getElementById('house').textContent = addressData.house || '';
+                document.getElementById('apparts').textContent = addressData.apparts || '';
             }
         }
 

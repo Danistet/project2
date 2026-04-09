@@ -27,11 +27,13 @@
             <datalist id="resultsHome">
                 <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
             </datalist><br>
-            <div style="visibility: visible;">
+            <div>
                 <label>Квартира:</label><br>
-                <input type="search" id="appartsInput" list="reauthApparts" placeholder="Введите номер Квартиры"
-                @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
-                <datalist id="resultsHome">
+                <input type="checkbox" id="appartscheck" v-model="showApparts"><br>
+                <input :style="{ visibility: showApparts ? 'visible' : 'hidden' }" type="search" name="appartsInput" 
+                    id="appartsInput" list="reauthApparts" placeholder="Введите номер Квартиры"
+                    @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
+                <datalist id="resultsApparts">
                     <option v-for="appr in apparts" :key="appr.id" :value="appr.house" :data-id="appr.id"></option>
                 </datalist>
             </div><br>
