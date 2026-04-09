@@ -64,10 +64,9 @@ createApp({
         appartsId: showApparts.value ? selectedAppartId.value : null
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      if (townSearch.value != "" || streetSearch.value != "" || houseInput.value !="")
+      if (townSearch.value != "" && streetSearch.value != "" && houseInput.value !="")
       {
         console.log("address",addressData);
-        console.log("session",sessionStorage);
         window.location.href = 'main.html';
       }
       else
@@ -256,15 +255,17 @@ createApp({
       phone, password, response, error, meternum, mountdate, verifydate,
       towns, streets, buildings, apparts,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
-      houseInput, townSearch, streetSearch, houseSearch, appartsSearch,
-      onTownInput, onTownChange, showApparts,
+      houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
+      onTownInput,
+      onTownChange,
       onStreetInput,
       onStreetChange,
       onHouseInput,
       onHouseChange,
-      onAppartsInput, onAppartsChange,
+      onAppartsInput,
+      onAppartsChange,
       login,
-      saveAddressAndContinue 
+      saveAddressAndContinue
     };
   }
 }).mount('#app');

@@ -11,7 +11,7 @@ app.use(express.json());
 app.post('/cities', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
-    db.query('SELECT ID, CAST(NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS NAME FROM PAS_RTOWN ORDER BY NAME', (err, result) => {
+    db.query(`SELECT ID, CAST(NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS NAME FROM PAS_RTOWN ORDER BY NAME`, (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });     
       res.json(result.map(r => ({ id: r.ID, name: r.NAME })));
@@ -55,7 +55,7 @@ app.post('/buildings', (req, res) => {
     /////////////////////////////////add CORPS
     const query = `
       SELECT 
-      ID, HOUSE 
+      ID, HOUSE, CORPS 
       FROM BUILDINGS 
       WHERE STREET_ID = ? 
       ORDER BY HOUSE
@@ -63,12 +63,11 @@ app.post('/buildings', (req, res) => {
     db.query(query, [streetId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
-      res.json(result.map(r => ({ id: r.ID, house: r.HOUSE })));
+      res.json(result.map(r => ({ id: r.ID, house: r.HOUSE, corps: r.CORPS })));
     });
   });
 });
 
-///////////////////////////add LETTER
 app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
@@ -76,8 +75,8 @@ app.post('/apparts', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
     const query = `
       SELECT 
-        A.ID, 
-        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS
+      A.ID, A.LETTER,
+      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
       ORDER BY A.APPARTS
@@ -86,8 +85,8 @@ app.post('/apparts', (req, res) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
       res.json(result.map(r => ({ 
-        id: r.ID, 
-        house: r.APPARTS
+        id: r.ID,
+        letters: r.LETTERS
       })));
     });
   });
@@ -105,7 +104,7 @@ app.post('/update-token', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }    
-    const query = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?';
+    const query = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?`;
     
     db.query(query, [phone, token], (err, result) => {
       if (err) {
@@ -122,7 +121,7 @@ app.post('/update-token', (req, res) => {
       const now = Date.now();
       const newToken = token;
       const newAuthDate = now;
-      const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';
+      const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;
         
       db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
         db.detach();         
@@ -153,7 +152,7 @@ app.post('/auth', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = 'SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?';
+    const authQuery = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?`;
     
     db.query(authQuery, [phone, userpswd], (err, authResult) => {
       if (err) {
@@ -166,7 +165,7 @@ app.post('/auth', (req, res) => {
         return res.status(401).json({ error: 'Invalid phone or password'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
-      const meterQuery = 'SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS';      
+      const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
         const minute = 2000;        
@@ -188,7 +187,7 @@ app.post('/auth', (req, res) => {
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
-          const updateQuery = 'UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?';      
+          const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;      
           db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
             if (upderr) {
               db.detach();
@@ -198,7 +197,7 @@ app.post('/auth', (req, res) => {
             finishResponse(newToken, now, meterNum, mountDate, verifyDate);
           });
         } else {
-          const updateQuery = 'UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?';       
+          const updateQuery = `UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?`;       
           db.query(updateQuery, [now, phone], (upderr) => {
             if (upderr) {
               db.detach();
@@ -214,7 +213,7 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { phone, userpswd, fname, sname, lname, townId, streetId, buildingId, house  } = req.body;
+  const { phone, userpswd } = req.body;
   
   if (!phone || !userpswd) {
     return res.status(400).json({ error: 'Missing phone or userpswd' });
@@ -225,7 +224,7 @@ app.post('/register', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'DB connect error' });
     }
-    const checkQuery = 'SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?';
+    const checkQuery = `SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?`;
     db.query(checkQuery, [phone], (err, result) => {
       if (err) {
         console.error('Check user error:', err);
@@ -239,14 +238,14 @@ app.post('/register', (req, res) => {
       }   
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
-      const insertUser = 'INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)';
+      const insertUser = `INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)`;
       db.query(insertUser, [phone, userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }                        
-        const meterQuery = 'SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS';
+        const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;
         db.query(meterQuery, [phone], (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
           const mountDate = meterResult?.[0]?.MOUNT_DATE || null;

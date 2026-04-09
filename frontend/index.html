@@ -10,7 +10,7 @@
   <body>
     <h1>Вход</h1> 
     <div id="app" class="server-response">
-      <input v-model="phone" placeholder="телефон. номер" required type="tel"><br>
+      <input v-model="phone" placeholder="телефон. номер" required type="tel" inputmode="numeric" @input="e => phone = e.target.value.replace(/\D/g, '').slice(0, 11)"><br>
       <input v-model="password" type="password" placeholder="Пароль" required/><br>
       <br>
       <button @click="login">Войти</button><br>
