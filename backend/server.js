@@ -104,37 +104,56 @@ app.post('/apparts', (req, res) => {
   });
 });
 
+app.post('/PH', (req, res) => {
+  const ph = req.query.ph;
+  if (!ph) return res.status(400).json({ error: 'ph required' });
+
+  const query = `
+    SELECT
+    PH,
+    METER_ID
+    FROM METER_IND
+    WHERE METER_ID = ?
+    ORDER BY PH, METER_ID
+  `;
+  firebird.attach(config, (err, db) => {
+    db.query(query, [ph], (err, result) =>{
+      if (err) return res.status(500).json({ error: 'Query failed' });  
+      res.json(result.map(r => {
+        return {
+          meter_id: r.METER_ID,
+          ph: r.PH
+        };
+      }));
+    });
+  });
+});
+
 app.post('/update-token', (req, res) => {
-  const { phone, token } = req.body;
-  
+  const { phone, token } = req.body;  
   if (!phone || !token) {
     return res.status(400).json({ error: 'Missing phone or token' });
-  }
-  
+  }  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }    
-    const query = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?`;
-    
+    const query = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?`;  
     db.query(query, [phone, token], (err, result) => {
       if (err) {
         db.detach();
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Database query error' });
-      }
-      
+      }    
       if (result.length === 0) {
         db.detach();
         return res.status(401).json({ error: 'Invalid token or phone' });
-      }
-      
+      }    
       const now = Date.now();
       const newToken = token;
       const newAuthDate = now;
-      const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;
-        
+      const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;    
       db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
         db.detach();         
         if (upderr) {
@@ -180,7 +199,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
-        const minute = 2000;        
+        const minute = 60000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 

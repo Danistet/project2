@@ -4,6 +4,7 @@
         <meta charset="WIN1251">
         <title>Главная страница</title>
         <script src="./api.js"></script>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
 
     <body>
@@ -26,10 +27,10 @@
         <div>
             <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
             <button onclick="info()" id="infbt">Показания</button><br>
-            <button onclick="logout()">Выход</button>
+            <button onclick="logout()" id="changebutton">Сменить адрес</button>
         </div>
         <script>
-
+            ////////////////////////////////////////////RMETER_STATUS
         function loadAddressDisplay() {
         const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
             if (addressData) {
@@ -49,19 +50,22 @@
                 const errorElement = document.getElementById('error');
                 const continueButton = document.getElementById('ContinueButton');
                 const infoButton = document.getElementById('infbt');
+                const changebutton = document.getElementById('changebutton');
                 if (!authData) {
                     errorElement.textContent = 'Сессия не найдена';
-                    continueButton.style.display = 'none';
-                    infoButton.style.display = 'none';
+                    continueButton.style.display = 'visible';
+                    infoButton.style.display = 'hidden';
+
                     setTimeout(() => window.location.href = 'index.html', 2000);
                 } else {
                     const now = Date.now();
-                    const EXPIRY_MS = 20000;
+                    const EXPIRY_MS = 60000;
     
                     if (now - authData.authDate > EXPIRY_MS) {
                         errorElement.textContent = 'Истёк срок сессии';
                         continueButton.style.display = 'visible';
-                        infoButton.style.display = 'none';                                      
+                        infoButton.style.display = 'none';
+                        changebutton.style.display = 'none';                                      
                         sessionStorage.setItem('reauthPhone', authData.phone);
                         sessionStorage.setItem('lastAuthDate', authData.authDate);
                     } else {    
@@ -97,12 +101,11 @@
                         errorElement.textContent = 'Ошибка формата данных счетчика';
                     }
                 } else {
-                    console.log("Данные счетчика не найдены в sessionStorage");
+                    console.log("Данные счетчика не найдены");
                 }
             }
 
-            function logout() {
-                sessionStorage.clear();
+            function logout() {               
                 window.location.href = 'address.html';
             }
 

@@ -11,18 +11,19 @@ createApp({
     const towns = ref([]);
     const streets = ref([]);
     const buildings = ref([]);
+    const apparts = ref([]);
     const selectedTownId = ref(null);
     const selectedStreetId = ref(null);
     const selectedBuildingId = ref(null);
+    const selectedAppartId = ref(null);
     const houseInput = ref('');
     const townSearch = ref('');
     const streetSearch = ref('');
     const houseSearch = ref('');
-
-    const apparts = ref([]);
     const appartsSearch = ref('');
-    const selectedAppartId = ref(null);
     const showApparts = ref(true); 
+    const PH = ref('');
+    const PHData = ref('');
     const { onMounted } = Vue;
 
     watch(townSearch, (newVal) => {
@@ -52,6 +53,12 @@ createApp({
       }
     });
 
+    const NewPH = () => {
+      const phValue = document.getElementById('newPH')?.value || '';
+      sessionStorage.setItem('ph', JSON.stringify({ PH: phValue }));
+      PH.value = phValue;
+    };
+
     const saveAddressAndContinue = () => {
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
@@ -66,7 +73,6 @@ createApp({
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
       if (townSearch.value != "" && streetSearch.value != "" && houseInput.value !="")
       {
-        console.log("address",addressData);
         window.location.href = 'main.html';
       }
       else
@@ -253,9 +259,10 @@ createApp({
     });
     return { 
       phone, password, response, error, meternum, mountdate, verifydate,
-      towns, streets, buildings, apparts,
+      towns, streets, buildings, apparts, PHData,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
+      NewPH,
       onTownInput,
       onTownChange,
       onStreetInput,

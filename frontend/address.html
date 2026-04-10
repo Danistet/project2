@@ -39,7 +39,7 @@
             </div><br>
             <div>
                 <button @click="saveAddressAndContinue">Подтвердить</button><br>
-                <button onclick="tologin()">Обратно на страницу входа</button>
+                <button onclick="tologin()">Выход</button>
             </div>
         </div><br>
     </body>
@@ -47,6 +47,7 @@
     <script>
         function tologin()
         {
+            sessionStorage.clear();
             window.location.href = 'index.html';
         }
     </script>
