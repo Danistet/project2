@@ -93,7 +93,7 @@ createApp({
         const data = await response.json();
         streets.value = data;
       } catch (err) {
-        console.error('Ошибка загрузки улиц:', err);
+        console.error('Failed to load streets:', err);
       }
     };
 

@@ -52,10 +52,11 @@ app.post('/buildings', (req, res) => {
   
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
-    /////////////////////////////////add CORPS
     const query = `
       SELECT 
-      ID, HOUSE, CORPS 
+      ID,
+      CAST(HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, 
+      CAST(CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS 
       FROM BUILDINGS 
       WHERE STREET_ID = ? 
       ORDER BY HOUSE
@@ -63,7 +64,13 @@ app.post('/buildings', (req, res) => {
     db.query(query, [streetId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });
-      res.json(result.map(r => ({ id: r.ID, house: r.HOUSE, corps: r.CORPS })));
+      res.json(result.map(r => { 
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        return {
+          id: r.ID,
+          house: `${r.HOUSE} ${corpsPart}`.trim()
+        };
+      }));
     });
   });
 });
@@ -71,23 +78,28 @@ app.post('/buildings', (req, res) => {
 app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
+  
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    if (err) return res.status(500).json({ error: 'DB connection failed' });   
     const query = `
       SELECT 
-      A.ID, A.LETTER,
-      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS
+      A.ID, 
+      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+      CAST(A.LETTER AS VARCHAR(10) CHARACTER SET WIN1251) AS LETTER
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
-      ORDER BY A.APPARTS
-    `; 
+      ORDER BY A.APPARTS, A.LETTER
+    `;    
     db.query(query, [buildingId], (err, result) => {
       db.detach();
-      if (err) return res.status(500).json({ error: 'Query failed' });
-      res.json(result.map(r => ({ 
-        id: r.ID,
-        letters: r.LETTERS
-      })));
+      if (err) return res.status(500).json({ error: 'Query failed' });     
+      res.json(result.map(r => { 
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        return {
+          id: r.ID,
+          house: `кв. ${r.APPARTS}${letterPart}`.trim()
+        };
+      }));
     });
   });
 });

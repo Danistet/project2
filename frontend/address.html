@@ -31,7 +31,7 @@
                 <label>Квартира:</label><br>
                 <input type="checkbox" id="appartscheck" v-model="showApparts"><br>
                 <input :style="{ visibility: showApparts ? 'visible' : 'hidden' }" type="search" name="appartsInput" 
-                    id="appartsInput" list="reauthApparts" placeholder="Введите номер Квартиры"
+                    id="appartsInput" list="resultsApparts" placeholder="Введите номер Квартиры"
                     @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
                 <datalist id="resultsApparts">
                     <option v-for="appr in apparts" :key="appr.id" :value="appr.house" :data-id="appr.id"></option>
