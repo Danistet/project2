@@ -3,6 +3,7 @@ const firebird = require('node-firebird');
 const cors = require('cors');
 const crypto = require('crypto');
 const config = require('./config');
+const { error } = require('console');
 const app = express();
 const PORT = 3000;
 app.use(cors());
@@ -85,7 +86,8 @@ app.post('/apparts', (req, res) => {
       SELECT 
       A.ID, 
       CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-      CAST(A.LETTER AS VARCHAR(10) CHARACTER SET WIN1251) AS LETTER
+      CAST(A.LETTER AS VARCHAR(10) CHARACTER SET WIN1251) AS LETTER,
+      A.G_LICSCHET
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
       ORDER BY A.APPARTS, A.LETTER
@@ -97,7 +99,8 @@ app.post('/apparts', (req, res) => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
         return {
           id: r.ID,
-          house: `кв. ${r.APPARTS}${letterPart}`.trim()
+          house: `кв. ${r.APPARTS}${letterPart}`.trim(),
+          g_licschet: r.G_LICSCHET
         };
       }));
     });
@@ -107,7 +110,7 @@ app.post('/apparts', (req, res) => {
 app.post('/PH', (req, res) => {
   const ph = req.query.ph;
   if (!ph) return res.status(400).json({ error: 'ph required' });
-
+////////////////////////////////////////METER_IND
   const query = `
     SELECT
     PH,
@@ -119,6 +122,7 @@ app.post('/PH', (req, res) => {
   firebird.attach(config, (err, db) => {
     db.query(query, [ph], (err, result) =>{
       if (err) return res.status(500).json({ error: 'Query failed' });  
+      console.log('query',query , 'ph', ph);
       res.json(result.map(r => {
         return {
           meter_id: r.METER_ID,
@@ -293,6 +297,51 @@ app.post('/register', (req, res) => {
             message: 'User registered successfully'
           });     
         });
+      });
+    });
+  });
+});
+
+app.post('/meter-by-licschet', (req, res) => {
+  const {g_licschet} = req.body;
+  if (!g_licschet) {
+    return res.status(400).json({error: "g_licschet req"});
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error', err);
+      return res.status(500).json({error: 'DB connect error'});
+    }
+    const query = `
+      SELECT
+      METER_NUM,
+      MOUNT_DATE,
+      VERIFY_DATE,
+      LS
+      FROM METERS
+      WHERE LS = ?
+    `;
+    db.query(query, [g_licschet], (err, result) => {
+      db.detach();
+      if (err) 
+      {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }
+      if (result.length === 0) 
+      {
+        return res.json ({
+          found: false,
+          meterNum: null,
+          mountDate: null,
+          verifyDate: null
+        });
+      }
+      res.json({
+        found: true,
+        meterNum: result[0].METER_NUM,
+        mountDate: result[0].MOUNT_DATE,
+        verifyDate: result[0].VERIFY_DATE
       });
     });
   });

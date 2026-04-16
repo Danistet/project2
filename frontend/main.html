@@ -80,6 +80,10 @@
                 const storedMeterData = sessionStorage.getItem('meternum');
                 const storedMountData = sessionStorage.getItem('mountdate');
                 const storedVerifyDate = sessionStorage.getItem('verifydate');
+                const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
+                if (!storedMeterData && addressData?.g_licschet) {
+                    console.log('Данные счетчика не в сессии, но есть g_licschet:', addressData.g_licschet);
+                }
                 const meterNumElement = document.getElementById('meterNum');
                 const mountDateElement = document.getElementById('mountDate');
                 const verifyDateElement = document.getElementById('verifyDate');

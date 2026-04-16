@@ -10,7 +10,7 @@
     <body>
         <h1>Регистрация</h1>
         <div id="app" class="server-response">
-            <input v-model="phone" placeholder="телефон. номер" required type="tel" maxlength="11" inputmode="numeric" @input="e => phone = e.target.value.replace(/\D/g, '').slice(0, 11)"><br>
+            <input v-model="phone" placeholder="телефон. номер" required type="tel" maxlength="11" minlength="11" inputmode="numeric" @input="e => phone = e.target.value.replace(/\D/g, '').slice(0, 11)"><br>
             <input v-model="password" type="password" placeholder="Придумайте пароль" required maxlength="25"/><br>
             <br>
             <button @click="login('register')">Создать аккаунт</button><br>

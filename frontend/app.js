@@ -68,7 +68,9 @@ createApp({
         house: houseInput.value || document.getElementById('houseInput')?.value || '',
         buildingId: selectedBuildingId.value,
         apparts: showApparts.value ? appartsSearch.value : null,
-        appartsId: showApparts.value ? selectedAppartId.value : null
+        appartsId: showApparts.value ? selectedAppartId.value : null,
+        g_licschet: sessionStorage.getItem('licschet') ? 
+        JSON.parse(sessionStorage.getItem('licschet')).g_licschet : null
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
       if (townSearch.value != "" && streetSearch.value != "" && houseInput.value !="")
@@ -92,7 +94,7 @@ createApp({
 
     const loadStreets = async (townId) => {
       try {
-        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {
+        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {/////////?
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -174,12 +176,29 @@ createApp({
       if (option) selectedAppartId.value = option.dataset.id;
     };
 
-    const onAppartsChange = (e) => {
+    const onAppartsChange = async (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsApparts option')]
         .find(o => o.value === val);
       selectedAppartId.value = option?.dataset.id || null;
       appartsSearch.value = val;
+
+      if (selectedAppartId.value && option?.dataset?.licschet) 
+      {
+        const g_licschet = option.dataset.licschet;
+        try {
+          const meterData = await apiRequest('/meter-by-licschet', { g_licschet });
+          sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meterData.meterNum}));
+          sessionStorage.setItem('mountdate', JSON.stringify({mountDate: meterData.mountDate}));
+          sessionStorage.setItem('verifydate', JSON.stringify({verifyDate: meterData.verifyDate}));
+          sessionStorage.setItem('licschet', JSON.stringify({g_licschet}));
+        } catch (err) {
+          console.error("error", err);
+          sessionStorage.setItem('meternum', JSON.stringify({ meterNum: null }));
+          sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: null }));
+          sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: null }));
+        }
+      }
     };
 
     const login = async (mode = 'login') => {

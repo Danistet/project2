@@ -34,7 +34,12 @@
                     id="appartsInput" list="resultsApparts" placeholder="Введите номер Квартиры"
                     @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
                 <datalist id="resultsApparts">
-                    <option v-for="appr in apparts" :key="appr.id" :value="appr.house" :data-id="appr.id"></option>
+                    <option v-for="appr in apparts" 
+                        :key="appr.id" 
+                        :value="appr.house" 
+                        :data-id="appr.id" 
+                        :data-licschet="appr.g_licschet">
+                    </option>
                 </datalist>
             </div><br>
             <div>
