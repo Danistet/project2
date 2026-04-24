@@ -38,30 +38,18 @@
                 }
                 return str.replace('.', ',');
             }
-            const inputPH = document.getElementById('newPH');
-            inputPH.addEventListener('blur', (e) => {
-                e.target.value = formatWithThousands(e.target.value);
-            });
-            inputPH.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
-            });
-            document.getElementById('submitPH').addEventListener('click', () => {
-                const rawValue = inputPH.value;
-                const formatted = formatWithThousands(rawValue);            
-                if (!formatted) {
-                alert('Введите показание');
-                return;
-                }
-                sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));
-                apiRequest('/PH', { ph: formatted })
-                .then(() => {
-                    alert('Показания переданы: ' + formatted);
-                })
-                .catch(err => {
-                    console.error('Ошибка отправки:', err);
-                    alert('Ошибка: ' + err.message);
+                document.addEventListener('DOMContentLoaded', () => {
+                    const inputPH = document.getElementById('newPH');
+                    if (inputPH) {
+                        inputPH.addEventListener('blur', (e) => {
+                            e.target.value = formatWithThousands(e.target.value);
+                        });
+                        inputPH.addEventListener('input', (e) => {
+                            e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
+                        });
+                    }
                 });
-            });
+
         </script>
 
         <script>

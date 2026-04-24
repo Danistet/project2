@@ -53,10 +53,34 @@ createApp({
       }
     });
 
+    const formatWithThousands = (value) => {
+      if (!value && value !== 0) return '';
+      const str = String(value).trim();
+      if (!str) return '';
+      if (/[,\.]\d+/.test(str)) return str.replace('.', ',');
+      if (/^\d+$/.test(str)) return `${str},000`;
+      return str.replace('.', ',');
+    };
+
     const NewPH = () => {
-      const phValue = document.getElementById('newPH')?.value || '';
-      sessionStorage.setItem('ph', JSON.stringify({ PH: phValue }));
-      PH.value = phValue;
+      try {
+        const inputEl = document.getElementById('newPH');
+        const rawValue = inputEl?.value?.trim() || '';
+        if (!rawValue)
+        {
+          alert("введите показания");
+          return;
+        }
+        const formatted = formatWithThousands(rawValue);
+        sessionStorage.setItem('ph', JSON.stringify({PH: formatted}));
+        PH.value = formatted;
+        const result = await apiRequest('/PH', {ph: formatted});
+        alert("показания переданы");
+        console.log('responce', result);
+      } catch (err) {
+        console.error('error:',err);
+        alert('error',err.message);
+      };
     };
 
     const saveAddressAndContinue = () => {
@@ -161,7 +185,6 @@ createApp({
       const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === val);
       selectedBuildingId.value = option?.dataset.id || null;
       houseInput.value = val;
-
       if (selectedBuildingId.value) {
         loadApparts(selectedBuildingId.value);
       } else {

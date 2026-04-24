@@ -59,7 +59,7 @@
                     setTimeout(() => window.location.href = 'index.html', 2000);
                 } else {
                     const now = Date.now();
-                    const EXPIRY_MS = 60000;
+                    const EXPIRY_MS = 600000;
     
                     if (now - authData.authDate > EXPIRY_MS) {
                         errorElement.textContent = 'Истёк срок сессии';

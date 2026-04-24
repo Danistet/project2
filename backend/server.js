@@ -97,11 +97,22 @@ app.post('/apparts', (req, res) => {
       if (err) return res.status(500).json({ error: 'Query failed' });     
       res.json(result.map(r => { 
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
-        return {
-          id: r.ID,
-          house: `кв. ${r.APPARTS}${letterPart}`.trim(),
-          g_licschet: r.G_LICSCHET
-        };
+        if (r.APPARTS == null)
+        {
+          return {
+            id: r.ID,
+            house: `${letterPart}`.trim(),
+            g_licschet: r.G_LICSCHET
+          };
+        }//////////////////////////////если квартира не указана то первая дата, не надо так
+        else
+        {
+          return {
+            id: r.ID,
+            house: `кв. ${r.APPARTS}${letterPart}`.trim(),
+            g_licschet: r.G_LICSCHET
+          };
+        }       
       }));
     });
   });
@@ -203,7 +214,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
-        const minute = 60000;        
+        const minute = 600000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 
