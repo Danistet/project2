@@ -124,13 +124,13 @@ app.post('/PH', (req, res) => {
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id обязательны' });
   }
-  const createdate = Date.now();
+  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }
-    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`;   
+    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`;  
     db.query(checkQuery, [meter_id], (err, checkResult) => {
       if (err) {
         db.detach();
@@ -141,28 +141,55 @@ app.post('/PH', (req, res) => {
         db.detach();
         return res.status(404).json({ error: 'Счётчик не найден' });
       }
-      const insertQuery = `
-        INSERT INTO METERS_IND (PH, METER_ID, CREATEDATE) 
-        VALUES (?, ?, ?)
-      `;     
-      console.log('Executing:', insertQuery, [ph, meter_id, createdate]); 
-      db.query(insertQuery, [ph, meter_id, createdate], (err) => {
-        db.detach();  
+      const findLatestQuery = `
+        SELECT FIRST 1 ID, CREATEDATE 
+        FROM METERS_IND 
+        WHERE METER_ID = ? 
+        ORDER BY CREATEDATE DESC
+      `;      
+      db.query(findLatestQuery, [meter_id], (err, latestResult) => {
         if (err) {
-          console.error('Insert error:', err);
-          return res.status(500).json({ 
-            error: 'Не удалось сохранить показание',
+          db.detach();
+          console.error('Find latest error:', err);
+          return res.status(500).json({ error: 'Database query error' });
+        }
+        if (latestResult.length > 0) {
+          const latestId = latestResult[0].ID;
+          console.log('Updating existing record ID:', latestId);        
+          const updateQuery = `UPDATE METERS_IND SET PH = ?, CREATEDATE = ? WHERE ID = ?`;        
+          db.query(updateQuery, [ph, createdate, latestId], (err) => {
+            db.detach();
+            if (err) {
+              console.error('Update error:', err);
+              return res.status(500).json({ error: 'Не удалось обновить показание' });
+            }          
+            res.json({
+              status: 'OK',
+              message: 'Показание обновлено',
+              action: 'UPDATE',
+              data: { ph, meter_id, createdate }
+            });
+          });       
+        } else {
+          console.log('No record found, inserting new');        
+          const insertQuery = `
+            INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
+            VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
+          `;      
+          db.query(insertQuery, [ph, meter_id, createdate], (err) => {
+            db.detach();
+            if (err) {
+              console.error('Insert error:', err);
+              return res.status(500).json({ error: 'Не удалось сохранить показание' });
+            }          
+            res.json({
+              status: 'OK',
+              message: 'Показание сохранено (новая запись)',
+              action: 'INSERT',
+              data: { ph, meter_id, createdate }
+            });
           });
         }
-        res.json({
-          status: 'OK',
-          message: 'Показание сохранено',
-          data: { 
-            ph,
-            meter_id, 
-            createdate: new Date(createdate).toISOString() 
-          }
-        });
       });
     });
   });
@@ -211,25 +238,21 @@ app.post('/update-token', (req, res) => {
 });
 
 app.post('/auth', (req, res) => {
-  const { phone, userpswd } = req.body;
-  
+  const { phone, userpswd } = req.body; 
   if (!phone || !userpswd) {
     return res.status(400).json({ error: 'Missing phone or password' });
   }
-  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?`;
-    
+    const authQuery = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?`;  
     db.query(authQuery, [phone, userpswd], (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
       }
-
       if (authResult.length === 0) {
         db.detach();
         return res.status(401).json({ error: 'Invalid phone or password'});
@@ -283,12 +306,10 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { phone, userpswd } = req.body;
-  
+  const { phone, userpswd } = req.body; 
   if (!phone || !userpswd) {
     return res.status(400).json({ error: 'Missing phone or userpswd' });
   }
-  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
@@ -300,8 +321,7 @@ app.post('/register', (req, res) => {
         console.error('Check user error:', err);
         db.detach();
         return res.status(500).json({ error: 'Login error' });
-      }
-      
+      }    
       if (result.length > 0) {
         db.detach();
         return res.status(409).json({ error: 'User already exists' });
@@ -377,6 +397,48 @@ app.post('/meter-by-licschet', (req, res) => {
         meterNum: result[0].METER_NUM,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE
+      });
+    });
+  });
+});
+
+app.get('/PH/last', (req, res) => {
+  const { meter_id } = req.query; 
+  if (!meter_id) {
+    return res.status(400).json({ error: 'meter_id required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT FIRST 1 PH, CREATEDATE 
+      FROM METERS_IND 
+      WHERE METER_ID = ? 
+      ORDER BY CREATEDATE DESC
+    `;  
+    db.query(query, [meter_id], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }     
+      if (result.length === 0) {
+        return res.json({ found: false, ph: null, date: null });
+      }
+      const phRaw = result[0].PH;
+      const phFormatted = phRaw !== null && phRaw !== undefined
+        ? Number(phRaw).toLocaleString('ru-RU', { 
+            minimumFractionDigits: 3, 
+            maximumFractionDigits: 3 
+          })
+        : null;    
+      res.json({
+        found: true,
+        ph: phFormatted,
+        phRaw: phRaw,
+        date: result[0].CREATEDATE
       });
     });
   });

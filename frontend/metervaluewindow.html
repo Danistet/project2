@@ -109,6 +109,39 @@
                 errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
             }
         </script>
+
+        <script>
+            async function loadPreviousPHFromAPI() {
+                const phElement = document.getElementById('PH');
+                if (!phElement) return;
+                const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+                const meter_id = meterData.meterNum;            
+                if (!meter_id) {
+                    phElement.textContent = 'нет данных';
+                    return;
+                }             
+                try {
+                    const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                    });                   
+                    const result = await response.json();                 
+                    if (result.found && result.ph) {
+                    phElement.textContent = result.ph;
+                    sessionStorage.setItem('ph', JSON.stringify({ PH: result.ph }));
+                    } else {
+                    phElement.textContent = 'нет данных';
+                    }
+                } catch (err) {
+                    console.error('Failed to load previous PH:', err);
+                    phElement.textContent = 'нет данных';
+                }
+                }
+                window.addEventListener('DOMContentLoaded', async () => {              
+                loadMeterData();
+                loadPreviousPHFromAPI();
+                });
+        </script>
     </body>
 
     <style>
