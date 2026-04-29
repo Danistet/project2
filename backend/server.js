@@ -130,7 +130,7 @@ app.post('/PH', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }
-    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`;  
+    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`; 
     db.query(checkQuery, [meter_id], (err, checkResult) => {
       if (err) {
         db.detach();
@@ -141,55 +141,30 @@ app.post('/PH', (req, res) => {
         db.detach();
         return res.status(404).json({ error: 'Счётчик не найден' });
       }
-      const findLatestQuery = `
-        SELECT FIRST 1 ID, CREATEDATE 
-        FROM METERS_IND 
-        WHERE METER_ID = ? 
-        ORDER BY CREATEDATE DESC
-      `;      
-      db.query(findLatestQuery, [meter_id], (err, latestResult) => {
+      const insertQuery = `
+        INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
+        VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
+      `;     
+      console.log('Inserting new record:', { ph, meter_id, createdate });     
+      db.query(insertQuery, [ph, meter_id, createdate], (err) => {
+        db.detach();  
         if (err) {
-          db.detach();
-          console.error('Find latest error:', err);
-          return res.status(500).json({ error: 'Database query error' });
-        }
-        if (latestResult.length > 0) {
-          const latestId = latestResult[0].ID;
-          console.log('Updating existing record ID:', latestId);        
-          const updateQuery = `UPDATE METERS_IND SET PH = ?, CREATEDATE = ? WHERE ID = ?`;        
-          db.query(updateQuery, [ph, createdate, latestId], (err) => {
-            db.detach();
-            if (err) {
-              console.error('Update error:', err);
-              return res.status(500).json({ error: 'Не удалось обновить показание' });
-            }          
-            res.json({
-              status: 'OK',
-              message: 'Показание обновлено',
-              action: 'UPDATE',
-              data: { ph, meter_id, createdate }
-            });
-          });       
-        } else {
-          console.log('No record found, inserting new');        
-          const insertQuery = `
-            INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
-            VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
-          `;      
-          db.query(insertQuery, [ph, meter_id, createdate], (err) => {
-            db.detach();
-            if (err) {
-              console.error('Insert error:', err);
-              return res.status(500).json({ error: 'Не удалось сохранить показание' });
-            }          
-            res.json({
-              status: 'OK',
-              message: 'Показание сохранено (новая запись)',
-              action: 'INSERT',
-              data: { ph, meter_id, createdate }
-            });
+          console.error('Insert error:', err);
+          return res.status(500).json({ 
+            error: 'Не удалось сохранить показание',
+            details: err.message
           });
         }
+        res.json({
+          status: 'OK',
+          message: 'Показание сохранено',
+          action: 'INSERT',
+          data: { 
+            ph, 
+            meter_id, 
+            createdate 
+          }
+        });
       });
     });
   });
@@ -403,7 +378,7 @@ app.post('/meter-by-licschet', (req, res) => {
 });
 
 app.get('/PH/last', (req, res) => {
-  const { meter_id } = req.query; 
+  const { meter_id } = req.query;
   if (!meter_id) {
     return res.status(400).json({ error: 'meter_id required' });
   }
@@ -413,17 +388,17 @@ app.get('/PH/last', (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
     const query = `
-      SELECT FIRST 1 PH, CREATEDATE 
+      SELECT FIRST 1 PH, CREATEDATE, ID
       FROM METERS_IND 
       WHERE METER_ID = ? 
-      ORDER BY CREATEDATE DESC
-    `;  
+      ORDER BY ID DESC
+    `; 
     db.query(query, [meter_id], (err, result) => {
       db.detach();
       if (err) {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
-      }     
+      }  
       if (result.length === 0) {
         return res.json({ found: false, ph: null, date: null });
       }
@@ -433,12 +408,13 @@ app.get('/PH/last', (req, res) => {
             minimumFractionDigits: 3, 
             maximumFractionDigits: 3 
           })
-        : null;    
+        : null;     
       res.json({
         found: true,
         ph: phFormatted,
         phRaw: phRaw,
-        date: result[0].CREATEDATE
+        date: result[0].CREATEDATE,
+        id: result[0].ID
       });
     });
   });

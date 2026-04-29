@@ -89,7 +89,13 @@ createApp({
           meter_id: meter_id 
         });               
         alert((result.message || 'Показания переданы'));
-        console.log('Response:', result);        
+        console.log('Response:', result);  
+        const phElement = document.getElementById('PH');
+        if (phElement) {
+          phElement.textContent = formatted;
+        }
+        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));
+        
       } catch (err) {
         console.error('Error:', err);
         alert('error: ' + (err.message || 'Неизвестная ошибка'));
