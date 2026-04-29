@@ -61,26 +61,39 @@ createApp({
       if (/^\d+$/.test(str)) return `${str},000`;
       return str.replace('.', ',');
     };
-
-    const NewPH = () => {
+    
+    const NewPH = async () => {
       try {
         const inputEl = document.getElementById('newPH');
-        const rawValue = inputEl?.value?.trim() || '';
-        if (!rawValue)
-        {
-          alert("введите показания");
+        const rawValue = inputEl?.value?.trim() || '';            
+        if (!rawValue) {
+          alert("Введите показания");
+          return;
+        }      
+        const formatted = formatWithThousands(rawValue);
+        const numericValue = parseFloat(rawValue.replace(',', '.'));
+        if (isNaN(numericValue)) {
+          alert('Некорректное число');
+          return;
+        }        
+        const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+        const meter_id = meterData.meterNum;            
+        if (!meter_id) {
+          alert('Не найден серийный номер счётчика');
           return;
         }
-        const formatted = formatWithThousands(rawValue);
-        sessionStorage.setItem('ph', JSON.stringify({PH: formatted}));
+        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));
         PH.value = formatted;
-        const result = await apiRequest('/PH', {ph: formatted});
-        alert("показания переданы");
-        console.log('responce', result);
+        const result = await apiRequest('/PH', { 
+          ph: numericValue,
+          meter_id: meter_id 
+        });               
+        alert((result.message || 'Показания переданы'));
+        console.log('Response:', result);        
       } catch (err) {
-        console.error('error:',err);
-        alert('error',err.message);
-      };
+        console.error('Error:', err);
+        alert('error: ' + (err.message || 'Неизвестная ошибка'));
+      }
     };
 
     const saveAddressAndContinue = () => {
@@ -118,7 +131,7 @@ createApp({
 
     const loadStreets = async (townId) => {
       try {
-        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {/////////?
+        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -301,7 +314,7 @@ createApp({
     });
     return { 
       phone, password, response, error, meternum, mountdate, verifydate,
-      towns, streets, buildings, apparts, PHData,
+      towns, streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
       NewPH,

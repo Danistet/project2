@@ -103,7 +103,7 @@ app.post('/apparts', (req, res) => {
             id: r.ID,
             house: `${letterPart}`.trim(),
             g_licschet: r.G_LICSCHET
-          };
+          };///////////////////////////licschet actuality check
         }//////////////////////////////если квартира не указана то первая дата, не надо так
         else
         {
@@ -119,27 +119,51 @@ app.post('/apparts', (req, res) => {
 });
 
 app.post('/PH', (req, res) => {
-  const ph = req.query.ph;
-  if (!ph) return res.status(400).json({ error: 'ph required' });
-////////////////////////////////////////METER_IND
-  const query = `
-    SELECT
-    PH,
-    METER_ID
-    FROM METER_IND
-    WHERE METER_ID = ?
-    ORDER BY PH, METER_ID
-  `;
+  const { ph, meter_id } = req.body;
+  console.log('POST /PH:', { ph, meter_id, type: typeof ph });
+  if (ph === undefined || ph === null || !meter_id) {
+    return res.status(400).json({ error: 'ph и meter_id обязательны' });
+  }
+  const createdate = Date.now();
   firebird.attach(config, (err, db) => {
-    db.query(query, [ph], (err, result) =>{
-      if (err) return res.status(500).json({ error: 'Query failed' });  
-      console.log('query',query , 'ph', ph);
-      res.json(result.map(r => {
-        return {
-          meter_id: r.METER_ID,
-          ph: r.PH
-        };
-      }));
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`;   
+    db.query(checkQuery, [meter_id], (err, checkResult) => {
+      if (err) {
+        db.detach();
+        console.error('Check meter error:', err);
+        return res.status(500).json({ error: 'Database query error' });
+      }
+      if (checkResult.length === 0) {
+        db.detach();
+        return res.status(404).json({ error: 'Счётчик не найден' });
+      }
+      const insertQuery = `
+        INSERT INTO METERS_IND (PH, METER_ID, CREATEDATE) 
+        VALUES (?, ?, ?)
+      `;     
+      console.log('Executing:', insertQuery, [ph, meter_id, createdate]); 
+      db.query(insertQuery, [ph, meter_id, createdate], (err) => {
+        db.detach();  
+        if (err) {
+          console.error('Insert error:', err);
+          return res.status(500).json({ 
+            error: 'Не удалось сохранить показание',
+          });
+        }
+        res.json({
+          status: 'OK',
+          message: 'Показание сохранено',
+          data: { 
+            ph,
+            meter_id, 
+            createdate: new Date(createdate).toISOString() 
+          }
+        });
+      });
     });
   });
 });

@@ -7,23 +7,26 @@
         <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     </head>
     <body>
-        <div class="container">
-            <h1>Передать показания</h1>
-            <div id="error"></div>
+        <div id="app">
+            <div class="container">
+                <h1>Передать показания</h1>
+                <div id="error"></div>
+            </div>
+            <div>
+                <p>Серийный номер:</p>
+                <p id="meterNum"></p>
+                <p>Предыдущие показания:</p>
+                <p id="PH">нет данных</p>
+                <br>
+                <p>Текущее показание:</p>
+            </div>
+            <div>
+                <input required type="text" id="newPH" v-model="PH" inputmode="decimal" placeholder="0,000"><br>
+                <button @click="NewPH">Передать</button><br>
+                <button onclick="main()">Выход</button>
+            </div>
         </div>
-        <div>
-            <p>Серийный номер:</p>
-            <p id="meterNum"></p>
-            <p>Предыдущие показания:</p>
-            <p id="PH">нет данных</p>
-            <br>
-            <p>Текущее показание:</p>
-        </div>
-        <div>
-            <input required type="text" id="newPH" v-model="newPH" inputmode="decimal" placeholder="0,000"><br>
-            <button @click="NewPH">Передать</button><br>
-            <button onclick="main()">Выход</button>
-        </div>
+        <script src="./app.js"></script>
 
         <script>
             function formatWithThousands(value) {
