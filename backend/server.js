@@ -180,7 +180,7 @@ app.post('/update-token', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }    
-    const query = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND TOKEN = ?`;  
+    const query = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLE_RHONE = ? AND TOKEN = ?`;  
     db.query(query, [phone, token], (err, result) => {
       if (err) {
         db.detach();
@@ -194,7 +194,7 @@ app.post('/update-token', (req, res) => {
       const now = Date.now();
       const newToken = token;
       const newAuthDate = now;
-      const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;    
+      const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;    
       db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
         db.detach();         
         if (upderr) {
@@ -222,7 +222,7 @@ app.post('/auth', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = `SELECT TOKEN, AUTHDATE FROM NEW_TABLE WHERE USERNAME = ? AND USERPSWD = ?`;  
+    const authQuery = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLE_RHONE = ? AND CONTROLLER_PSWD = ?`;  
     db.query(authQuery, [phone, userpswd], (err, authResult) => {
       if (err) {
         db.detach();
@@ -255,7 +255,7 @@ app.post('/auth', (req, res) => {
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
-          const updateQuery = `UPDATE NEW_TABLE SET TOKEN = ?, AUTHDATE = ? WHERE USERNAME = ?`;      
+          const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;      
           db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
             if (upderr) {
               db.detach();
@@ -265,7 +265,7 @@ app.post('/auth', (req, res) => {
             finishResponse(newToken, now, meterNum, mountDate, verifyDate);
           });
         } else {
-          const updateQuery = `UPDATE NEW_TABLE SET AUTHDATE = ? WHERE USERNAME = ?`;       
+          const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;       
           db.query(updateQuery, [now, phone], (upderr) => {
             if (upderr) {
               db.detach();
@@ -290,7 +290,7 @@ app.post('/register', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'DB connect error' });
     }
-    const checkQuery = `SELECT 1 FROM NEW_TABLE WHERE USERNAME = ?`;
+    const checkQuery = `SELECT 1 FROM CONTROLLERS WHERE CONTROLLE_RHONE = ?`;
     db.query(checkQuery, [phone], (err, result) => {
       if (err) {
         console.error('Check user error:', err);
@@ -303,7 +303,7 @@ app.post('/register', (req, res) => {
       }   
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
-      const insertUser = `INSERT INTO NEW_TABLE (USERNAME, USERPSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)`;
+      const insertUser = `INSERT INTO CONTROLLERS (CONTROLLE_RHONE, CONTROLLER_PSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)`;
       db.query(insertUser, [phone, userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
