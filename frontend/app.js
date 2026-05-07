@@ -53,6 +53,22 @@ createApp({
       }
     });
 
+    watch(showApparts, (newVal) => {
+      if (!newVal)
+      {
+        appartsSearch.value = '';
+        selectedAppartId.value = null;
+        sessionStorage.removeItem('licschet');
+      }
+      else
+      {
+        setTimeout(() => {
+          const input = document.getElementById('appartsInput');
+          if (input) input.focus();
+        }, 100);
+      }
+    });
+
     const formatWithThousands = (value) => {
       if (!value && value !== 0) return '';
       const str = String(value).trim();
@@ -103,6 +119,12 @@ createApp({
     };
 
     const saveAddressAndContinue = () => {
+      if (showApparts.value && (!appartsSearch.value || appartsSearch.value.trim() === '')) {
+        alert("Введите номер квартиры");
+        const input = document.getElementById('appartsInput');
+        if (input) input.focus();
+        return;
+      }
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
         townId: selectedTownId.value,
@@ -110,13 +132,15 @@ createApp({
         streetId: selectedStreetId.value,
         house: houseInput.value || document.getElementById('houseInput')?.value || '',
         buildingId: selectedBuildingId.value,
-        apparts: showApparts.value ? appartsSearch.value : null,
+
+        apparts: showApparts.value ? (appartsSearch.value?.trim() || null) : null,
         appartsId: showApparts.value ? selectedAppartId.value : null,
-        g_licschet: sessionStorage.getItem('licschet') ? 
-        JSON.parse(sessionStorage.getItem('licschet')).g_licschet : null
+        g_licschet: (showApparts.value && selectedAppartId.value) ? 
+          (JSON.parse(sessionStorage.getItem('licschet') || '{}').g_licschet || null) 
+          : null
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      if (townSearch.value != "" && streetSearch.value != "" && houseInput.value !="")
+      if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim())
       {
         window.location.href = 'main.html';
       }
@@ -239,7 +263,12 @@ createApp({
           sessionStorage.setItem('meternum', JSON.stringify({ meterNum: null }));
           sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: null }));
           sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: null }));
+          sessionStorage.removeItem('licschet');
         }
+      }
+      else if (!selectedAppartId.value)
+      {
+        sessionStorage.removeItem('licschet');
       }
     };
 

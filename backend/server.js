@@ -103,8 +103,9 @@ app.post('/apparts', (req, res) => {
             id: r.ID,
             house: `${letterPart}`.trim(),
             g_licschet: r.G_LICSCHET
+            ////////////////////////////////////////////RMETER_STATUS check
           };///////////////////////////licschet actuality check
-        }//////////////////////////////если квартира не указана то первая дата, не надо так
+        }
         else
         {
           return {
@@ -334,8 +335,14 @@ app.post('/register', (req, res) => {
 
 app.post('/meter-by-licschet', (req, res) => {
   const {g_licschet} = req.body;
-  if (!g_licschet) {
-    return res.status(400).json({error: "g_licschet req"});
+  if (!g_licschet || String(g_licschet).trim() === '') {
+    return res.status(400).json({ 
+      error: "g_licschet required",
+      found: false,
+      meterNum: null,
+      mountDate: null,
+      verifyDate: null
+    });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
