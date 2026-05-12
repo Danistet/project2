@@ -11,6 +11,7 @@ createApp({
     const towns = ref([]);
     const streets = ref([]);
     const buildings = ref([]);
+    const currentBuildingLicschet = ref(null);
     const apparts = ref([]);
     const selectedTownId = ref(null);
     const selectedStreetId = ref(null);
@@ -104,8 +105,7 @@ createApp({
           ph: numericValue,
           meter_id: meter_id 
         });               
-        alert((result.message || 'Показания переданы'));
-        console.log('Response:', result);  
+        alert((result.message || 'Показания переданы'));  
         const phElement = document.getElementById('PH');
         if (phElement) {
           phElement.textContent = formatted;
@@ -125,23 +125,33 @@ createApp({
         if (input) input.focus();
         return;
       }
+      let g_licschet = null;
+      try {
+        const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
+        if (licschetData?.g_licschet?.trim()) {
+          g_licschet = licschetData.g_licschet;
+        }
+      } catch (e) {
+        console.warn('Failed to parse licschet', e);
+      }
+      if (!g_licschet && currentBuildingLicschet.value?.trim()) {
+        g_licschet = currentBuildingLicschet.value;
+      }
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
         townId: selectedTownId.value,
         street: streetSearch.value || document.getElementById('streetInput')?.value || '',
         streetId: selectedStreetId.value,
-        house: houseInput.value || document.getElementById('houseInput')?.value || '',
-        buildingId: selectedBuildingId.value,
-
+        house: houseInput.value || document.getElementById('houseInput')?.value || '',        
         apparts: showApparts.value ? (appartsSearch.value?.trim() || null) : null,
         appartsId: showApparts.value ? selectedAppartId.value : null,
-        g_licschet: (showApparts.value && selectedAppartId.value) ? 
-          (JSON.parse(sessionStorage.getItem('licschet') || '{}').g_licschet || null) 
-          : null
+        g_licschet,
+        buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
       if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim())
       {
+        //console.log("2", addressData.g_licschet);
         window.location.href = 'main.html';
       }
       else
@@ -183,12 +193,21 @@ createApp({
     };
 
     const loadApparts = async (buildingId) => {
-      if (!buildingId) { apparts.value = []; return; }
+      if (!buildingId) { 
+        apparts.value = []; 
+        currentBuildingLicschet.value = null;
+        return; 
+      }
       try {
         const result = await apiRequest(`/apparts?buildingId=${buildingId}`);
         apparts.value = result;
+        const emptyAppart = result.find(appr => 
+          (!appr.house || appr.house.trim() === '') && appr.g_licschet
+        );
+        currentBuildingLicschet.value = emptyAppart?.g_licschet || null;              
       } catch (err) {
         console.error('Failed to load apartments:', err);
+        currentBuildingLicschet.value = null;
       }
     };
 
@@ -242,33 +261,70 @@ createApp({
       if (option) selectedAppartId.value = option.dataset.id;
     };
 
+    const clearMeterDataToSession = () => {
+      sessionStorage.setItem('meternum', JSON.stringify({meterNum: null }));
+      sessionStorage.setItem('mountdate', JSON.stringify({mountDate: null }));
+      sessionStorage.setItem('verifydate', JSON.stringify({verifyDate: null })); 
+      sessionStorage.removeItem('licschet');
+    };
+
+    const saveMeterDataToSession = (data) => { 
+      if (!data?.found) {
+        console.warn('No meter found');
+        clearMeterDataToSession();
+        return;
+      }     
+      sessionStorage.setItem('meternum', JSON.stringify({ meterNum: data.meterNum || null }));
+      sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: data.mountDate || null }));
+      sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: data.verifyDate || null }));        
+      if (data.licschet && data.licschet.trim() !== '') {
+        sessionStorage.setItem('licschet', JSON.stringify({ g_licschet: data.licschet }));
+      } else {
+        sessionStorage.removeItem('licschet');
+      }
+    };
+
     const onAppartsChange = async (e) => {
       const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsApparts option')]
-        .find(o => o.value === val);
+      let option = [...document.querySelectorAll('#resultsApparts option')]
+        .find(o => o.value === val && o.dataset.id);    
       selectedAppartId.value = option?.dataset.id || null;
       appartsSearch.value = val;
-
-      if (selectedAppartId.value && option?.dataset?.licschet) 
-      {
+      if (selectedAppartId.value && option?.dataset?.licschet?.trim()) {
         const g_licschet = option.dataset.licschet;
         try {
           const meterData = await apiRequest('/meter-by-licschet', { g_licschet });
-          sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meterData.meterNum}));
-          sessionStorage.setItem('mountdate', JSON.stringify({mountDate: meterData.mountDate}));
-          sessionStorage.setItem('verifydate', JSON.stringify({verifyDate: meterData.verifyDate}));
-          sessionStorage.setItem('licschet', JSON.stringify({g_licschet}));
+          console.log('[DEBUG] /meter-by-licschet response:', meterData);
+          saveMeterDataToSession(meterData);
         } catch (err) {
           console.error("error", err);
-          sessionStorage.setItem('meternum', JSON.stringify({ meterNum: null }));
-          sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: null }));
-          sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: null }));
-          sessionStorage.removeItem('licschet');
+          clearMeterDataToSession();
+        }
+      } 
+      else if (!selectedAppartId.value && selectedBuildingId.value && currentBuildingLicschet.value) {   
+        try {
+          const meterData = await apiRequest('/meter-by-licschet', { 
+            g_licschet: currentBuildingLicschet.value 
+          });
+          saveMeterDataToSession(meterData);
+        } catch (err) {
+          console.error("error", err);
+          clearMeterDataToSession();
         }
       }
-      else if (!selectedAppartId.value)
-      {
-        sessionStorage.removeItem('licschet');
+      else if (!selectedAppartId.value && selectedBuildingId.value) {
+        try {
+          const meterData = await apiRequest('/meter-by-building', { 
+            buildingId: selectedBuildingId.value 
+          });
+          saveMeterDataToSession(meterData);
+        } catch (err) {
+          console.error("error building lookup", err);
+          clearMeterDataToSession();
+        }
+      }
+      else {
+        clearMeterDataToSession();
       }
     };
 
@@ -309,7 +365,6 @@ createApp({
         sessionStorage.setItem('verifyDate', JSON.stringify({
           verifyDate: result.verifyDate
         }));        
-        console.log('Ответ сервера:', result);
 
         if (!result.phone) {
           throw new Error('Сервер не вернул phone');
@@ -352,6 +407,7 @@ createApp({
       towns, streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
+      currentBuildingLicschet,
       NewPH,
       onTownInput,
       onTownChange,

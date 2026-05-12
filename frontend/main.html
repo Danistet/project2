@@ -58,7 +58,7 @@
                     setTimeout(() => window.location.href = 'index.html', 2000);
                 } else {
                     const now = Date.now();
-                    const EXPIRY_MS = 600000;
+                    const EXPIRY_MS = 1200000;
     
                     if (now - authData.authDate > EXPIRY_MS) {
                         errorElement.textContent = 'Истёк срок сессии';
@@ -81,7 +81,7 @@
                 const storedVerifyDate = sessionStorage.getItem('verifydate');
                 const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
                 if (!storedMeterData && addressData?.g_licschet) {
-                    console.log('Данные счетчика не в сессии, но есть g_licschet:', addressData.g_licschet);
+                    console.log(addressData.g_licschet);
                 }
                 const meterNumElement = document.getElementById('meterNum');
                 const mountDateElement = document.getElementById('mountDate');

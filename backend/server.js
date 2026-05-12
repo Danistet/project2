@@ -23,10 +23,8 @@ app.post('/cities', (req, res) => {
 app.post('/streets', (req, res) => {
   const townId = req.query.townId;
   if (!townId) return res.status(400).json({ error: 'townId required' });
-  
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connection failed' });
-    
+    if (err) return res.status(500).json({ error: 'DB connection failed' }); 
     const query = `
       SELECT 
       ID, 
@@ -50,7 +48,6 @@ app.post('/streets', (req, res) => {
 app.post('/buildings', (req, res) => {
   const streetId = req.query.streetId;
   if (!streetId) return res.status(400).json({ error: 'streetId required' });
-  
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
     const query = `
@@ -79,14 +76,13 @@ app.post('/buildings', (req, res) => {
 app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
-  
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });   
     const query = `
       SELECT 
       A.ID, 
       CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-      CAST(A.LETTER AS VARCHAR(10) CHARACTER SET WIN1251) AS LETTER,
+      CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
       A.G_LICSCHET
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
@@ -121,7 +117,6 @@ app.post('/apparts', (req, res) => {
 
 app.post('/PH', (req, res) => {
   const { ph, meter_id } = req.body;
-  console.log('POST /PH:', { ph, meter_id, type: typeof ph });
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id обязательны' });
   }
@@ -237,7 +232,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, [phone], (err, meterResult) => {        
         const now = Date.now();
-        const minute = 600000;        
+        const minute = 1200000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 
@@ -334,16 +329,7 @@ app.post('/register', (req, res) => {
 });
 
 app.post('/meter-by-licschet', (req, res) => {
-  const {g_licschet} = req.body;
-  if (!g_licschet || String(g_licschet).trim() === '') {
-    return res.status(400).json({ 
-      error: "g_licschet required",
-      found: false,
-      meterNum: null,
-      mountDate: null,
-      verifyDate: null
-    });
-  }
+  const {g_licschet, buildingId} = req.body;
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error', err);
@@ -378,7 +364,57 @@ app.post('/meter-by-licschet', (req, res) => {
         found: true,
         meterNum: result[0].METER_NUM,
         mountDate: result[0].MOUNT_DATE,
-        verifyDate: result[0].VERIFY_DATE
+        verifyDate: result[0].VERIFY_DATE,
+        licschet: result[0].LS
+      });
+    });
+  });
+});
+
+app.post('/meter-by-building', (req, res) => {
+  const { buildingId } = req.body;
+  if (!buildingId) {
+    return res.status(400).json({ error: 'buildingId required' });
+  } 
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT M.METER_NUM, M.MOUNT_DATE, M.VERIFY_DATE, M.LS
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
+        AND (A.APPARTS IS NULL OR TRIM(A.APPARTS) = '')
+      ORDER BY M.MOUNT_DATE DESC
+      ROWS 1
+    `;
+    const buildingIdNum = parseInt(buildingId, 10);
+    if (isNaN(buildingIdNum)) {
+      db.detach();
+      return res.status(400).json({ error: 'Invalid buildingId' });
+    }   
+    db.query(query, [buildingIdNum], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }
+      if (!result || result.length === 0) {
+        return res.json({
+          found: false,
+          meterNum: null,
+          mountDate: null,
+          verifyDate: null
+        });        
+      }
+      res.json({
+        found: true,
+        meterNum: result[0].METER_NUM,
+        mountDate: result[0].MOUNT_DATE,
+        verifyDate: result[0].VERIFY_DATE,
+        licschet: result[0].LS
       });
     });
   });
@@ -415,7 +451,7 @@ app.get('/PH/last', (req, res) => {
             minimumFractionDigits: 3, 
             maximumFractionDigits: 3 
           })
-        : null;     
+      : null;     
       res.json({
         found: true,
         ph: phFormatted,
