@@ -60,6 +60,9 @@ createApp({
         appartsSearch.value = '';
         selectedAppartId.value = null;
         sessionStorage.removeItem('licschet');
+        if (selectedBuildingId.value) {
+          loadMeterByBuilding(selectedBuildingId.value);
+        }
       }
       else
       {
@@ -110,8 +113,7 @@ createApp({
         if (phElement) {
           phElement.textContent = formatted;
         }
-        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));
-        
+        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));     
       } catch (err) {
         console.error('Error:', err);
         alert('error: ' + (err.message || 'Неизвестная ошибка'));
@@ -119,11 +121,52 @@ createApp({
     };
 
     const saveAddressAndContinue = () => {
-      if (showApparts.value && (!appartsSearch.value || appartsSearch.value.trim() === '')) {
-        alert("Введите номер квартиры");
-        const input = document.getElementById('appartsInput');
-        if (input) input.focus();
+
+      if (!townSearch.value?.trim() || !selectedTownId.value) {
+        alert("Выберите город из списка");
+        document.getElementById('townInput')?.focus();
         return;
+      }
+
+      if (!streetSearch.value?.trim() || !selectedStreetId.value) {
+        alert("Выберите улицу из списка");
+        document.getElementById('streetInput')?.focus();
+        return;
+      }
+      
+      let houseValue = houseInput.value?.trim();
+      if (!houseValue) {
+        alert("Введите номер дома");
+        const input = document.getElementById('houseInput');
+        if (input) { input.focus(); input.select(); }
+        return;
+      }
+      if (!selectedBuildingId.value) {
+        alert("Несуществующий номер дома");
+        const input = document.getElementById('houseInput');
+        if (input) { input.focus(); input.select(); }
+        return;
+      }
+      let appartsValue = null;
+      let appartsIdValue = null;
+      if (showApparts.value) {
+        appartsValue = appartsSearch.value?.trim();
+        if (!appartsValue) {
+          alert("Введите номер квартиры");
+          const input = document.getElementById('appartsInput');
+          if (input) { input.focus(); input.select(); }
+          return;
+        }
+        if (!selectedAppartId.value) {
+          alert("Несуществующий номер квартиры");
+          const input = document.getElementById('appartsInput');
+          if (input) { input.focus(); input.select(); }
+          return;
+        }
+        appartsIdValue = selectedAppartId.value;
+      } else {
+        appartsValue = "0";
+        appartsIdValue = null;
       }
       let g_licschet = null;
       try {
@@ -143,15 +186,26 @@ createApp({
         street: streetSearch.value || document.getElementById('streetInput')?.value || '',
         streetId: selectedStreetId.value,
         house: houseInput.value || document.getElementById('houseInput')?.value || '',        
-        apparts: showApparts.value ? (appartsSearch.value?.trim() || null) : null,
-        appartsId: showApparts.value ? selectedAppartId.value : null,
+        apparts: appartsValue,
+        appartsId: appartsIdValue, 
         g_licschet,
         buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
+      const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+      const hasMeter = meterData?.meterNum?.trim();
+      if (!showApparts.value && !hasMeter) {
+        const input =document.getElementById('houseInput');
+        if (input) {input.focus(); input.select();}
+        return;
+      }
+      if (showApparts.value && selectedAppartId.value && !hasMeter) {
+        alert("счётчик не найден");
+        return;
+      }
       if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim())
       {
-        //console.log("2", addressData.g_licschet);
+        //console.log(addressData.g_licschet);
         window.location.href = 'main.html';
       }
       else
@@ -216,6 +270,7 @@ createApp({
       const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
       if (option) selectedTownId.value = option.dataset.id;
     };
+
     const onTownChange = (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
@@ -284,17 +339,32 @@ createApp({
       }
     };
 
+    const loadMeterByBuilding = async (buildingId) => {
+      if (!buildingId) {
+        clearMeterDataToSession();
+        return;
+      }
+      try {
+        const meterData = await apiRequest('/meter-by-building', { 
+          buildingId: buildingId 
+        });
+        saveMeterDataToSession(meterData);
+      } catch (err) {
+        console.error("error building lookup", err);
+        clearMeterDataToSession();
+      }
+    };
+
     const onAppartsChange = async (e) => {
       const val = e.target.value;
       let option = [...document.querySelectorAll('#resultsApparts option')]
         .find(o => o.value === val && o.dataset.id);    
       selectedAppartId.value = option?.dataset.id || null;
-      appartsSearch.value = val;
+      appartsSearch.value = val; 
       if (selectedAppartId.value && option?.dataset?.licschet?.trim()) {
         const g_licschet = option.dataset.licschet;
         try {
           const meterData = await apiRequest('/meter-by-licschet', { g_licschet });
-          console.log('[DEBUG] /meter-by-licschet response:', meterData);
           saveMeterDataToSession(meterData);
         } catch (err) {
           console.error("error", err);
@@ -313,15 +383,7 @@ createApp({
         }
       }
       else if (!selectedAppartId.value && selectedBuildingId.value) {
-        try {
-          const meterData = await apiRequest('/meter-by-building', { 
-            buildingId: selectedBuildingId.value 
-          });
-          saveMeterDataToSession(meterData);
-        } catch (err) {
-          console.error("error building lookup", err);
-          clearMeterDataToSession();
-        }
+        await loadMeterByBuilding(selectedBuildingId.value);
       }
       else {
         clearMeterDataToSession();

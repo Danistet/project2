@@ -140,8 +140,7 @@ app.post('/PH', (req, res) => {
       const insertQuery = `
         INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
         VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
-      `;     
-      console.log('Inserting new record:', { ph, meter_id, createdate });     
+      `;          
       db.query(insertQuery, [ph, meter_id, createdate], (err) => {
         db.detach();  
         if (err) {
