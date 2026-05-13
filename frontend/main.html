@@ -30,7 +30,7 @@
             <button onclick="logout()" id="changebutton">Сменить адрес</button>
         </div>
         <script>
-        function loadAddressDisplay() {
+        function loadAddressDisplay() {//////////////////////differrent meters
         const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
             if (addressData) {
                 document.getElementById('streettype').textContent = addressData.street?.split(' ')[0] || '';
@@ -38,7 +38,7 @@
                 document.getElementById('house').textContent = addressData.house || '';
                 document.getElementById('apparts').textContent = addressData.apparts || '';
                 document.getElementById('apparts').textContent = 
-                addressData.apparts && addressData.apparts !== "0" ? addressData.apparts : '';
+                addressData.apparts && addressData.apparts !== "-1" ? addressData.apparts : '';
             }
         }
 

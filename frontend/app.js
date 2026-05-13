@@ -165,7 +165,7 @@ createApp({
         }
         appartsIdValue = selectedAppartId.value;
       } else {
-        appartsValue = "0";
+        appartsValue = "-1";
         appartsIdValue = null;
       }
       let g_licschet = null;

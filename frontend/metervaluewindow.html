@@ -21,7 +21,7 @@
                 <p>Текущее показание:</p>
             </div>
             <div>
-                <input required type="text" id="newPH" v-model="PH" inputmode="decimal" placeholder="0,000"><br>
+                <input maxlength="15" required type="text" id="newPH" v-model="PH" inputmode="decimal" placeholder="0,000"><br>
                 <button @click="NewPH">Передать</button><br>
                 <button onclick="main()">Выход</button>
             </div>
