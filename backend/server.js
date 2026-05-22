@@ -370,6 +370,41 @@ app.post('/meter-by-licschet', (req, res) => {
   });
 });
 
+app.post('/meters-by-licschet', (req, res) => {///////////////
+  const {g_licschet} = req.body;
+  if (!g_licschet)
+  {
+    return res.status(400).json({ error: 'g_licschet required'});
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'DB connect error:', err});
+    }
+    const query = `
+      SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE, LS, ID
+      FROM METERS
+      WHERE LS = ?
+      ORDER BY MOUNT_DATE DESC
+    `;
+    db.query(query, [g_licschet], (err, result) =>{
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });  
+      }
+      res.json(result.map(r => ({
+        found: true,
+        meterNum: r.METER_NUM,
+        mountDate: r.MOUNT_DATE,
+        verifyDate: r.VERIFY_DATE,
+        licschet: r.LS,
+        id: r.ID
+      })));
+    });
+  });
+});
+
 app.post('/meter-by-building', (req, res) => {
   const { buildingId } = req.body;
   if (!buildingId) {
@@ -415,6 +450,48 @@ app.post('/meter-by-building', (req, res) => {
         verifyDate: result[0].VERIFY_DATE,
         licschet: result[0].LS
       });
+    });
+  });
+});
+
+app.post('/meters-by-building', (req, res) => {////////////////////////////////
+  const { buildingId } = req.body;
+  if (!buildingId) {
+    return res.status(400).json({error: 'buildingId required'});
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT M.METER_NUM, M.MOUNT_DATE, M.VERIFY_DATE, M.LS, M.ID
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
+      
+      ORDER BY M.MOUNT_DATE DESC
+    `;
+    //AND (A.APPARTS IS NULL OR TRIM(A.APPARTS) = '')
+    const buildingIdNum = parseInt(buildingId, 10);
+    if (isNaN(buildingIdNum)) {
+      db.detach();
+      return res.status(400).json({ error: 'Invalid buildingId' });
+    }
+    db.query(query, [buildingIdNum], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }
+      res.json(result.map(r => ({
+        found: true,
+        meterNum: r.METER_NUM,
+        mountDate: r.MOUNT_DATE,
+        verifyDate: r.VERIFY_DATE,
+        licschet: r.LS,
+        id: r.ID
+      })));
     });
   });
 });

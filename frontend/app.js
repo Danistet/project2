@@ -25,6 +25,10 @@ createApp({
     const showApparts = ref(true); 
     const PH = ref('');
     const PHData = ref('');
+    //////
+    const meters = ref([]);
+    const showMeterSelect = ref(false);
+    const selectedMeter = ref(null);
     const { onMounted } = Vue;
 
     watch(townSearch, (newVal) => {
@@ -96,8 +100,8 @@ createApp({
           alert('Некорректное число');
           return;
         }        
-        const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
-        const meter_id = meterData.meterNum;            
+        const meterData = JSON.parse(sessionStorage.getItem('activeMeter') || sessionStorage.getItem('meternum') || '{}');
+        const meter_id = meterData.meterNum;;            
         if (!meter_id) {
           alert('Не найден серийный номер счётчика');
           return;
@@ -120,20 +124,17 @@ createApp({
       }
     };
 
-    const saveAddressAndContinue = () => {
-
+    const saveAddressAndContinue = async () => {
       if (!townSearch.value?.trim() || !selectedTownId.value) {
         alert("Выберите город из списка");
         document.getElementById('townInput')?.focus();
         return;
       }
-
       if (!streetSearch.value?.trim() || !selectedStreetId.value) {
         alert("Выберите улицу из списка");
         document.getElementById('streetInput')?.focus();
         return;
-      }
-      
+      }     
       let houseValue = houseInput.value?.trim();
       if (!houseValue) {
         alert("Введите номер дома");
@@ -146,7 +147,7 @@ createApp({
         const input = document.getElementById('houseInput');
         if (input) { input.focus(); input.select(); }
         return;
-      }
+      }    
       let appartsValue = null;
       let appartsIdValue = null;
       if (showApparts.value) {
@@ -180,6 +181,42 @@ createApp({
       if (!g_licschet && currentBuildingLicschet.value?.trim()) {
         g_licschet = currentBuildingLicschet.value;
       }
+      let allMeters = [];
+      let foundMeterForSession = null; 
+      try {
+        if (showApparts.value && selectedAppartId.value) {
+          const selectedAppart = apparts.value.find(a => a.id === selectedAppartId.value);
+          const licschet = selectedAppart?.g_licschet;
+          
+          if (licschet) {
+            allMeters = await getMetersByLicschet(licschet);
+            if (allMeters?.length === 1) {
+              foundMeterForSession = allMeters[0];
+            }
+          }
+        } 
+        else if (currentBuildingLicschet.value && !showApparts.value) {
+          allMeters = await getMetersByLicschet(currentBuildingLicschet.value);
+          if (allMeters?.length === 1) {
+            foundMeterForSession = allMeters[0];
+          }
+        } 
+        else if (selectedBuildingId.value) {
+          allMeters = await getMetersByBuilding(selectedBuildingId.value);
+          if (allMeters?.length === 1) {
+            foundMeterForSession = allMeters[0];
+          }
+        }      
+      } catch (err) {
+        console.warn('Failed to load meters list:', err);
+        allMeters = [];
+      }
+      saveAllMeters(allMeters);
+      if (foundMeterForSession) {
+        saveMeterDataToSession(foundMeterForSession);
+      } else {
+        clearMeterDataToSession();
+      }
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
         townId: selectedTownId.value,
@@ -194,22 +231,9 @@ createApp({
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
       const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
       const hasMeter = meterData?.meterNum?.trim();
-      if (!showApparts.value && !hasMeter) {
-        const input =document.getElementById('houseInput');
-        if (input) {input.focus(); input.select();}
-        return;
-      }
-      if (showApparts.value && selectedAppartId.value && !hasMeter) {
-        alert("счётчик не найден");
-        return;
-      }
-      if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim())
-      {
-        //console.log(addressData.g_licschet);
+      if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim()) {
         window.location.href = 'main.html';
-      }
-      else
-      {
+      } else {
         alert("Введите данные");
       }
     };
@@ -355,38 +379,89 @@ createApp({
       }
     };
 
+    const loadMetersByBuilding = async (buildingId) => {////////////////////
+      if (!buildingId) {
+        meters.value = [];
+        clearMeterDataToSession();
+        return;
+      }
+      try {
+        const meterList = await apiRequest('/meters-by-building', {buildingId});
+        meters.value = meterList;
+        if (meterList.length === 1) {
+          selectMeter(meterList[0]);
+        } else if (meterList.length > 1) {
+          showMeterSelect.value = true;
+        } else {
+          clearMeterDataToSession();
+          showMeterSelect.value = false;
+        }
+      } catch (err) {
+        console.error("error:" , err);
+        meters.value = [];
+        clearMeterDataToSession();
+        showMeterSelect.value = false;
+      }
+    };
+
+    const loadMetersByLicschet = async (g_licschet) => {///////////////////
+      if (!g_licschet?.trim()) {
+        meters.value = [];
+        clearMeterDataToSession();
+        return;
+      }
+      try {
+        const meterList = await apiRequest('/meters-by-licschet', { g_licschet });
+        meters.value = meterList;      
+        if (meterList.length === 1) {
+          selectMeter(meterList[0]);
+        } else if (meterList.length > 1) {
+          showMeterSelect.value = true;
+        } else {
+          clearMeterDataToSession();
+          showMeterSelect.value = false;
+        }
+      } catch (err) {
+        console.error("error:", err);
+        meters.value = [];
+        clearMeterDataToSession();
+        showMeterSelect.value = false;
+      }
+    };
+
+    const selectMeter = (meter) => {
+      selectedMeter.value = meter;
+      saveSelectedMeter(meter);
+      saveMeterDataToSession(meter);
+      showMeterSelect.value = false;
+      const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+      addressData.selectedMeterId = meter.id;
+      addressData.selectMeterNum = meter.meterNum;
+      sessionStorage.setItem('userAddress', JSON.stringify(addressData));
+    };
+
     const onAppartsChange = async (e) => {
       const val = e.target.value;
       let option = [...document.querySelectorAll('#resultsApparts option')]
         .find(o => o.value === val && o.dataset.id);    
       selectedAppartId.value = option?.dataset.id || null;
       appartsSearch.value = val; 
+      showMeterSelect.value = false;
+      selectedMeter.value = null;    
       if (selectedAppartId.value && option?.dataset?.licschet?.trim()) {
         const g_licschet = option.dataset.licschet;
-        try {
-          const meterData = await apiRequest('/meter-by-licschet', { g_licschet });
-          saveMeterDataToSession(meterData);
-        } catch (err) {
-          console.error("error", err);
-          clearMeterDataToSession();
-        }
+        await loadMetersByLicschet(g_licschet);
       } 
       else if (!selectedAppartId.value && selectedBuildingId.value && currentBuildingLicschet.value) {   
-        try {
-          const meterData = await apiRequest('/meter-by-licschet', { 
-            g_licschet: currentBuildingLicschet.value 
-          });
-          saveMeterDataToSession(meterData);
-        } catch (err) {
-          console.error("error", err);
-          clearMeterDataToSession();
-        }
+        await loadMetersByLicschet(currentBuildingLicschet.value);
       }
       else if (!selectedAppartId.value && selectedBuildingId.value) {
-        await loadMeterByBuilding(selectedBuildingId.value);
+        await loadMetersByBuilding(selectedBuildingId.value);
       }
       else {
+        meters.value = [];
         clearMeterDataToSession();
+        showMeterSelect.value = false;
       }
     };
 
@@ -470,6 +545,8 @@ createApp({
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
       currentBuildingLicschet,
+      meters, showMeterSelect, selectedMeter,
+      selectMeter, loadMetersByBuilding, loadMetersByLicschet,
       NewPH,
       onTownInput,
       onTownChange,

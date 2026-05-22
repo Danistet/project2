@@ -11,118 +11,192 @@
         <h1>Главная страница</h1>
         <h2>
             <span id="streettype"></span>
-            <span id="street"></span>           
+            <span id="street"></span><br>           
             <span id="house"></span>
             <span id="apparts"></span>
             <p id="error" style="color: rgb(243, 66, 66);"></p> 
-        </h2>          
-        <div>
-            <p>Серийный номер:</p>
-            <p id="meterNum"></p>
-            <p>Дата установки: </p>
-            <p id="mountDate"></p>
-            <p>дата проверки счетчика:</p>
-            <p id="verifyDate"></p>
-        </div>
-        <div>
+        </h2>
+       
+        <div id="metersContainer"></div>
+        <div id="actionButtons">
             <button onclick="cont()" id="ContinueButton" class="ContinueButton">продолжить</button><br>
             <button onclick="info()" id="infbt">Показания</button><br>
+        </div>
+        <div>
             <button onclick="logout()" id="changebutton">Сменить адрес</button>
         </div>
-        <script>
-        function loadAddressDisplay() {//////////////////////differrent meters
-        const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
+
+    <script>
+        let pageMeters = [];
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Не указана';
+            try {
+                return new Date(dateStr).toLocaleDateString('ru-RU');
+            } catch {
+                return 'Не указана';
+            }
+        }
+
+        function loadAddressDisplay() {
+            const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
             if (addressData) {
                 document.getElementById('streettype').textContent = addressData.street?.split(' ')[0] || '';
                 document.getElementById('street').textContent = addressData.street?.split(' ').slice(1).join(' ') || addressData.street || '';
                 document.getElementById('house').textContent = addressData.house || '';
-                document.getElementById('apparts').textContent = addressData.apparts || '';
-                document.getElementById('apparts').textContent = 
-                addressData.apparts && addressData.apparts !== "-1" ? addressData.apparts : '';
+                document.getElementById('apparts').textContent = addressData.apparts && addressData.apparts !== "-1" ? addressData.apparts : '';
             }
         }
 
-            document.addEventListener('DOMContentLoaded', () => {
-            initPage();
+        function renderMetersBlocks(meters) {
+            const container = document.getElementById('metersContainer');
+            const actionButtons = document.getElementById('actionButtons');            
+            if (!meters || meters.length === 0) {
+                container.innerHTML = '<p class="no-meters">Счётчики не найдены</p>';
+                if (actionButtons) actionButtons.style.display = 'none';
+                return;
+            }
+            pageMeters = meters;
+            container.innerHTML = meters.map((meter, idx) => `
+                <div class="meter-block" data-meter-id="${meter.id}">
+                    <h4>Счётчик #${idx + 1}</h4>
+                    <div>
+                        <p>Серийный номер:</p>
+                        <p class="meter-num">${meter.meterNum || 'Не указан'}</p>
+                        <p>Дата установки:</p>
+                        <p class="meter-date">${formatDate(meter.mountDate)}</p>
+                        <p>Дата проверки счётчика:</p>
+                        <p class="meter-date">${formatDate(meter.verifyDate)}</p>
+                    </div>
+                    <button class="select-btn" onclick="selectThisMeter('${meter.id}')">
+                        Выбрать
+                    </button>
+                </div>
+            `).join('');
+            if (actionButtons && !getActiveMeter()) {
+                actionButtons.style.display = 'none';
+            }
+        }
+
+        function selectThisMeter(meterId) {
+            const meter = pageMeters.find(m => String(m.id) === String(meterId));          
+            if (!meter) {
+                console.error('Счётчик не найден в pageMeters:', meterId, pageMeters);
+                alert('Ошибка: данные счётчика не найдены');
+                return;
+            }         
+            saveActiveMeter(meter);
+            sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meter.meterNum }));
+            sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: meter.mountDate }));
+            sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: meter.verifyDate }));
+            if (meter.licschet) {
+                sessionStorage.setItem('licschet', JSON.stringify({ g_licschet: meter.licschet }));
+            }
+            const actionButtons = document.getElementById('actionButtons');
+            if (actionButtons) actionButtons.style.display = 'block';
+            const blocks = document.querySelectorAll('.meter-block');
+            blocks.forEach(block => {
+                if (block.dataset.meterId != meterId) {
+                    block.style.opacity = '0.5';
+                    const btn = block.querySelector('.select-btn');
+                    if (btn) btn.disabled = true;
+                }
+            });          
+            const selectedBlock = document.querySelector(`.meter-block[data-meter-id="${meterId}"]`);
+            if (selectedBlock) {
+                selectedBlock.style.borderColor = '#00ff00';
+                selectedBlock.style.background = 'rgba(0,255,0,0.1)';
+            }
+        }
+
+        async function loadMetersOnMain() {
+            let meters = [];
+            if (typeof getAllMeters === 'function') {
+                meters = getAllMeters();
+            }
+            if (!meters || meters.length === 0) {
+                const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+                try {
+                    if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
+                        meters = await getMetersByLicschet(addressData.g_licschet);
+                    } else if (addressData?.buildingId && typeof getMetersByBuilding === 'function') {
+                        meters = await getMetersByBuilding(addressData.buildingId);
+                    }                  
+                    if (meters?.length && typeof saveAllMeters === 'function') {
+                        saveAllMeters(meters);
+                    }
+                } catch (err) {
+                    console.error('Failed to load meters:', err);
+                    document.getElementById('error').textContent = 'Ошибка загрузки счётчиков';
+                    return;
+                }
+            }
+            renderMetersBlocks(meters);
+            if (typeof getActiveMeter === 'function' && getActiveMeter()) {
+                const actionButtons = document.getElementById('actionButtons');
+                if (actionButtons) actionButtons.style.display = 'block';
+            }
+        }
+
+        function initPage() {
+            const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
+            const errorElement = document.getElementById('error');
+            const continueButton = document.getElementById('ContinueButton');
+            const infoButton = document.getElementById('infbt');
+            const changebutton = document.getElementById('changebutton');         
+            if (!authData) {
+                errorElement.textContent = 'Сессия не найдена';
+                if (continueButton) continueButton.style.display = 'visible';
+                if (infoButton) infoButton.style.display = 'hidden';
+                setTimeout(() => window.location.href = 'index.html', 2000);
+                return;
+            }          
+            const now = Date.now();
+            const EXPIRY_MS = 1200000;           
+            if (now - authData.authDate > EXPIRY_MS) {
+                errorElement.textContent = 'Истёк срок сессии';
+                if (continueButton) continueButton.style.display = 'visible';
+                if (infoButton) infoButton.style.display = 'none';
+                if (changebutton) changebutton.style.display = 'none';
+                sessionStorage.setItem('reauthPhone', authData.phone);
+                sessionStorage.setItem('lastAuthDate', authData.authDate);
+            } else {
+                if (continueButton) continueButton.style.display = 'none';
+                if (infoButton) infoButton.style.display = 'visible';
+            }
+            
             loadAddressDisplay();
-            });
-            function initPage() {
-                const authData = JSON.parse(sessionStorage.getItem('authData'));
-                const errorElement = document.getElementById('error');
-                const continueButton = document.getElementById('ContinueButton');
-                const infoButton = document.getElementById('infbt');
-                const changebutton = document.getElementById('changebutton');
-                if (!authData) {
-                    errorElement.textContent = 'Сессия не найдена';
-                    continueButton.style.display = 'visible';
-                    infoButton.style.display = 'hidden';
+            loadMetersOnMain();
+        }
 
-                    setTimeout(() => window.location.href = 'index.html', 2000);
-                } else {
-                    const now = Date.now();
-                    const EXPIRY_MS = 1200000;
-    
-                    if (now - authData.authDate > EXPIRY_MS) {
-                        errorElement.textContent = 'Истёк срок сессии';
-                        continueButton.style.display = 'visible';
-                        infoButton.style.display = 'none';
-                        changebutton.style.display = 'none';                                      
-                        sessionStorage.setItem('reauthPhone', authData.phone);
-                        sessionStorage.setItem('lastAuthDate', authData.authDate);
-                    } else {    
-                        continueButton.style.display = 'none';
-                        infoButton.style.display = 'visible';
-                    }
-                    loadMeterData();
-                }
+        function logout() {           
+            sessionStorage.removeItem('allMeters');
+            sessionStorage.removeItem('activeMeter');
+            sessionStorage.removeItem('selectedMeter');
+            sessionStorage.removeItem('meternum');
+            sessionStorage.removeItem('mountdate');
+            sessionStorage.removeItem('verifydate');
+            sessionStorage.removeItem('licschet');
+            // sessionStorage.removeItem('userAddress');    
+            window.location.href = 'address.html';
+        }
+
+        function info() {
+            const activeMeter = getActiveMeter ? getActiveMeter() : null;
+            if (activeMeter) {
+                sessionStorage.setItem('activeMeter', JSON.stringify(activeMeter));
             }
+            window.location.href = 'metervaluewindow.html';
+        }
 
-            async function loadMeterData() {                
-                const storedMeterData = sessionStorage.getItem('meternum');
-                const storedMountData = sessionStorage.getItem('mountdate');
-                const storedVerifyDate = sessionStorage.getItem('verifydate');
-                const addressData = JSON.parse(sessionStorage.getItem('userAddress'));
-                if (!storedMeterData && addressData?.g_licschet) {
-                    console.log(addressData.g_licschet);
-                }
-                const meterNumElement = document.getElementById('meterNum');
-                const mountDateElement = document.getElementById('mountDate');
-                const verifyDateElement = document.getElementById('verifyDate');
-                const errorElement = document.getElementById('error');
+        function cont() {
+            sessionStorage.removeItem('authData');
+            window.location.href = 'oldtokenwindow.html';
+        }
 
-                if (storedMeterData && storedMountData) {
-                    try {
-                        const meterObj = JSON.parse(storedMeterData);
-                        const mountObj = JSON.parse(storedMountData);
-                        const verifyObj = JSON.parse(storedVerifyDate);
-                        const mNum = meterObj.meterNum || 'Не указан';
-                        const mDate = mountObj.mountDate ? new Date(mountObj.mountDate).toLocaleDateString('ru-RU') : 'Не указана';
-                        const mVDate = verifyObj.verifyDate ? new Date(verifyObj.verifyDate).toLocaleDateString('ru-RU') : 'Не указана';
-                        meterNumElement.textContent = mNum;
-                        mountDateElement.textContent = mDate; 
-                        verifyDateElement.textContent = mVDate;               
-                    } catch (e) {
-                        console.error("Ошибка данных счетчика:", e);
-                        errorElement.textContent = 'Ошибка формата данных счетчика';
-                    }
-                } else {
-                    console.log("Данные счетчика не найдены");
-                }
-            }
-
-            function logout() {               
-                window.location.href = 'address.html';
-            }
-
-            function info() {
-                window.location.href = 'metervaluewindow.html';
-            }
-
-            function cont() {
-                sessionStorage.removeItem('authData');
-                window.location.href = 'oldtokenwindow.html';
-            }
-        </script>     
+        document.addEventListener('DOMContentLoaded', () => {
+            initPage();
+        });
+    </script>
     </body>
 
     <style>
@@ -180,6 +254,35 @@
         h2
         {
             white-space: nowrap;
+        }
+
+
+
+        .meter-block {
+            border: 3px solid goldenrod;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin: 15px auto;
+            max-width: 500px;
+            background: rgba(218,165,32,0.08);
+        }
+        .meter-block h4 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            text-align: center;
+        }
+        .meter-block .select-btn {
+            display: block;
+            margin: 12px auto 0;
+            width: 200px;
+            padding: 8px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .no-meters {
+            text-align: center;
+            color: #f34242;
+            margin: 20px;
         }
     </style>
 </html>

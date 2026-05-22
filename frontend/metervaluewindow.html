@@ -79,11 +79,19 @@
             });
 
             async function loadMeterData() {
+                const selectedMeter = getSelectedMeter();
                 const storedMeterData = sessionStorage.getItem('meternum');
+                const meterData = selectedMeter || (storedMeterData ? JSON.parse(storedMeterData) : null);
                 const meterNumElement = document.getElementById('meterNum');
                 const errorElement = document.getElementById('error');
                 errorElement.style.color = 'red';
                 const ph = document.getElementById('PH');
+                if (meterData?.meterNum) {
+                    meterNumElement.textContent = meterData.meterNum;
+                    sessionStorage.setItem('activeMeter', JSON.stringify(meterData));
+                } else {
+                    meterNumElement.textContent = 'Не указан';
+                }
                 if (storedMeterData) {
                     try {
                         const meterObj = JSON.parse(storedMeterData);

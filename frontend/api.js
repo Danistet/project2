@@ -33,3 +33,64 @@ function getAuthData() {
 function clearSession() {
   sessionStorage.clear();
 }
+
+////////////////////////////
+async function getMetersByLicschet(g_licschet) {
+  return await apiRequest('/meters-by-licschet', { g_licschet });
+}
+
+async function getMetersByBuilding(buildingId) {
+  return await apiRequest('/meters-by-building', {buildingId});
+}
+
+function getSelectedMeter() {
+  const data = sessionStorage.getItem('selectedMeter');
+  return data ? JSON.parse(data) : null;
+}
+
+function saveSelectedMeter(meter) {
+  sessionStorage.setItem('selectedMeter', JSON.stringify({
+    meterNum: meter.meterNum,
+    mountDate: meter.mountDate,
+    verifyDate: meter.verifyDate,
+    licschet: meter.licschet,
+    id: meter.id
+  }));
+}
+
+function clearSelectedMeter() {
+  sessionStorage.removeItem('selectedMeter');
+}
+
+function getActiveMeter() {
+  const data = sessionStorage.getItem('activeMeter');
+  return data ? JSON.parse(data) : null;
+}
+
+function saveActiveMeter(meter) {
+  sessionStorage.setItem('activeMeter', JSON.stringify({
+    meterNum: meter.meterNum,
+    mountDate: meter.mountDate,
+    verifyDate: meter.verifyDate,
+    licschet: meter.licschet,
+    id: meter.id
+  }));
+}
+
+function clearActiveMeter() {
+  sessionStorage.removeItem('activeMeter');
+}
+
+
+function saveAllMeters(meters) {
+  sessionStorage.setItem('allMeters', JSON.stringify(meters));
+}
+
+function getAllMeters() {
+  const data = sessionStorage.getItem('allMeters');
+  return data ? JSON.parse(data) : [];
+}
+
+function clearAllMeters() {
+  sessionStorage.removeItem('allMeters');
+}
