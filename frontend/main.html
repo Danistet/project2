@@ -58,7 +58,7 @@
             pageMeters = meters;
             container.innerHTML = meters.map((meter, idx) => `
                 <div class="meter-block" data-meter-id="${meter.id}">
-                    <h4>Счётчик #${idx + 1}</h4>
+                    <h4>${meter.groupName ? meter.groupName.trim() : 'Услуга не указана'}</h4>
                     <div>
                         <p>Серийный номер:</p>
                         <p class="meter-num">${meter.meterNum || 'Не указан'}</p>
@@ -175,8 +175,7 @@
             sessionStorage.removeItem('meternum');
             sessionStorage.removeItem('mountdate');
             sessionStorage.removeItem('verifydate');
-            sessionStorage.removeItem('licschet');
-            // sessionStorage.removeItem('userAddress');    
+            sessionStorage.removeItem('licschet');   
             window.location.href = 'address.html';
         }
 

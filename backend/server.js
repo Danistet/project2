@@ -99,8 +99,7 @@ app.post('/apparts', (req, res) => {
             id: r.ID,
             house: `${letterPart}`.trim(),
             g_licschet: r.G_LICSCHET
-            ////////////////////////////////////////////RMETER_STATUS check
-          };///////////////////////////licschet actuality check
+          };///////////////////////////licschet actuality check////////////////RMETER_STATUS todo
         }
         else
         {
@@ -336,12 +335,18 @@ app.post('/meter-by-licschet', (req, res) => {
     }
     const query = `
       SELECT
-      METER_NUM,
-      MOUNT_DATE,
-      VERIFY_DATE,
-      LS
-      FROM METERS
-      WHERE LS = ?
+        M.METER_NUM,
+        M.MOUNT_DATE,
+        M.VERIFY_DATE,
+        M.LS,
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+      FROM METERS M
+      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      WHERE M.LS = ?
+        AND RS.ID = 1
+        AND S.GROUP_ID IN (537, 555, 597)
     `;
     db.query(query, [g_licschet], (err, result) => {
       db.detach();
@@ -356,7 +361,8 @@ app.post('/meter-by-licschet', (req, res) => {
           found: false,
           meterNum: null,
           mountDate: null,
-          verifyDate: null
+          verifyDate: null,
+          groupName: null
         });
       }
       res.json({
@@ -364,13 +370,14 @@ app.post('/meter-by-licschet', (req, res) => {
         meterNum: result[0].METER_NUM,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
-        licschet: result[0].LS
+        licschet: result[0].LS,
+        groupName: result[0].GROUP_NAME
       });
     });
   });
 });
 
-app.post('/meters-by-licschet', (req, res) => {///////////////
+app.post('/meters-by-licschet', (req, res) => {
   const {g_licschet} = req.body;
   if (!g_licschet)
   {
@@ -382,10 +389,21 @@ app.post('/meters-by-licschet', (req, res) => {///////////////
       return res.status(500).json({ error: 'DB connect error:', err});
     }
     const query = `
-      SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE, LS, ID
-      FROM METERS
-      WHERE LS = ?
-      ORDER BY MOUNT_DATE DESC
+      SELECT 
+        M.METER_NUM, 
+        M.MOUNT_DATE, 
+        M.VERIFY_DATE, 
+        M.LS, 
+        M.ID,
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+      FROM METERS M
+      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      WHERE M.LS = ?
+        AND RS.ID = 1
+        AND S.GROUP_ID IN (537, 555, 597)
+      ORDER BY M.MOUNT_DATE DESC
     `;
     db.query(query, [g_licschet], (err, result) =>{
       db.detach();
@@ -399,7 +417,8 @@ app.post('/meters-by-licschet', (req, res) => {///////////////
         mountDate: r.MOUNT_DATE,
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,
-        id: r.ID
+        id: r.ID,
+        groupName: r.GROUP_NAME
       })));
     });
   });
@@ -416,10 +435,20 @@ app.post('/meter-by-building', (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
     const query = `
-      SELECT M.METER_NUM, M.MOUNT_DATE, M.VERIFY_DATE, M.LS
+      SELECT 
+        M.METER_NUM, 
+        M.MOUNT_DATE, 
+        M.VERIFY_DATE, 
+        M.LS,
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
       WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
+        AND RS.ID = 1
+        AND S.GROUP_ID IN (537, 555, 597)
         AND (A.APPARTS IS NULL OR TRIM(A.APPARTS) = '')
       ORDER BY M.MOUNT_DATE DESC
       ROWS 1
@@ -440,7 +469,8 @@ app.post('/meter-by-building', (req, res) => {
           found: false,
           meterNum: null,
           mountDate: null,
-          verifyDate: null
+          verifyDate: null,
+          groupName: null
         });        
       }
       res.json({
@@ -448,13 +478,14 @@ app.post('/meter-by-building', (req, res) => {
         meterNum: result[0].METER_NUM,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
-        licschet: result[0].LS
+        licschet: result[0].LS,
+        groupName: result[0].GROUP_NAME
       });
     });
   });
 });
 
-app.post('/meters-by-building', (req, res) => {////////////////////////////////
+app.post('/meters-by-building', (req, res) => {
   const { buildingId } = req.body;
   if (!buildingId) {
     return res.status(400).json({error: 'buildingId required'});
@@ -465,14 +496,23 @@ app.post('/meters-by-building', (req, res) => {////////////////////////////////
       return res.status(500).json({ error: 'Database connection failed' });
     }
     const query = `
-      SELECT M.METER_NUM, M.MOUNT_DATE, M.VERIFY_DATE, M.LS, M.ID
+      SELECT 
+        M.METER_NUM, 
+        M.MOUNT_DATE, 
+        M.VERIFY_DATE, 
+        M.LS, 
+        M.ID,
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
       WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
-      
+        AND RS.ID = 1
+        AND S.GROUP_ID IN (537, 555, 597)
       ORDER BY M.MOUNT_DATE DESC
     `;
-    //AND (A.APPARTS IS NULL OR TRIM(A.APPARTS) = '')
     const buildingIdNum = parseInt(buildingId, 10);
     if (isNaN(buildingIdNum)) {
       db.detach();
@@ -490,7 +530,8 @@ app.post('/meters-by-building', (req, res) => {////////////////////////////////
         mountDate: r.MOUNT_DATE,
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,
-        id: r.ID
+        id: r.ID,
+        groupName: r.GROUP_NAME
       })));
     });
   });

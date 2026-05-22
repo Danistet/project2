@@ -34,7 +34,6 @@ function clearSession() {
   sessionStorage.clear();
 }
 
-////////////////////////////
 async function getMetersByLicschet(g_licschet) {
   return await apiRequest('/meters-by-licschet', { g_licschet });
 }

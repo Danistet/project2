@@ -25,7 +25,6 @@ createApp({
     const showApparts = ref(true); 
     const PH = ref('');
     const PHData = ref('');
-    //////
     const meters = ref([]);
     const showMeterSelect = ref(false);
     const selectedMeter = ref(null);
@@ -379,7 +378,7 @@ createApp({
       }
     };
 
-    const loadMetersByBuilding = async (buildingId) => {////////////////////
+    const loadMetersByBuilding = async (buildingId) => {
       if (!buildingId) {
         meters.value = [];
         clearMeterDataToSession();
@@ -404,7 +403,7 @@ createApp({
       }
     };
 
-    const loadMetersByLicschet = async (g_licschet) => {///////////////////
+    const loadMetersByLicschet = async (g_licschet) => {
       if (!g_licschet?.trim()) {
         meters.value = [];
         clearMeterDataToSession();
