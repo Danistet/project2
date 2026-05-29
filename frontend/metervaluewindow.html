@@ -1,190 +1,387 @@
 <!DOCTYPE html>
 <html lang="ru">
-    <head>
-        <meta charset="WIN1251">
-        <title>информация</title>
-        <script src="./api.js"></script>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    </head>
-    <body>
-        <div id="app">
-            <div class="container">
-                <h1>Передать показания</h1>
-                <div id="error"></div>
-            </div>
-            <div>
-                <p>Серийный номер:</p>
-                <p id="meterNum"></p>
-                <p>Предыдущее показание:</p>
-                <p id="PH">нет данных</p>
-                <br>
-                <p>Текущее показание:</p>
-            </div>
-            <div>
-                <input maxlength="15" required type="text" id="newPH" v-model="PH" inputmode="decimal" placeholder="0,000"><br>
-                <button @click="NewPH">Передать</button><br>
-                <button onclick="main()">Выход</button>
-            </div>
-        </div>
-        <script src="./app.js"></script>
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Передать показания</title>
+    <script src="./api.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="page-header">
+        <h1>Передать показания</h1>
+        <div id="error" class="error-message"></div>
+      </header>
 
-        <script>
-            function formatWithThousands(value) {
-                if (!value && value !== 0) return '';
-                const str = String(value).trim();
-                if (!str) return '';
-                if (/[,\.]\d+/.test(str)) {
-                return str.replace('.', ',');
-                }
-                if (/^\d+$/.test(str)) {
-                return `${str},000`;
-                }
-                return str.replace('.', ',');
-            }
-            document.addEventListener('DOMContentLoaded', () => {
-                const inputPH = document.getElementById('newPH');
-                if (inputPH) {
-                    inputPH.addEventListener('blur', (e) => {
-                        e.target.value = formatWithThousands(e.target.value);
-                    });
-                    inputPH.addEventListener('input', (e) => {
-                        e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
-                    });
-                }
-            });
-        </script>
+      <main class="content-wrapper">
+        <section class="info-card">
+          <div class="info-row">
+            <span class="info-label">Серийный номер:</span>
+            <span id="meterNum" class="info-value"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Предыдущее показание:</span>
+            <span id="PH" class="info-value">нет данных</span>
+          </div>
+        </section>
 
-        <script>
-            window.addEventListener('DOMContentLoaded', async () => {
-                const authData = JSON.parse(sessionStorage.getItem('authData'));
-                const phoneElement = document.getElementById('phone');
-                const errorContainer = document.getElementById('error');
-                const ph = document.getElementById('PH');
-                if (!authData) {
-                    showError('Сессия не найдена');
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 2000);
-                    return;
-                }                   
-                if (!authData.phone || !authData.token) {
-                    showError('Некорректные данные сессии');
-                    clearSession();
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 2000);
-                    return;
-                }  
-                loadMeterData();                            
-            });
+        <section class="form-section">
+          <label for="newPH" class="form-label">Текущее показание:</label>
+          <input 
+            maxlength="15" 
+            required 
+            type="text" 
+            id="newPH" 
+            v-model="PH" 
+            inputmode="decimal" 
+            placeholder="0,000"
+            class="form-input"
+          >
+          
+          <div class="button-group">
+            <button @click="NewPH" class="btn-primary">Передать</button>
+            <button onclick="main()" class="btn-secondary">Выход</button>
+          </div>
+        </section>
+      </main>
+    </div>
 
-            async function loadMeterData() {
-                const selectedMeter = getSelectedMeter();
-                const storedMeterData = sessionStorage.getItem('meternum');
-                const meterData = selectedMeter || (storedMeterData ? JSON.parse(storedMeterData) : null);
-                const meterNumElement = document.getElementById('meterNum');
-                const errorElement = document.getElementById('error');
-                errorElement.style.color = 'red';
-                const ph = document.getElementById('PH');
-                if (meterData?.meterNum) {
-                    meterNumElement.textContent = meterData.meterNum;
-                    sessionStorage.setItem('activeMeter', JSON.stringify(meterData));
-                } else {
-                    meterNumElement.textContent = 'Не указан';
-                }
-                if (storedMeterData) {
-                    try {
-                        const meterObj = JSON.parse(storedMeterData);
-                        const mNum = meterObj.meterNum || 'Не указан';
-                        meterNumElement.textContent = mNum;
-                    } catch (e) {
-                        console.error("Ошибка данных счетчика:", e);
-                        errorElement.textContent = 'Ошибка формата данных счетчика';
-                    }
-                } else {
-                    console.log("Данные счетчика не найдены");
-                    meterNumElement.textContent = 'Не указан';
-                }
+    <script src="./app.js"></script>
 
-            }
-            function main() {                
-                const now = Date.now();                 
-                window.location.href = 'main.html';
-            }
-            function showError(message) {
-                const errorContainer = document.getElementById('error');
-                errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
-            }
-        </script>
-
-        <script>
-            async function loadPreviousPHFromAPI() {
-                const phElement = document.getElementById('PH');
-                if (!phElement) return;          
-                const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
-                const meter_id = meterData.meterNum;              
-                if (!meter_id) {
-                    phElement.textContent = 'нет данных';
-                    return;
-                }              
-                try {
-                    const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                    });                 
-                    const result = await response.json();                   
-                    if (result.found && result.ph) {
-                    phElement.textContent = result.ph;
-                    sessionStorage.setItem('ph', JSON.stringify({ PH: result.ph }));
-                    } else {
-                    phElement.textContent = 'нет данных';
-                    }
-                } catch (err) {
-                    console.error('Failed to load previous PH:', err);
-                    phElement.textContent = 'нет данных';
-                }
-            }
-            window.addEventListener('DOMContentLoaded', () => {
-                loadMeterData();
-                loadPreviousPHFromAPI(); 
-            });
-        </script>
-    </body>
-
-    <style>
-        body 
-        {
-            margin: 0;
-            color: goldenrod;
-            background-color: rgb(56, 54, 54);
-            font-size: 24px;
-            justify-content: center;
-            justify-items: center;
+    <script>
+      function formatWithThousands(value) {
+        if (!value && value !== 0) return '';
+        const str = String(value).trim();
+        if (!str) return '';
+        if (/[,\.]\d+/.test(str)) {
+          return str.replace('.', ',');
         }
-        button 
-        {
-            background-color: aqua;
-            width: 177px;
+        if (/^\d+$/.test(str)) {
+          return `${str},000`;
         }
-        div 
-        {
-            justify-content: center;
-            justify-items: center;
+        return str.replace('.', ',');
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        const inputPH = document.getElementById('newPH');
+        if (inputPH) {
+          inputPH.addEventListener('blur', (e) => {
+            e.target.value = formatWithThousands(e.target.value);
+          });
+          inputPH.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
+          });
         }
-        p 
-        {
-            color: blueviolet;
-            justify-content: center;
-            justify-items: center;
-            word-break: break-all;
-            white-space: nowrap;
+      });
+    </script>
+
+    <script>
+      window.addEventListener('DOMContentLoaded', async () => {
+        const authData = JSON.parse(sessionStorage.getItem('authData'));
+        const errorContainer = document.getElementById('error');
+        if (!authData) {
+          showError('Сессия не найдена');
+          setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+          return;
+        }                   
+        if (!authData.phone || !authData.token) {
+          showError('Некорректные данные сессии');
+          clearSession();
+          setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+          return;
+        }  
+        loadMeterData();                            
+      });
+
+      async function loadMeterData() {
+        const selectedMeter = getSelectedMeter();
+        const storedMeterData = sessionStorage.getItem('meternum');
+        const meterData = selectedMeter || (storedMeterData ? JSON.parse(storedMeterData) : null);
+        const meterNumElement = document.getElementById('meterNum');
+        const errorElement = document.getElementById('error');
+        errorElement.style.color = 'red';
+        
+        if (meterData?.meterNum) {
+          meterNumElement.textContent = meterData.meterNum;
+          sessionStorage.setItem('activeMeter', JSON.stringify(meterData));
+        } else {
+          meterNumElement.textContent = 'Не указан';
         }
-        input
-        {
-            background-color: aquamarine;
-            color: rgb(0, 0, 0);
-            justify-content: right;
-            justify-items: right;
+        if (storedMeterData) {
+          try {
+            const meterObj = JSON.parse(storedMeterData);
+            meterNumElement.textContent = meterObj.meterNum || 'Не указан';
+          } catch (e) {
+            console.error("Ошибка данных счетчика:", e);
+            errorElement.textContent = 'Ошибка формата данных счетчика';
+          }
+        } else {
+          console.log("Данные счетчика не найдены");
+          meterNumElement.textContent = 'Не указан';
         }
-    </style>
+      }
+      function main() {                
+        window.location.href = 'main.html';
+      }
+      function showError(message) {
+        const errorContainer = document.getElementById('error');
+        errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
+      }
+    </script>
+
+    <script>
+      async function loadPreviousPHFromAPI() {
+        const phElement = document.getElementById('PH');
+        if (!phElement) return;          
+        const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+        const meter_id = meterData.meterNum;              
+        if (!meter_id) {
+          phElement.textContent = 'нет данных';
+          return;
+        }              
+        try {
+          const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });                 
+          const result = await response.json();                   
+          if (result.found && result.ph) {
+            phElement.textContent = result.ph;
+            sessionStorage.setItem('ph', JSON.stringify({ PH: result.ph }));
+          } else {
+            phElement.textContent = 'нет данных';
+          }
+        } catch (err) {
+          console.error('Failed to load previous PH:', err);
+          phElement.textContent = 'нет данных';
+        }
+      }
+      window.addEventListener('DOMContentLoaded', () => {
+        loadMeterData();
+        loadPreviousPHFromAPI(); 
+      });
+    </script>
+  </body>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 20px 16px;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+
+    .page-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 15px;
+      color: #C62828;
+      min-height: 22px;
+      text-align: center;
+    }
+
+    .content-wrapper {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .info-card {
+      width: 100%;
+      border: 2px solid #45B0E1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #FFFFFF;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .info-label {
+      font-weight: 500;
+      color: #333333;
+      font-size: 17px;
+    }
+
+    .info-value {
+      font-weight: 700;
+      color: #000000;
+      font-size: 18px;
+      word-break: break-word;
+      text-align: right;
+      min-width: 120px;
+    }
+
+    .form-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .form-label {
+      font-weight: 500;
+      color: #333333;
+      font-size: 17px;
+      align-self: flex-start;
+      margin-left: 4px;
+    }
+
+    .form-input {
+      width: 100%;
+      min-height: 56px;
+      padding: 16px 20px;
+      font-size: 20px;
+      font-weight: 500;
+      color: #000000;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      text-align: right;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .form-input::placeholder {
+      color: #999999;
+      font-weight: 400;
+    }
+
+    .form-input:focus {
+      border-color: #2E8BC0;
+      background-color: #F8FDFF;
+    }
+
+    .button-group {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    button {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      text-align: center;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+
+    button:active {
+      background-color: #1A6B96;
+      border-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+
+    .btn-secondary:active {
+      background-color: #E0F4FA;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      .page-header h1 {
+        font-size: 24px;
+      }
+      
+      .info-card {
+        padding: 18px 20px;
+      }
+      
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      
+      .info-value {
+        text-align: left;
+        width: 100%;
+      }
+      
+      .form-input {
+        min-height: 52px;
+        font-size: 19px;
+        padding: 14px 18px;
+      }
+      
+      button {
+        min-height: 52px;
+        font-size: 17px;
+        max-width: 100%;
+      }
+    }
+
+    .server-response {
+      white-space: pre-line;
+    }
+  </style>
 </html>

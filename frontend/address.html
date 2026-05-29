@@ -1,97 +1,348 @@
 <!DOCTYPE html>
 <html lang="ru">
-    <head>
-        <meta charset="WIN1251">
-        <title>Введите адрес</title>
-        <script src="./api.js"></script>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    </head>
-    <body>
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Введите адрес</title>
+    <script src="./api.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div id="app" class="page-wrapper">
+      <header class="page-header">
         <h1>Введите адрес</h1>
-        <div id="app">
-            <label>Город:</label><br>
-            <input type="search" id="townInput" list="resultsTown" placeholder="Введите город" 
-                @input="onTownInput" @change="onTownChange" v-model="townSearch">
+      </header>
+
+      <main class="content-card">
+        <form @submit.prevent="saveAddressAndContinue" novalidate>
+          <div class="form-group">
+            <label for="townInput" class="form-label">Город</label>
+            <input 
+              type="search" 
+              id="townInput" 
+              list="resultsTown" 
+              placeholder="Введите город" 
+              @input="onTownInput" 
+              @change="onTownChange" 
+              v-model="townSearch"
+              class="form-input"
+              required
+            >
             <datalist id="resultsTown">
-                <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
-            </datalist><br>
-            <label>Улица:</label><br>
-            <input type="search" id="streetInput" list="resultsStreet" placeholder="Введите улицу" 
-                @input="onStreetInput" @change="onStreetChange" :disabled="!selectedTownId" v-model="streetSearch">
+              <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label for="streetInput" class="form-label">Улица</label>
+            <input 
+              type="search" 
+              id="streetInput" 
+              list="resultsStreet" 
+              placeholder="Введите улицу" 
+              @input="onStreetInput" 
+              @change="onStreetChange" 
+              :disabled="!selectedTownId" 
+              v-model="streetSearch"
+              class="form-input"
+              :required="!!selectedTownId"
+            >
             <datalist id="resultsStreet">
-                <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
-            </datalist><br>
-                <label>Дом:</label><br>
-            <input type="search" id="houseInput" list="resultsHome" placeholder="Введите номер дома" 
-                @input="onHouseInput" @change="onHouseChange" :disabled="!selectedStreetId" v-model="houseSearch">
+              <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label for="houseInput" class="form-label">Дом</label>
+            <input 
+              type="search" 
+              id="houseInput" 
+              list="resultsHome" 
+              placeholder="Введите номер дома" 
+              @input="onHouseInput" 
+              @change="onHouseChange" 
+              :disabled="!selectedStreetId" 
+              v-model="houseSearch"
+              class="form-input"
+              :required="!!selectedStreetId"
+            >
             <datalist id="resultsHome">
-                <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
-            </datalist><br>
-            <div>
-                <label>Квартира:</label><br>
-                <input type="checkbox" id="appartscheck" v-model="showApparts"><br>
-                <input :style="{ visibility: showApparts ? 'visible' : 'hidden' }" type="search" name="appartsInput"
-                    :required="showApparts" 
-                    id="appartsInput" list="resultsApparts" placeholder="Введите номер Квартиры"
-                    @input="onAppartsInput" @change="onAppartsChange" v-model="appartsSearch">
-                <datalist id="resultsApparts">
-                    <option v-for="appr in apparts" 
-                        :key="appr.id" 
-                        :value="appr.house" 
-                        :data-id="appr.id" 
-                        :data-licschet="appr.g_licschet">
-                    </option>
-                </datalist>
-            </div><br>
-            <div>
-                <button @click="saveAddressAndContinue">Подтвердить</button><br>
-                <button onclick="tologin()">Выход</button>
-            </div>
-        </div><br>
-    </body>
+              <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label class="form-label checkbox-label">
+              <input type="checkbox" id="appartscheck" v-model="showApparts" class="form-checkbox">
+              <span class="checkbox-text">Квартира</span>
+            </label>
+            <input 
+              :style="{ 
+                visibility: showApparts ? 'visible' : 'hidden', 
+                position: showApparts ? 'static' : 'absolute',
+                opacity: showApparts ? '1' : '0',
+                pointerEvents: showApparts ? 'auto' : 'none',
+                height: showApparts ? 'auto' : '0',
+                overflow: 'hidden'
+              }" 
+              type="search" 
+              id="appartsInput" 
+              list="resultsApparts" 
+              placeholder="Введите номер квартиры"
+              :required="showApparts" 
+              @input="onAppartsInput" 
+              @change="onAppartsChange" 
+              v-model="appartsSearch"
+              class="form-input"
+              tabindex="-1"
+            >
+            <datalist id="resultsApparts">
+              <option v-for="appr in apparts" 
+                  :key="appr.id" 
+                  :value="appr.house" 
+                  :data-id="appr.id" 
+                  :data-licschet="appr.g_licschet">
+              </option>
+            </datalist>
+          </div>
+          <div class="button-group">
+            <button type="submit" class="btn-primary">Подтвердить</button>
+            <button type="button" onclick="tologin()" class="btn-secondary">Выход</button>
+          </div>
+        </form>
+      </main>
+    </div>
+
     <script src="./app.js"></script>
     <script>
-        function tologin()
-        {
-            sessionStorage.clear();
-            window.location.href = 'index.html';
-        }
+      function tologin() {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      }
     </script>
+  </body>
 
-    <style>
-    body 
-    {
+  <style>
+    * {
+      box-sizing: border-box;
       margin: 0;
-      color: goldenrod;
-      background-color: rgb(56, 54, 54);
-      font-size: 24px;
-      justify-content: center;
-      justify-items: center;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
     }
-    button 
-    {
-      background-color: aqua;
-      width: 177px;
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 20px 16px;
     }
-    .server-response 
-    {
+
+    .page-wrapper {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .page-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #000000;
+    }
+
+    .content-card {
+      width: 100%;
+      max-width: 480px;
+      border: 2px solid #45B0E1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: #FFFFFF;
+    }
+
+    form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .form-label {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
+    }
+
+    .form-input {
+      width: 100%;
+      min-height: 56px;
+      padding: 16px 20px;
+      font-size: 18px;
+      color: #000000;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .form-input::placeholder {
+      color: #999999;
+    }
+
+    .form-input:focus {
+      border-color: #2E8BC0;
+      background-color: #F8FDFF;
+    }
+
+    .form-input:disabled {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+    }
+
+    .form-checkbox {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      accent-color: #45B0E1;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    .checkbox-text {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
+    }
+
+    .button-group {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    button {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      text-align: center;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+
+    button:active {
+      background-color: #1A6B96;
+      border-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+
+    .btn-secondary:active {
+      background-color: #E0F4FA;
+    }
+
+    datalist {
+      font-size: 16px;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      .page-header h1 {
+        font-size: 24px;
+      }
+      
+      .content-card {
+        padding: 20px 16px;
+        gap: 18px;
+      }
+      
+      .form-input {
+        min-height: 52px;
+        font-size: 17px;
+        padding: 14px 18px;
+      }
+      
+      .form-checkbox {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+        min-height: 22px;
+      }
+      
+      .checkbox-text {
+        font-size: 16px;
+      }
+      
+      button {
+        min-height: 52px;
+        font-size: 17px;
+        max-width: 100%;
+      }
+    }
+
+    .server-response {
       white-space: pre-line;
-      color: goldenrod;
-      padding: 16px;
-      border-radius: 6px;
-      justify-content: center;
-      justify-items: center;
-    }
-    p
-    {
-      font-size: 14px;
-      color: greenyellow;
-      word-break: break-all;
-    }
-    input
-    {
-      background-color: aquamarine;
-      color: rgb(0, 0, 0);
     }
   </style>
 </html>

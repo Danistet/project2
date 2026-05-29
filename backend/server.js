@@ -102,7 +102,6 @@ app.post('/apparts', (req, res) => {
               AND S.GROUP_ID IN (537, 555, 597)
           )
         )
-      ORDER BY A.APPARTS, A.LETTER
     `;    
     db.query(query, [buildingId], (err, result) => {
       db.detach();
@@ -309,7 +308,7 @@ app.post('/register', (req, res) => {
       }    
       if (result.length > 0) {
         db.detach();
-        return res.status(409).json({ error: 'User already exists' });
+        return res.status(409).json({ error: 'Пользователь уже существует' });
       }   
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
