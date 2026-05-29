@@ -80,12 +80,28 @@ app.post('/apparts', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });   
     const query = `
       SELECT 
-      A.ID, 
-      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-      CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
-      A.G_LICSCHET
+        A.ID, 
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
+        A.G_LICSCHET
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
+        AND (
+          NOT EXISTS (
+            SELECT 1 FROM METERS M WHERE M.LS = A.G_LICSCHET
+          )
+          OR
+          EXISTS (
+            SELECT 1 
+            FROM METERS M
+            INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+            INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+            INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+            WHERE M.LS = A.G_LICSCHET
+              AND RS.ID = 1
+              AND S.GROUP_ID IN (537, 555, 597)
+          )
+        )
       ORDER BY A.APPARTS, A.LETTER
     `;    
     db.query(query, [buildingId], (err, result) => {
@@ -224,7 +240,7 @@ app.post('/auth', (req, res) => {
       }
       if (authResult.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'Invalid phone or password'});
+        return res.status(401).json({ error: 'неправильный телефон или пароль'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
