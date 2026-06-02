@@ -114,7 +114,7 @@ app.post('/apparts', (req, res) => {
             id: r.ID,
             house: `${letterPart}`.trim(),
             g_licschet: r.G_LICSCHET
-          };///////////////////////////licschet actuality check////////////////RMETER_STATUS todo
+          };
         }
         else
         {
