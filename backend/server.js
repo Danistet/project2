@@ -517,6 +517,7 @@ app.post('/meters-by-building', (req, res) => {
         M.VERIFY_DATE, 
         M.LS, 
         M.ID,
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
@@ -546,6 +547,7 @@ app.post('/meters-by-building', (req, res) => {
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,
         id: r.ID,
+        apparts: r.APPARTS,
         groupName: r.GROUP_NAME
       })));
     });

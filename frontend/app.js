@@ -185,8 +185,7 @@ createApp({
       try {
         if (showApparts.value && selectedAppartId.value) {
           const selectedAppart = apparts.value.find(a => a.id === selectedAppartId.value);
-          const licschet = selectedAppart?.g_licschet;
-          
+          const licschet = selectedAppart?.g_licschet;          
           if (licschet) {
             allMeters = await getMetersByLicschet(licschet);
             if (allMeters?.length === 1) {
@@ -202,6 +201,9 @@ createApp({
         } 
         else if (selectedBuildingId.value) {
           allMeters = await getMetersByBuilding(selectedBuildingId.value);
+          if (!showApparts.value) {
+            allMeters = allMeters.filter(m => !m.apparts || String(m.apparts).trim() === '');
+          }
           if (allMeters?.length === 1) {
             foundMeterForSession = allMeters[0];
           }
@@ -210,12 +212,21 @@ createApp({
         console.warn('Failed to load meters list:', err);
         allMeters = [];
       }
+
       saveAllMeters(allMeters);
-      if (foundMeterForSession) {
-        saveMeterDataToSession(foundMeterForSession);
+      const finalMeter = foundMeterForSession || selectedMeter.value;
+      if (finalMeter) {
+        saveMeterDataToSession(finalMeter);
       } else {
         clearMeterDataToSession();
+        if (!showApparts.value) {
+          alert("Для выбранного дома не найдено счётчиков.");
+        } else {
+          alert("Для выбранной квартиры не найдено подходящих счётчиков.");
+        }
+        return; 
       }
+
       const addressData = {
         town: townSearch.value || document.getElementById('townInput')?.value || '',
         townId: selectedTownId.value,
