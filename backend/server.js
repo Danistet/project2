@@ -294,6 +294,13 @@ app.post('/register', (req, res) => {
   if (!phone || !userpswd) {
     return res.status(400).json({ error: 'Missing phone or userpswd' });
   }
+  const phoneDigits = String(phone).replace(/\D/g, '');
+  if (phoneDigits.length < 11) {
+    return res.status(400).json({ error: 'Телефон должен содержать минимум 11 цифр' });
+  }
+  if (userpswd.length < 8) {
+    return res.status(400).json({ error: 'Пароль должен содержать минимум 8 символов' });
+  }
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);

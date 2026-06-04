@@ -478,8 +478,19 @@ createApp({
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
+      const phoneValue = phone.value.trim();
+      const passwordValue = password.value.trim();
       if (!phone.value.trim() || !password.value.trim()) {
         error.value = 'Логин и пароль обязательны для заполнения';
+        return;
+      }
+      const phoneDigits = phoneValue.replace(/\D/g, '');
+      if (phoneDigits.length < 11) {
+        error.value = 'Телефон должен содержать минимум 11 цифр';
+        return;
+      }
+      if (passwordValue.length < 8) {
+        error.value = 'Пароль должен содержать минимум 8 символов';
         return;
       }   
       try {
