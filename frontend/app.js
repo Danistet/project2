@@ -125,7 +125,7 @@ createApp({
 
     const saveAddressAndContinue = async () => {
       if (!townSearch.value?.trim() || !selectedTownId.value) {
-        alert("Выберите город из списка");
+     alert("Выберите город из списка");
         document.getElementById('townInput')?.focus();
         return;
       }
@@ -168,44 +168,23 @@ createApp({
         appartsValue = "-1";
         appartsIdValue = null;
       }
-      let g_licschet = null;
-      try {
-        const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
-        if (licschetData?.g_licschet?.trim()) {
-          g_licschet = licschetData.g_licschet;
-        }
-      } catch (e) {
-        console.warn('Failed to parse licschet', e);
-      }
-      if (!g_licschet && currentBuildingLicschet.value?.trim()) {
-        g_licschet = currentBuildingLicschet.value;
-      }
+
       let allMeters = [];
-      let foundMeterForSession = null; 
       try {
         if (showApparts.value && selectedAppartId.value) {
-          const selectedAppart = apparts.value.find(a => a.id === selectedAppartId.value);
+          const selectedAppart = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
           const licschet = selectedAppart?.g_licschet;          
           if (licschet) {
             allMeters = await getMetersByLicschet(licschet);
-            if (allMeters?.length === 1) {
-              foundMeterForSession = allMeters[0];
-            }
           }
         } 
         else if (currentBuildingLicschet.value && !showApparts.value) {
           allMeters = await getMetersByLicschet(currentBuildingLicschet.value);
-          if (allMeters?.length === 1) {
-            foundMeterForSession = allMeters[0];
-          }
         } 
         else if (selectedBuildingId.value) {
           allMeters = await getMetersByBuilding(selectedBuildingId.value);
           if (!showApparts.value) {
             allMeters = allMeters.filter(m => !m.apparts || String(m.apparts).trim() === '');
-          }
-          if (allMeters?.length === 1) {
-            foundMeterForSession = allMeters[0];
           }
         }      
       } catch (err) {
@@ -213,11 +192,7 @@ createApp({
         allMeters = [];
       }
 
-      saveAllMeters(allMeters);
-      const finalMeter = foundMeterForSession || selectedMeter.value;
-      if (finalMeter) {
-        saveMeterDataToSession(finalMeter);
-      } else {
+      if (!allMeters || allMeters.length === 0) {
         clearMeterDataToSession();
         if (!showApparts.value) {
           alert("Для выбранного дома не найдено счётчиков.");
@@ -227,25 +202,26 @@ createApp({
         return; 
       }
 
+      saveAllMeters(allMeters);
+      const g_licschet = allMeters[0]?.licschet || null;
+      if (allMeters.length === 1) {
+        saveMeterDataToSession(allMeters[0]);
+      } else {
+        clearMeterDataToSession();
+      }
       const addressData = {
-        town: townSearch.value || document.getElementById('townInput')?.value || '',
+        town: townSearch.value || '',
         townId: selectedTownId.value,
-        street: streetSearch.value || document.getElementById('streetInput')?.value || '',
+        street: streetSearch.value || '',
         streetId: selectedStreetId.value,
-        house: houseInput.value || document.getElementById('houseInput')?.value || '',        
+        house: houseInput.value || '',
         apparts: appartsValue,
         appartsId: appartsIdValue, 
         g_licschet,
         buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
-      const hasMeter = meterData?.meterNum?.trim();
-      if (townSearch.value?.trim() && streetSearch.value?.trim() && houseInput.value?.trim()) {
-        window.location.href = 'main.html';
-      } else {
-        alert("Введите данные");
-      }
+      window.location.href = 'main.html';
     };
 
     const loadTowns = async () => {
@@ -318,6 +294,7 @@ createApp({
       const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
       if (option) selectedStreetId.value = option.dataset.id;
     };
+
     const onStreetChange = (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
@@ -331,6 +308,7 @@ createApp({
       const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === e.target.value);
       if (option) selectedBuildingId.value = option.dataset.id;
     };
+
     const onHouseChange = (e) => {
       const val = e.target.value;
       const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === val);
@@ -362,7 +340,7 @@ createApp({
         console.warn('No meter found');
         clearMeterDataToSession();
         return;
-      }     
+      } 
       sessionStorage.setItem('meternum', JSON.stringify({ meterNum: data.meterNum || null }));
       sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: data.mountDate || null }));
       sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: data.verifyDate || null }));        
@@ -457,7 +435,7 @@ createApp({
       selectedAppartId.value = option?.dataset.id || null;
       appartsSearch.value = val; 
       showMeterSelect.value = false;
-      selectedMeter.value = null;    
+      selectedMeter.value = null;
       if (selectedAppartId.value && option?.dataset?.licschet?.trim()) {
         const g_licschet = option.dataset.licschet;
         await loadMetersByLicschet(g_licschet);
@@ -501,7 +479,7 @@ createApp({
             userpswd: password.value,
             meternum: meternum.value,
           });
-          response.value = 'Пользователь зарегистрирован';
+          response.value = 'Пользователь зарегистрирован';      
         } else {
           result = await apiRequest('/auth', {
             phone: phone.value,
@@ -523,7 +501,6 @@ createApp({
         sessionStorage.setItem('verifyDate', JSON.stringify({
           verifyDate: result.verifyDate
         }));        
-
         if (!result.phone) {
           throw new Error('Сервер не вернул phone');
         }
@@ -551,15 +528,17 @@ createApp({
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
-        window.location.href = 'address.html';                     
+        window.location.href = 'address.html'; 
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);
       }
     };
+
     onMounted(() => {
       loadTowns();
     });
+
     return { 
       phone, password, response, error, meternum, mountdate, verifydate,
       towns, streets, buildings, apparts, PHData, PH,
