@@ -49,7 +49,9 @@ app.post('/auth', (req, res) => {
         };        
         const meterNum = meterResult?.[0]?.METER_NUM || null;
         const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
-        const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;                
+        const verifyDate = meterResult?.[0]?.VERIFY_DATE || null; 
+        // Логика обновления токена: если с момента последней авторизации прошло больше 20 минут (1200000 мс),
+        // генерируем новый токен. Иначе просто обновляем дату авторизации, сохраняя старый токен.               
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
@@ -85,7 +87,7 @@ app.post('/register', (req, res) => {
   }
   const phoneDigits = String(phone).replace(/\D/g, '');
   if (phoneDigits.length < 11) {
-    return res.status(400).json({ error: 'Телефон должен содержать минимум 11 цифр' });
+    return res.status(400).json({ error: 'Телефон должен содержать 11 цифр' });
   }
   if (userpswd.length < 8) {
     return res.status(400).json({ error: 'Пароль должен содержать минимум 8 символов' });
@@ -247,7 +249,9 @@ app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connection failed' });   
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    // выбираем квартиры, для которых либо вообще нет счётчиков,
+    // либо есть счётчики с определённым статусом (RS.ID = 1) и группой услуг (537, 555, 597).   
     const query = `
       SELECT 
         A.ID, 
@@ -407,6 +411,8 @@ app.post('/meter-by-building', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }
+    // SQL-запрос ищет счётчик по зданию, игнорируя квартиры (APPARTS IS NULL),
+    // и берёт только первую запись (ROWS 1), отсортированную по дате установки.
     const query = `
       SELECT 
         M.METER_NUM, 
@@ -517,6 +523,7 @@ app.post('/PH', (req, res) => {
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id обязательны' });
   }
+  // Форматируем текущую дату в формат, совместимый с Firebird (YYYY-MM-DD HH:MM:SS)
   const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
   firebird.attach(config, (err, db) => {
     if (err) {
@@ -608,5 +615,3 @@ app.get('/PH/last', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-

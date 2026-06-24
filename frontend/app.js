@@ -30,6 +30,7 @@ createApp({
     const selectedMeter = ref(null);
     const { onMounted } = Vue;
 
+    // Сброс зависимых полей (улица, дом) при очистке поля "Город"
     watch(townSearch, (newVal) => {
       if (!newVal || newVal.trim() === '') {
         streetSearch.value = '';
@@ -41,6 +42,7 @@ createApp({
       }
     });
 
+    // Сброс зависимых полей (дом) при очистке поля "Улица"
     watch(streetSearch, (newVal) => {
       if (!newVal || newVal.trim() === '') {
         houseSearch.value = '';
@@ -49,6 +51,7 @@ createApp({
       }
     });
 
+    // Сброс зависимых полей (квартира) при очистке поля "Дом"
     watch(houseSearch, (newVal) => {
       if (!newVal || newVal.trim() === '') {
         appartsSearch.value = '';
@@ -57,6 +60,8 @@ createApp({
       }
     });
 
+    // Отслеживание переключения режима "вводить квартиру" / "не вводить".
+    // Если режим выключен, пытаемся загрузить счётчик по зданию, иначе фокусируемся на поле квартиры.
     watch(showApparts, (newVal) => {
       if (!newVal)
       {
@@ -75,7 +80,7 @@ createApp({
         }, 100);
       }
     });
-
+    // заменяем точку на запятую, добавляем ",000", если дробной части нет.
     const formatWithThousands = (value) => {
       if (!value && value !== 0) return '';
       const str = String(value).trim();
@@ -85,6 +90,7 @@ createApp({
       return str.replace('.', ',');
     };
     
+    //Считывает значение из поля, форматирует его, валидирует и отправляет на сервер
     const NewPH = async () => {
       try {
         const inputEl = document.getElementById('newPH');
@@ -98,7 +104,8 @@ createApp({
         if (isNaN(numericValue)) {
           alert('Некорректное число');
           return;
-        }        
+        }   
+        // сначала ищем 'activeMeter', если нет - берём 'meternum', если и его нет - пустой объект.     
         const meterData = JSON.parse(sessionStorage.getItem('activeMeter') || sessionStorage.getItem('meternum') || '{}');
         const meter_id = meterData.meterNum;;            
         if (!meter_id) {
@@ -123,6 +130,9 @@ createApp({
       }
     };
 
+    // Валидирует введённый адрес (город, улица, дом, квартира) и сохраняет его в sessionStorage.
+    // В зависимости от режима (с квартирой или без) загружает список подходящих счётчиков
+    // и перенаправляет пользователя на main.html.
     const saveAddressAndContinue = async () => {
       if (!townSearch.value?.trim() || !selectedTownId.value) {
      alert("Выберите город из списка");
@@ -168,7 +178,9 @@ createApp({
         appartsValue = "-1";
         appartsIdValue = null;
       }
-
+      // 1. Если выбрана квартира и у неё есть лицевой счёт - ищем по л/с.
+      // 2. Если квартира не выбрана, но у здания есть дефолтный л/с - ищем по нему.
+      // 3. Иначе ищем все счётчики по зданию (фильтруя пустые квартиры, если режим без квартир).
       let allMeters = [];
       try {
         if (showApparts.value && selectedAppartId.value) {
@@ -351,6 +363,8 @@ createApp({
       }
     };
 
+    // Загружает ОДИН счётчик по ID здания через /meter-by-building
+    // и сохраняет его данные в sessionStorage.
     const loadMeterByBuilding = async (buildingId) => {
       if (!buildingId) {
         clearMeterDataToSession();
@@ -367,6 +381,9 @@ createApp({
       }
     };
 
+    // Загружает СПИСОК счётчиков по ID здания через /meters-by-building.
+    // Если найден один счётчик — автоматически выбирает его.
+    // Если несколько — показывает диалог выбора. Если ни одного — очищает данные.
     const loadMetersByBuilding = async (buildingId) => {
       if (!buildingId) {
         meters.value = [];
@@ -392,6 +409,7 @@ createApp({
       }
     };
 
+    //Загружает СПИСОК счётчиков по лицевому счёту через /meters-by-licschet.
     const loadMetersByLicschet = async (g_licschet) => {
       if (!g_licschet?.trim()) {
         meters.value = [];
@@ -417,6 +435,8 @@ createApp({
       }
     };
 
+    // Финализирует выбор конкретного счётчика: сохраняет его в sessionStorage,
+    // обновляет адресные данные и скрывает диалог выбора.
     const selectMeter = (meter) => {
       selectedMeter.value = meter;
       saveSelectedMeter(meter);
