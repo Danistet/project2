@@ -67,8 +67,16 @@
         pageMeters = meters;
         container.innerHTML = meters.map((meter, idx) => `
           <div class="meter-block" data-meter-id="${meter.id}">
-            <h4>${meter.groupName ? meter.groupName.trim() : 'Услуга не указана'}</h4>
-            <div class="meter-details">
+            <h4>${meter.clientName || 'Не указано'}</h4>      
+            <div class="meter-details">    
+              <div class="detail-row">
+                <span class="detail-label">Лицевой счёт:</span>
+                <span class="detail-value meter-num">${meter.licschet || 'Не указан'}</span>
+              </div>  
+              <div class="detail-row">
+                <span class="detail-label">Услуга:</span>
+                <span class="detail-value meter-num">${meter.groupName ? meter.groupName.trim() : 'Услуга не указана'}</span>
+              </div>  
               <div class="detail-row">
                 <span class="detail-label">Серийный номер:</span>
                 <span class="detail-value meter-num">${meter.meterNum || 'Не указан'}</span>

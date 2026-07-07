@@ -316,30 +316,32 @@ app.post('/meter-by-licschet', (req, res) => {
         M.MOUNT_DATE,
         M.VERIFY_DATE,
         M.LS,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
       INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
       INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE M.LS = ?
         AND RS.ID = 1
         AND S.GROUP_ID IN (537, 555, 597)
     `;
     db.query(query, [g_licschet], (err, result) => {
       db.detach();
-      if (err) 
-      {
+      if (err) {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
       }
-      if (result.length === 0) 
-      {
-        return res.json ({
+      if (result.length === 0) {
+        return res.json({
           found: false,
           meterNum: null,
           mountDate: null,
           verifyDate: null,
-          groupName: null
+          groupName: null,
+          clientName: null
         });
       }
       res.json({
@@ -348,7 +350,8 @@ app.post('/meter-by-licschet', (req, res) => {
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
         licschet: result[0].LS,
-        groupName: result[0].GROUP_NAME
+        groupName: result[0].GROUP_NAME,
+        clientName: result[0].CLIENT_NAME
       });
     });
   });
@@ -356,8 +359,7 @@ app.post('/meter-by-licschet', (req, res) => {
 
 app.post('/meters-by-licschet', (req, res) => {
   const {g_licschet} = req.body;
-  if (!g_licschet)
-  {
+  if (!g_licschet) {
     return res.status(400).json({ error: 'g_licschet required'});
   }
   firebird.attach(config, (err, db) => {
@@ -372,17 +374,20 @@ app.post('/meters-by-licschet', (req, res) => {
         M.VERIFY_DATE, 
         M.LS, 
         M.ID,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
       INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
       INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE M.LS = ?
         AND RS.ID = 1
         AND S.GROUP_ID IN (537, 555, 597)
       ORDER BY M.MOUNT_DATE DESC
     `;
-    db.query(query, [g_licschet], (err, result) =>{
+    db.query(query, [g_licschet], (err, result) => {
       db.detach();
       if (err) {
         console.error('Query error:', err);
@@ -395,7 +400,8 @@ app.post('/meters-by-licschet', (req, res) => {
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,
         id: r.ID,
-        groupName: r.GROUP_NAME
+        groupName: r.GROUP_NAME,
+        clientName: r.CLIENT_NAME
       })));
     });
   });
@@ -419,12 +425,14 @@ app.post('/meter-by-building', (req, res) => {
         M.MOUNT_DATE, 
         M.VERIFY_DATE, 
         M.LS,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
       INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
         AND RS.ID = 1
         AND S.GROUP_ID IN (537, 555, 597)
@@ -449,7 +457,8 @@ app.post('/meter-by-building', (req, res) => {
           meterNum: null,
           mountDate: null,
           verifyDate: null,
-          groupName: null
+          groupName: null,
+          clientName: null
         });        
       }
       res.json({
@@ -458,7 +467,8 @@ app.post('/meter-by-building', (req, res) => {
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
         licschet: result[0].LS,
-        groupName: result[0].GROUP_NAME
+        groupName: result[0].GROUP_NAME,
+        clientName: result[0].CLIENT_NAME
       });
     });
   });
@@ -482,12 +492,14 @@ app.post('/meters-by-building', (req, res) => {
         M.LS, 
         M.ID,
         CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
       INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
         AND RS.ID = 1
         AND S.GROUP_ID IN (537, 555, 597)
@@ -512,7 +524,8 @@ app.post('/meters-by-building', (req, res) => {
         licschet: r.LS,
         id: r.ID,
         apparts: r.APPARTS,
-        groupName: r.GROUP_NAME
+        groupName: r.GROUP_NAME,
+        clientName: r.CLIENT_NAME
       })));
     });
   });
