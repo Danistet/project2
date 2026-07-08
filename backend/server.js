@@ -11,35 +11,34 @@ app.use(express.json());
 
 
 app.post('/auth', (req, res) => {
-  const { phone, userpswd } = req.body; 
-  if (!phone || !userpswd) {
-    return res.status(400).json({ error: 'Missing phone or password' });
+  const { userpswd } = req.body; 
+  if (!userpswd) {
+    return res.status(400).json({ error: 'Missing password' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLE_RHONE = ? AND CONTROLLER_PSWD = ?`;  
-    db.query(authQuery, [phone, userpswd], (err, authResult) => {
+    const authQuery = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;  
+    db.query(authQuery, [userpswd], (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
       }
       if (authResult.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'неправильный телефон или пароль'});
+        return res.status(401).json({ error: 'неправильный пароль'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
-      db.query(meterQuery, [phone], (err, meterResult) => {        
+      db.query(meterQuery, (err, meterResult) => {        
         const now = Date.now();
         const minute = 1200000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 
             status: 'OK', 
-            phone, 
             token, 
             authDate,
             meterNum,
@@ -55,8 +54,8 @@ app.post('/auth', (req, res) => {
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
-          const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;      
-          db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
+          const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLER_PSWD = ?`;      
+          db.query(updateQuery, [newToken, newAuthDate, userpswd], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error:', upderr);
@@ -65,8 +64,8 @@ app.post('/auth', (req, res) => {
             finishResponse(newToken, now, meterNum, mountDate, verifyDate);
           });
         } else {
-          const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;       
-          db.query(updateQuery, [now, phone], (upderr) => {
+          const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE CONTROLLER_PSWD = ?`;       
+          db.query(updateQuery, [now, userpswd], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error', upderr);
@@ -81,13 +80,9 @@ app.post('/auth', (req, res) => {
 });
 
 app.post('/register', (req, res) => {
-  const { phone, userpswd } = req.body; 
-  if (!phone || !userpswd) {
-    return res.status(400).json({ error: 'Missing phone or userpswd' });
-  }
-  const phoneDigits = String(phone).replace(/\D/g, '');
-  if (phoneDigits.length < 11) {
-    return res.status(400).json({ error: 'Телефон должен содержать 11 цифр' });
+  const { userpswd } = req.body; 
+  if (!userpswd) {
+    return res.status(400).json({ error: 'Missing userpswd' });
   }
   if (userpswd.length < 8) {
     return res.status(400).json({ error: 'Пароль должен содержать минимум 8 символов' });
@@ -97,8 +92,8 @@ app.post('/register', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'DB connect error' });
     }
-    const checkQuery = `SELECT 1 FROM CONTROLLERS WHERE CONTROLLE_RHONE = ?`;
-    db.query(checkQuery, [phone], (err, result) => {
+    const checkQuery = `SELECT 1 FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;
+    db.query(checkQuery, (err, result) => {
       if (err) {
         console.error('Check user error:', err);
         db.detach();
@@ -110,22 +105,21 @@ app.post('/register', (req, res) => {
       }   
       const token = crypto.randomBytes(32).toString('hex');
       const authDate = Date.now();
-      const insertUser = `INSERT INTO CONTROLLERS (CONTROLLE_RHONE, CONTROLLER_PSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?, ?)`;
-      db.query(insertUser, [phone, userpswd, token, authDate], (err) => {
+      const insertUser = `INSERT INTO CONTROLLERS (CONTROLLER_PSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?)`;
+      db.query(insertUser, [userpswd, token, authDate], (err) => {
         if (err) {
           console.error('Insert user error:', err);
           db.detach();
           return res.status(500).json({ error: 'Unable to create user' });
         }                        
         const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;
-        db.query(meterQuery, [phone], (err, meterResult) => {
+        db.query(meterQuery, (err, meterResult) => {
           const meterNum = meterResult?.[0]?.METER_NUM || null;
           const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
           const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;        
           db.detach();
           res.status(201).json({ 
             status: 'OK', 
-            phone, 
             token, 
             authDate,
             meterNum,
@@ -140,17 +134,18 @@ app.post('/register', (req, res) => {
 });
 
 app.post('/update-token', (req, res) => {
-  const { phone, token } = req.body;  
-  if (!phone || !token) {
-    return res.status(400).json({ error: 'Missing phone or token' });
+  const { token } = req.body;  
+  if (!token) {
+    return res.status(400).json({ error: 'Missing token' });
   }  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }    
-    const query = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLE_RHONE = ? AND TOKEN = ?`;  
-    db.query(query, [phone, token], (err, result) => {
+    // Проверка только по токену (без пароля)
+    const query = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE TOKEN = ?`;  
+    db.query(query, [token], (err, result) => {
       if (err) {
         db.detach();
         console.error('Query error:', err);
@@ -158,13 +153,14 @@ app.post('/update-token', (req, res) => {
       }    
       if (result.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'Invalid token or phone' });
+        return res.status(401).json({ error: 'Invalid token' });
       }    
       const now = Date.now();
       const newToken = token;
       const newAuthDate = now;
-      const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLE_RHONE = ?`;    
-      db.query(updateQuery, [newToken, newAuthDate, phone], (upderr) => {
+      // Обновляем по токену
+      const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE TOKEN = ?`;    
+      db.query(updateQuery, [newAuthDate, token], (upderr) => {
         db.detach();         
         if (upderr) {
           console.error('Update error:', upderr);
@@ -172,7 +168,6 @@ app.post('/update-token', (req, res) => {
         }          
         res.json({ 
           status: 'OK', 
-          phone, 
           token, 
           authDate: now 
         });
@@ -330,12 +325,14 @@ app.post('/meter-by-licschet', (req, res) => {
     `;
     db.query(query, [g_licschet], (err, result) => {
       db.detach();
-      if (err) {
+      if (err) 
+      {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
       }
-      if (result.length === 0) {
-        return res.json({
+      if (result.length === 0) 
+      {
+        return res.json ({
           found: false,
           meterNum: null,
           mountDate: null,
@@ -359,7 +356,8 @@ app.post('/meter-by-licschet', (req, res) => {
 
 app.post('/meters-by-licschet', (req, res) => {
   const {g_licschet} = req.body;
-  if (!g_licschet) {
+  if (!g_licschet)
+  {
     return res.status(400).json({ error: 'g_licschet required'});
   }
   firebird.attach(config, (err, db) => {
@@ -387,7 +385,7 @@ app.post('/meters-by-licschet', (req, res) => {
         AND S.GROUP_ID IN (537, 555, 597)
       ORDER BY M.MOUNT_DATE DESC
     `;
-    db.query(query, [g_licschet], (err, result) => {
+    db.query(query, [g_licschet], (err, result) =>{
       db.detach();
       if (err) {
         console.error('Query error:', err);

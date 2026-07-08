@@ -1,7 +1,6 @@
 const { createApp, ref, watch } = Vue;
 createApp({
   setup() {
-    const phone = ref('');
     const password = ref('');
     const response = ref('');
     const error = ref('');
@@ -476,15 +475,9 @@ createApp({
     const login = async (mode = 'login') => {
       error.value = '';
       response.value = '';
-      const phoneValue = phone.value.trim();
       const passwordValue = password.value.trim();
-      if (!phone.value.trim() || !password.value.trim()) {
+      if (!password.value.trim()) {
         error.value = 'Логин и пароль обязательны для заполнения';
-        return;
-      }
-      const phoneDigits = phoneValue.replace(/\D/g, '');
-      if (phoneDigits.length < 11) {
-        error.value = 'Телефон должен содержать минимум 11 цифр';
         return;
       }
       if (passwordValue.length < 8) {
@@ -495,20 +488,17 @@ createApp({
         let result;
         if (mode === 'register') {    
           result = await apiRequest('/register', {
-            phone: phone.value,
             userpswd: password.value,
             meternum: meternum.value,
           });
           response.value = 'Пользователь зарегистрирован';      
         } else {
           result = await apiRequest('/auth', {
-            phone: phone.value,
             userpswd: password.value,
             meternum: meternum.value
           });
         }
         sessionStorage.setItem('authData', JSON.stringify({
-          phone: result.phone,
           token: result.token,
           authDate: result.authDate
         }));
@@ -521,9 +511,6 @@ createApp({
         sessionStorage.setItem('verifyDate', JSON.stringify({
           verifyDate: result.verifyDate
         }));        
-        if (!result.phone) {
-          throw new Error('Сервер не вернул phone');
-        }
         if (!result.token) {
           throw new Error('Сервер не вернул token');
         }
@@ -531,7 +518,6 @@ createApp({
           throw new Error('Сервер не вернул authDate');
         }
         const authData = {
-          phone: result.phone,
           token: result.token,
           authDate: result.authDate
         };
@@ -548,7 +534,8 @@ createApp({
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
-        window.location.href = 'address.html'; 
+        //window.location.href = 'address.html'; 
+        window.location.href = 'checktypewindow.html'; 
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);
@@ -560,7 +547,7 @@ createApp({
     });
 
     return { 
-      phone, password, response, error, meternum, mountdate, verifydate,
+      password, response, error, meternum, mountdate, verifydate,
       towns, streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,

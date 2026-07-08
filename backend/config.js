@@ -5,7 +5,7 @@ module.exports = {
   user: 'SYSDBA',
   password: 'masterkey',
   lowercase_keys: false,
-  role: null,
+  role: null, 
   pageSize: 4096,
   timeout: 30000,
 };

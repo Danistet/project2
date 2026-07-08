@@ -41,6 +41,7 @@
           
           <div class="button-group">
             <button @click="NewPH" class="btn-primary">Передать</button>
+            <button onclick="violation()" class="btn-primary">Список нарушений</button>
             <button onclick="main()" class="btn-secondary">Выход</button>
           </div>
         </section>
@@ -122,6 +123,9 @@
       }
       function main() {                
         window.location.href = 'main.html';
+      }
+      function violation() {
+        window.location.href = 'violationwindow.html';
       }
       function showError(message) {
         const errorContainer = document.getElementById('error');

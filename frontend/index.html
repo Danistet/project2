@@ -11,16 +11,7 @@
   <body>
     <div id="app">
       <h1>Вход</h1>   
-      <div class="form-container">
-        <input 
-          v-model="phone" 
-          placeholder="Телефон" 
-          required 
-          type="tel" 
-          inputmode="numeric" 
-          @input="e => phone = e.target.value.replace(/\D/g, '').slice(0, 11)"
-          class="form-input"
-        >       
+      <div class="form-container">      
         <input 
           v-model="password" 
           type="password" 
@@ -31,7 +22,6 @@
         />     
         <div class="button-group">
           <button @click="login" class="btn-primary">Войти</button>
-          <button onclick="registerw()" class="btn-secondary">Регистрация</button>
         </div>    
         <p v-if="response" class="response-message">{{ response }}</p>
         <p v-if="error" class="error-message">{{ error }}</p>
@@ -40,7 +30,7 @@
     <script src="./app.js"></script>
     <script>
       function registerw() {
-        window.location.href = 'registrationwindow.html'
+        //window.location.href = 'registrationwindow.html'
       }
     </script>
   </body>
