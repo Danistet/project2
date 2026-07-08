@@ -143,7 +143,6 @@ app.post('/update-token', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }    
-    // Проверка только по токену (без пароля)
     const query = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE TOKEN = ?`;  
     db.query(query, [token], (err, result) => {
       if (err) {
@@ -171,6 +170,78 @@ app.post('/update-token', (req, res) => {
           token, 
           authDate: now 
         });
+      });
+    });
+  });
+});
+
+app.post('/generate-act', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatDate = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const formatDateTime = (d) =>
+      `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const actBdate = new Date(year, month, 1);
+    const actEdate = new Date(year, month + 1, 0);
+    const bdateStr = formatDate(actBdate);
+    const edateStr = formatDate(actEdate);
+    const actDateStr = formatDateTime(now);
+    const maxQuery = `
+      SELECT MAX(CAST(ACT_NO AS INTEGER)) AS MAX_NO
+      FROM BUILD_MAINT_ACTS
+      WHERE ACT_BDATE >= ? AND ACT_BDATE < ?
+    `;
+    db.query(maxQuery, [bdateStr, edateStr], (err, result) => {
+      if (err) {
+        db.detach();
+        console.error('Max query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }
+      const maxNo = (result && result[0] && result[0].MAX_NO) || 0;
+      const newActNo = String(maxNo + 1).padStart(5, '0');
+      db.query('SELECT GEN_ID(BUILD_MAINT_ACTS_GEN, 1) AS NEW_ID FROM RDB$DATABASE', (err, idResult) => {
+        if (err) {
+          db.detach();
+          console.error('Generator error:', err);
+          return res.status(500).json({ error: 'Generator failed' });
+        }
+        const newId = idResult && idResult[0] && idResult[0].NEW_ID;
+        if (!newId) {
+          db.detach();
+          console.error('Generator returned empty');
+          return res.status(500).json({ error: 'Generator returned empty' });
+        }
+        const insertQuery = `
+          INSERT INTO BUILD_MAINT_ACTS
+            (ID, ACT_NO, ACT_BDATE, ACT_EDATE, ACT_DATE, CREATEDATE)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        db.query(
+          insertQuery,
+          [newId, newActNo, bdateStr, edateStr, actDateStr, actDateStr],
+          (err) => {
+            db.detach();
+            if (err) {
+              console.error('Insert error:', err);
+              return res.status(500).json({ error: 'Insert failed', details: err.message });
+            }
+            res.json({
+              actId: newId,
+              actNo: newActNo,
+              actDate: actDateStr,
+              actBdate: bdateStr,
+              actEdate: edateStr
+            });
+          }
+        );
       });
     });
   });
@@ -208,6 +279,37 @@ app.post('/streets', (req, res) => {
         id: r.ID, 
         name: `${r.STREET_TYPE} ${r.STREET}`.trim() 
       })));
+    });
+  });
+});
+
+app.post('/update-act-building', (req, res) => {
+  const { actId, buildingId } = req.body;
+  if (!actId || !buildingId) {
+    return res.status(400).json({ error: 'actId и buildingId обязательны' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const updateQuery = `
+      UPDATE BUILD_MAINT_ACTS
+      SET BUILDING_ID = ?
+      WHERE ID = ?
+    `;
+    db.query(updateQuery, [buildingId, actId], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Update error:', err);
+        return res.status(500).json({ error: 'Update failed', details: err.message });
+      }
+      res.json({
+        status: 'OK',
+        message: 'BUILDING_ID успешно обновлён',
+        actId,
+        buildingId
+      });
     });
   });
 });

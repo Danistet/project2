@@ -13,7 +13,6 @@
         <h1>Передать показания</h1>
         <div id="error" class="error-message"></div>
       </header>
-
       <main class="content-wrapper">
         <section class="info-card">
           <div class="info-row">
@@ -25,7 +24,6 @@
             <span id="PH" class="info-value">нет данных</span>
           </div>
         </section>
-
         <section class="form-section">
           <label for="newPH" class="form-label">Текущее показание:</label>
           <input 
@@ -37,8 +35,7 @@
             inputmode="decimal" 
             placeholder="0,000"
             class="form-input"
-          >
-          
+          >      
           <div class="button-group">
             <button @click="NewPH" class="btn-primary">Передать</button>
             <button onclick="violation()" class="btn-primary">Список нарушений</button>
@@ -85,42 +82,45 @@
           setTimeout(() => { window.location.href = 'index.html'; }, 2000);
           return;
         }                   
-        if (!authData.phone || !authData.token) {
+        if (!authData.token) {
           showError('Некорректные данные сессии');
           clearSession();
-          setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+          window.location.href = 'index.html';
           return;
         }  
         loadMeterData();                            
       });
-
       async function loadMeterData() {
-        const selectedMeter = getSelectedMeter();
-        const storedMeterData = sessionStorage.getItem('meternum');
-        const meterData = selectedMeter || (storedMeterData ? JSON.parse(storedMeterData) : null);
         const meterNumElement = document.getElementById('meterNum');
         const errorElement = document.getElementById('error');
         errorElement.style.color = 'red';
-        
+        let meterData = getActiveMeter();
+        if (!meterData) {
+          meterData = getSelectedMeter();
+        }
+        if (!meterData) {
+          const storedMeterData = sessionStorage.getItem('meternum');
+          if (storedMeterData) {
+            try {
+              meterData = JSON.parse(storedMeterData);
+            } catch (e) {
+              console.error("Ошибка данных счетчика:", e);
+              errorElement.textContent = 'Ошибка формата данных счетчика';
+              window.location.href = 'index.html';
+            }
+          }
+        }      
         if (meterData?.meterNum) {
           meterNumElement.textContent = meterData.meterNum;
-          sessionStorage.setItem('activeMeter', JSON.stringify(meterData));
-        } else {
-          meterNumElement.textContent = 'Не указан';
-        }
-        if (storedMeterData) {
-          try {
-            const meterObj = JSON.parse(storedMeterData);
-            meterNumElement.textContent = meterObj.meterNum || 'Не указан';
-          } catch (e) {
-            console.error("Ошибка данных счетчика:", e);
-            errorElement.textContent = 'Ошибка формата данных счетчика';
+          if (typeof saveActiveMeter === 'function') {
+            saveActiveMeter(meterData);
           }
         } else {
-          console.log("Данные счетчика не найдены");
           meterNumElement.textContent = 'Не указан';
+          console.log("Данные счетчика не найдены");
+          window.location.href = 'index.html';
         }
-      }
+      }    
       function main() {                
         window.location.href = 'main.html';
       }
@@ -137,18 +137,32 @@
       async function loadPreviousPHFromAPI() {
         const phElement = document.getElementById('PH');
         if (!phElement) return;          
-        const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
-        const meter_id = meterData.meterNum;              
+        let meterData = getActiveMeter();
+        if (!meterData) {
+          meterData = getSelectedMeter();
+        }
+        if (!meterData) {
+          const storedMeterData = sessionStorage.getItem('meternum');
+          if (storedMeterData) {
+            try {
+              meterData = JSON.parse(storedMeterData);
+            } catch (e) {
+              console.error("Ошибка данных счетчика:", e);
+              window.location.href = 'index.html';
+            }
+          }
+        }      
+        const meter_id = meterData?.meterNum;
         if (!meter_id) {
           phElement.textContent = 'нет данных';
           return;
-        }              
+        }       
         try {
           const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
-          });                 
-          const result = await response.json();                   
+          });       
+          const result = await response.json();       
           if (result.found && result.ph) {
             phElement.textContent = result.ph;
             sessionStorage.setItem('ph', JSON.stringify({ PH: result.ph }));
@@ -158,8 +172,9 @@
         } catch (err) {
           console.error('Failed to load previous PH:', err);
           phElement.textContent = 'нет данных';
+          window.location.href = 'index.html';
         }
-      }
+      }   
       window.addEventListener('DOMContentLoaded', () => {
         loadMeterData();
         loadPreviousPHFromAPI(); 

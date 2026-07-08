@@ -8,197 +8,232 @@
     <script src="./api.js"></script>
   </head>
   <body>
-    <h1>Выберите тип проверки</h1>
-    <button onclick="cont()" >Далее</button>
-    <div>
-        <button onclick="openOverlay()">Open Overlay</button>
-        <!-- The Overlay Wrapper -->
-        <div id="siteOverlay" class="overlay">
+    <div id="app">
+      <h1>Выберите тип проверки</h1>
+      <div class="form-container">
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" v-model="checkType" value="planned" />
+            <span>Плановая</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" v-model="checkType" value="unscheduled" />
+            <span>Внеплановая</span>
+          </label>
+        </div>
+        <button @click="continueAction" class="btn-primary">Продолжить</button>
+        <p v-if="error" class="error-message">{{ error }}</p>
+      </div>
+      <div v-if="showOverlay" class="overlay" @click.self="closeOverlay">
         <div class="overlay-content">
-            <h2>Overlay Title</h2>
-            <p>This is your content layer.</p>
-            <button onclick="closeOverlay()">Close</button>
+          <h2 class="act">Акт № {{ actNo }}</h2>
+          <p class="datetime">{{ actDate }}</p>
+          <button @click="closeOverlay" class="btn-primary">Продолжить</button>
         </div>
-        </div>
+      </div>
     </div>
   </body>
   <script>
-    function cont() {
-        window.location.href = 'address.html';
-    }
-    const overlay = document.getElementById("siteOverlay");
-
-    // Make the overlay visible
-    function openOverlay() {
-    overlay.style.display = "block";
-    }
-
-    // Hide the overlay
-    function closeOverlay() {
-    overlay.style.display = "none";
-    }
-
-    // Optional: Close overlay if clicking outside the content box
-    window.onclick = function(event) {
-    if (event.target === overlay) {
-        closeOverlay();
-    }
-    }
+    const { createApp, ref, onMounted } = Vue;
+    createApp({
+      setup() {
+        const showOverlay = ref(true);
+        const actNo = ref('');
+        const actDate = ref('');
+        const checkType = ref('planned');
+        const error = ref('');
+        const loadAct = async () => {
+          try {
+            const result = await apiRequest('/generate-act', {});
+            console.log('Акт успешно сгенерирован:', result);
+            actNo.value = result.actNo;
+            actDate.value = result.actDate;
+            sessionStorage.setItem('currentAct', JSON.stringify({
+              actId: result.actId,
+              actNo: result.actNo,
+              actDate: result.actDate,
+              actBdate: result.actBdate,
+              actEdate: result.actEdate
+            }));
+          } catch (err) {
+            console.error('Failed to generate act:', err);
+            error.value = 'Ошибка генерации акта: ' + (err.message || 'неизвестная ошибка');
+          }
+        };
+        const closeOverlay = () => {
+          showOverlay.value = false;
+        };
+        const continueAction = () => {
+          if (!checkType.value) {
+            error.value = 'Выберите тип проверки';
+            return;
+          }
+          sessionStorage.setItem('checkType', checkType.value);
+          window.location.href = 'address.html';
+        };
+        onMounted(() => {
+          loadAct();
+        });
+        return {
+          showOverlay,
+          actNo,
+          actDate,
+          checkType,
+          error,
+          closeOverlay,
+          continueAction
+        };
+      }
+    }).mount('#app');
   </script>
- <style>
+  <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    .overlay {
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #000000;
+        background-color: #FFFFFF;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        padding: 24px 16px;
+      }
+
+      h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 24px;
+        text-align: center;
+      }
+
+      .form-container {
+        width: 100%;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        border: 2px solid #45B0E1;
+      }
+
+      .radio-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 8px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+      }
+
+      .radio-label:hover {
+        background-color: #F0F9FC;
+      }
+
+      .radio-label input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #45B0E1;
+        cursor: pointer;
+      }
+
+      button {
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 16px;
+        font-weight: 500;
+        color: #FFFFFF;
+        background-color: #45B0E1;
+        border: 2px solid #45B0E1;
+        border-radius: 0;
+        cursor: pointer;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+        text-align: center;
+      }
+
+      button:hover {
+        background-color: #2E8BC0;
+        border-color: #2E8BC0;
+      }
+
+      button:active {
+        background-color: #1A6B96;
+        border-color: #1A6B96;
+      }
+
+      .error-message {
+        color: #C62828;
+        font-size: 14px;
+        margin-top: 8px;
+        word-break: break-word;
+      }
+
+      .overlay {
         position: fixed;
-        display: none;      /* Hidden by default */
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.7); /* Dimmed background */
-        z-index: 9999;     /* Sits on top of everything */
-    }
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-        /* Centered content box */
-    .overlay-content {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 30px;
+      .overlay-content {
+        background: #FFFFFF;
+        padding: 30px 40px;
         border-radius: 8px;
         text-align: center;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-      color: #000000;
-      background-color: #FFFFFF;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 24px 16px;
-    }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 24px;
-      text-align: center;
-      color: #000000;
-    }
-
-    .form-container {
-      width: 100%;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .form-input {
-      width: 100%;
-      padding: 14px 16px;
-      font-size: 16px;
-      color: #000000;
-      background-color: #FFFFFF;
-      border: 2px solid #45B0E1;
-      border-radius: 0;
-      outline: none;
-      transition: border-color 0.2s ease;
-    }
-
-    .form-input::placeholder {
-      color: #666666;
-    }
-
-    .form-input:focus {
-      border-color: #2E8BC0;
-    }
-
-    .button-group {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 8px;
-    }
-
-    button {
-      width: 100%;
-      padding: 14px 16px;
-      font-size: 16px;
-      font-weight: 500;
-      color: #FFFFFF;
-      background-color: #45B0E1;
-      border: 2px solid #45B0E1;
-      border-radius: 0;
-      cursor: pointer;
-      transition: background-color 0.2s ease, border-color 0.2s ease;
-      text-align: center;
-    }
-
-    button:hover {
-      background-color: #2E8BC0;
-      border-color: #2E8BC0;
-    }
-
-    button:active {
-      background-color: #1A6B96;
-      border-color: #1A6B96;
-    }
-
-    .btn-secondary {
-      background-color: #FFFFFF;
-      color: #45B0E1;
-      border: 2px solid #45B0E1;
-    }
-
-    .btn-secondary:hover {
-      background-color: #F0F9FC;
-    }
-
-    .response-message {
-      color: #2E7D32;
-      font-size: 14px;
-      margin-top: 8px;
-      word-break: break-word;
-    }
-
-    .error-message {
-      color: #C62828;
-      font-size: 14px;
-      margin-top: 8px;
-      word-break: break-word;
-    }
-
-    @media (max-width: 480px) {
-      body {
-        padding: 16px 12px;
+        max-width: 90%;
+        min-width: 280px;
+        border: 2px solid #45B0E1;
       }
-      
-      h1 {
+
+      .overlay-content .act {
         font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #000000;
+      }
+
+      .overlay-content .datetime {
+        font-size: 16px;
+        color: #333333;
         margin-bottom: 20px;
       }
-      
-      .form-input,
-      button {
-        padding: 12px 14px;
-        font-size: 16px;
-      }
-    }
 
-    .server-response {
-      white-space: pre-line;
-    }
-  </style>
+      .overlay-content button {
+        max-width: 200px;
+        margin: 0 auto;
+      }
+
+      @media (max-width: 480px) {
+        body {
+          padding: 16px 12px;
+        }
+        h1 {
+          font-size: 22px;
+          margin-bottom: 20px;
+        }
+        button {
+          padding: 12px 14px;
+        }
+      }
+    </style>
 </html>
