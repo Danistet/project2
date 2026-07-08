@@ -3,37 +3,34 @@
   <head>
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход</title>
+    <title></title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./api.js"></script>
   </head>
-
-  <body>
-    <div id="app">
-      <h1>Вход</h1>   
-      <div class="form-container">      
-        <input 
-          v-model="password" 
-          type="password" 
-          placeholder="Пароль"
-          maxlength="15" 
-          required
-          class="form-input"
-        />     
-        <div class="button-group">
-          <button @click="login" class="btn-primary">Войти</button>
+    <body>
+        <div id="app">
+            <h1>владелец лицевого счета присутствует?</h1>
+        </div>
+        <div>
+            <div class="form-container"> 
+                <div class="button-group">
+                    <button type="button">да</button>
+                    <button type="button">нет</button><br>
+                    <button type="button" onclick="tologin()" class="btn-secondary">Выход</button>
+                </div>
+            </div>
         </div>    
-        <p v-if="response" class="response-message">{{ response }}</p>
-        <p v-if="error" class="error-message">{{ error }}</p>
-      </div>
-    </div>   
+    </body>
+
     <script src="./app.js"></script>
     <script>
-
+      function tologin() {
+        sessionStorage.clear();
+        window.location.href = 'checktypewindow.html';
+      }
     </script>
-  </body>
 
-  <style>
+    <style>
     * {
       box-sizing: border-box;
       margin: 0;
@@ -165,4 +162,5 @@
       white-space: pre-line;
     }
   </style>
-</html>
+
+  </html>

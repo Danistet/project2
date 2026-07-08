@@ -202,8 +202,7 @@
               buildingId: addressData.buildingId
             });
             currentAct.buildingId = addressData.buildingId;
-            sessionStorage.setItem('currentAct', JSON.stringify(currentAct));       
-            console.log(`BUILDING_ID ${addressData.buildingId} привязан к акту № ${currentAct.actNo}`);
+            sessionStorage.setItem('currentAct', JSON.stringify(currentAct));                   
           } catch (err) {
             console.error('Failed to bind building to act:', err);
           }

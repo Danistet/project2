@@ -44,8 +44,7 @@
         const error = ref('');
         const loadAct = async () => {
           try {
-            const result = await apiRequest('/generate-act', {});
-            console.log('Акт успешно сгенерирован:', result);
+            const result = await apiRequest('/generate-act', {});            
             actNo.value = result.actNo;
             actDate.value = result.actDate;
             sessionStorage.setItem('currentAct', JSON.stringify({

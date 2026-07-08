@@ -232,7 +232,7 @@ createApp({
         buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      window.location.href = 'main.html';
+      window.location.href = 'checkownerwindow.html';
     };
 
     const loadTowns = async () => {
