@@ -9,7 +9,7 @@
   </head>
   <body>
     <div id="app">
-      <h1>Выберите тип проверки</h1>
+      <h1>Статус бойлера для приготовления ГВС</h1>
       <div class="form-container">
         <div class="radio-group">
           <label class="radio-label">
@@ -21,76 +21,24 @@
             <span>Отсутствует</span>
           </label>
         </div>
-        <button @click="continueAction" class="btn-primary">Продолжить</button>
-        <button onclick="logout()">Выход</button>
+        <button onclick="continueAction()" class="btn-primary">Продолжить</button>
+        <button onclick="logout()" class="btn-secondary">Назад</button>
         <p v-if="error" class="error-message">{{ error }}</p>
-      </div>
-      <div v-if="showOverlay" class="overlay" @click.self="closeOverlay">
-        <div class="overlay-content">
-          <h2 class="act">Акт № {{ actNo }}</h2>
-          <p class="datetime">{{ actDate }}</p>
-          <button @click="closeOverlay" class="btn-primary">Продолжить</button>
-        </div>
       </div>
     </div>
   </body>
   <script>
     function logout()
     {
-      window.location.href = 'index.html';
+      window.location.href = 'checkownerwindow.html';
+    }
+    function continueAction()
+    {
+      window.location.href = 'main.html';
     }
   </script>
   <script>
-    const { createApp, ref, onMounted } = Vue;
-    createApp({
-      setup() {
-        const showOverlay = ref(true);
-        const actNo = ref('');
-        const actDate = ref('');
-        const checkType = ref('planned');
-        const error = ref('');
-        const loadAct = async () => {
-          try {
-            const result = await apiRequest('/generate-act', {});            
-            actNo.value = result.actNo;
-            actDate.value = result.actDate;
-            sessionStorage.setItem('currentAct', JSON.stringify({
-              actId: result.actId,
-              actNo: result.actNo,
-              actDate: result.actDate,
-              actBdate: result.actBdate,
-              actEdate: result.actEdate
-            }));
-          } catch (err) {
-            console.error('Failed to generate act:', err);
-            error.value = 'Ошибка генерации акта: ' + (err.message || 'неизвестная ошибка');
-          }
-        };
-        const closeOverlay = () => {
-          showOverlay.value = false;
-        };
-        const continueAction = () => {
-          if (!checkType.value) {
-            error.value = 'Выберите тип';
-            return;
-          }
-          sessionStorage.setItem('checkType', checkType.value);
-          window.location.href = 'address.html';
-        };
-        onMounted(() => {
-          loadAct();
-        });
-        return {
-          showOverlay,
-          actNo,
-          actDate,
-          checkType,
-          error,
-          closeOverlay,
-          continueAction
-        };
-      }
-    }).mount('#app');
+ 
   </script>
   <style>
       * {

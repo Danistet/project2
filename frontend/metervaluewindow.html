@@ -38,7 +38,11 @@
           >      
           <div class="button-group">
             <button @click="NewPH" class="btn-primary">Передать</button>
-            <button onclick="violation()" class="btn-primary">Список нарушений</button>
+           <!-- <button onclick="violation()" class="btn-primary">Список нарушений</button>    -->        
+            <label class="form-label checkbox-label">
+              <input type="checkbox" id="appartscheck" v-model="showApparts" class="form-checkbox">
+              <span class="checkbox-text">Список нарушений</span>
+            </label>
             <button onclick="main()" class="btn-secondary">Назад</button>
           </div>
         </section>
@@ -362,6 +366,32 @@
       background-color: #E0F4FA;
     }
 
+    .checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+    }
+
+    .form-checkbox {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      accent-color: #45B0E1;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    .checkbox-text {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
+    }
+
     @media (max-width: 480px) {
       body {
         padding: 16px 12px;
@@ -398,6 +428,7 @@
         max-width: 100%;
       }
     }
+
 
     .server-response {
       white-space: pre-line;
