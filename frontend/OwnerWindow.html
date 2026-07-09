@@ -10,23 +10,13 @@
   <body>
     <div class="page-wrapper">
       <header class="page-header">
-        <h1>Выбор владельца лицевого счета</h1>
+        <h1>Введите инициалы владельца лицевого счета</h1>
         <div id="error" class="error-message"></div>
       </header>
       <main class="content-card">
-        <section class="address-section">
-          <div class="address-row">
-            <span id="streettype" class="address-part"></span>
-            <span id="street" class="address-part"></span>
-          </div>
-          <div class="address-row">
-            <span id="house" class="address-part"></span>
-            <span id="apparts" class="address-part"></span>
-          </div>
-        </section>
-        <section class="meters-section">
-          <div id="metersContainer" class="meters-container"></div>
-        </section>
+        <input placeholder="ФИО  владельца" class="form-input">
+        <input placeholder="номер телефона" class="form-input">
+        <input placeholder="адрес электронной почты" class="form-input">
         <section class="actions-section">
           <button onclick="cont()" id="ContinueButton" class="ContinueButton">Продолжить</button>            
           <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>
@@ -39,6 +29,9 @@
     function cont() {
         window.location.href = 'main.html';
       }
+    function logout() {
+      window.location.href = 'checkownerwindow.html';
+    }
   </script>
   <style>
     * {
@@ -135,6 +128,26 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      color: #000000;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .form-input::placeholder {
+      color: #666666;
+    }
+
+    .form-input:focus {
+      border-color: #2E8BC0;
     }
 
     .meter-block {
