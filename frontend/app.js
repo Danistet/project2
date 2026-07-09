@@ -472,12 +472,12 @@ createApp({
       }
     };
 
-    const login = async (mode = 'login') => {
+    const login = async (e) => {
       error.value = '';
       response.value = '';
       const passwordValue = password.value.trim();
       if (!password.value.trim()) {
-        error.value = 'Логин и пароль обязательны для заполнения';
+        error.value = 'Пароль обязателен для заполнения';
         return;
       }
       if (passwordValue.length < 8) {
@@ -485,19 +485,11 @@ createApp({
         return;
       }   
       try {
-        let result;
-        if (mode === 'register') {    
-          result = await apiRequest('/register', {
-            userpswd: password.value,
-            meternum: meternum.value,
-          });
-          response.value = 'Пользователь зарегистрирован';      
-        } else {
+        let result;      
           result = await apiRequest('/auth', {
             userpswd: password.value,
             meternum: meternum.value
           });
-        }
         sessionStorage.setItem('authData', JSON.stringify({
           token: result.token,
           authDate: result.authDate
@@ -534,7 +526,6 @@ createApp({
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
-        //window.location.href = 'address.html'; 
         window.location.href = 'checktypewindow.html'; 
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;

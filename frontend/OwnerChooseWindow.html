@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Выбор владельца лицевого счета</title>
+    <script src="./api.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div class="page-wrapper">
+      <header class="page-header">
+        <h1>Выбор владельца лицевого счета</h1>
+        <div id="error" class="error-message"></div>
+      </header>
+      <main class="content-card">
+        <section class="address-section">
+          <div class="address-row">
+            <span id="streettype" class="address-part"></span>
+            <span id="street" class="address-part"></span>
+          </div>
+          <div class="address-row">
+            <span id="house" class="address-part"></span>
+            <span id="apparts" class="address-part"></span>
+          </div>
+        </section>
+        <section class="meters-section">
+          <div id="metersContainer" class="meters-container"></div>
+        </section>
+        <section class="actions-section">
+          <button onclick="cont()" id="ContinueButton" class="ContinueButton">Продолжить</button>            
+          <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>
+        </section>
+      </main>
+    </div>
+  </body>
+
+  <script>
+    function cont() {
+        window.location.href = 'main.html';
+      }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 20px 16px;
+    }
+
+    .page-wrapper {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .page-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 15px;
+      color: #C62828;
+      min-height: 22px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .content-card {
+      width: 100%;
+      max-width: 480px;
+      border: 2px solid #45B0E1;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .address-section {
+      padding: 16px 20px;
+      background-color: #D1D1D1;
+      border-bottom: 2px solid #45B0E1;
+    }
+
+    .address-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .address-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .address-part {
+      font-size: 18px;
+      font-weight: 600;
+      color: #000000;
+      word-break: break-word;
+    }
+
+    .meters-section {
+      padding: 16px 20px;
+      background-color: #FFFFFF;
+    }
+
+    .meters-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .meter-block {
+      border: 2px solid #45B0E1;
+      padding: 16px;
+      background-color: #FFFFFF;
+      transition: border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .meter-block.selected {
+      border-color: #2E8BC0;
+      background-color: #F0F9FC;
+      border-width: 3px;
+    }
+
+    .meter-block h4 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 12px;
+      text-align: center;
+      border-bottom: 2px solid #D1D1D1;
+      padding-bottom: 8px;
+    }
+
+    .meter-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .detail-label {
+      font-size: 16px;
+      color: #333333;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      font-size: 17px;
+      color: #000000;
+      font-weight: 600;
+      text-align: right;
+      word-break: break-word;
+      min-width: 120px;
+    }
+
+    .select-btn {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #45B0E1;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+      touch-action: manipulation;
+    }
+
+    .select-btn:hover {
+      background-color: #F0F9FC;
+    }
+
+    .select-btn:active {
+      background-color: #E0F4FA;
+    }
+
+    .select-btn:disabled {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .no-meters {
+      text-align: center;
+      color: #C62828;
+      font-size: 16px;
+      font-weight: 500;
+      padding: 12px;
+    }
+
+    .actions-section {
+      padding: 16px 20px 24px; 
+      background-color: #D1D1D1; 
+      border-top: 2px solid #45B0E1;
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      gap: 12px;
+    }
+
+    .action-buttons {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      text-align: center;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+
+    button:active {
+      background-color: #1A6B96;
+      border-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+
+    .btn-secondary:active {
+      background-color: #E0F4FA;
+    }
+
+    .ContinueButton {
+      visibility: visible;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      .page-header h1 {
+        font-size: 22px;
+      }
+      
+      .content-card {
+        padding: 0;
+      }
+      
+      .address-section,
+      .meters-section,
+      .actions-section {
+        padding: 14px 16px;
+      }
+      
+      .address-part {
+        font-size: 17px;
+      }
+      
+      .detail-label {
+        font-size: 15px;
+      }
+      
+      .detail-value {
+        font-size: 16px;
+      }
+      
+      .select-btn {
+        min-height: 44px;
+        font-size: 15px;
+      }
+      
+      button {
+        min-height: 52px;
+        font-size: 17px;
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      
+      .detail-value {
+        text-align: left;
+        width: 100%;
+      }
+    }
+  </style>
+</html>

@@ -79,60 +79,6 @@ app.post('/auth', (req, res) => {
   });
 });
 
-app.post('/register', (req, res) => {
-  const { userpswd } = req.body; 
-  if (!userpswd) {
-    return res.status(400).json({ error: 'Missing userpswd' });
-  }
-  if (userpswd.length < 8) {
-    return res.status(400).json({ error: 'Пароль должен содержать минимум 8 символов' });
-  }
-  firebird.attach(config, (err, db) => {
-    if (err) {
-      console.error('DB connect error:', err);
-      return res.status(500).json({ error: 'DB connect error' });
-    }
-    const checkQuery = `SELECT 1 FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;
-    db.query(checkQuery, (err, result) => {
-      if (err) {
-        console.error('Check user error:', err);
-        db.detach();
-        return res.status(500).json({ error: 'Login error' });
-      }    
-      if (result.length > 0) {
-        db.detach();
-        return res.status(409).json({ error: 'Пользователь уже существует' });
-      }   
-      const token = crypto.randomBytes(32).toString('hex');
-      const authDate = Date.now();
-      const insertUser = `INSERT INTO CONTROLLERS (CONTROLLER_PSWD, TOKEN, AUTHDATE) VALUES (?, ?, ?)`;
-      db.query(insertUser, [userpswd, token, authDate], (err) => {
-        if (err) {
-          console.error('Insert user error:', err);
-          db.detach();
-          return res.status(500).json({ error: 'Unable to create user' });
-        }                        
-        const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;
-        db.query(meterQuery, (err, meterResult) => {
-          const meterNum = meterResult?.[0]?.METER_NUM || null;
-          const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
-          const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;        
-          db.detach();
-          res.status(201).json({ 
-            status: 'OK', 
-            token, 
-            authDate,
-            meterNum,
-            mountDate,
-            verifyDate,
-            message: 'User registered successfully'
-          });     
-        });
-      });
-    });
-  });
-});
-
 app.post('/update-token', (req, res) => {
   const { token } = req.body;  
   if (!token) {
