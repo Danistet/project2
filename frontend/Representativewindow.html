@@ -3,22 +3,22 @@
   <head>
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Выбор владельца лицевого счета</title>
+    <title>Выбор представителя владельца лицевого счета</title>
     <script src="./api.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   </head>
   <body>
-    <div class="page-wrapper">
+    <div id="app" class="page-wrapper">
       <header class="page-header">
         <h1>Введите инициалы представителя владельца лицевого счета</h1>
         <div id="error" class="error-message"></div>
       </header>
       <main class="content-card">
-        <input placeholder="ФИО представителя  владельца" class="form-input">
-        <input placeholder="номер телефона представителя" class="form-input">
-        <input placeholder="адрес электронной почты представителя" class="form-input">
+        <input v-model="name" placeholder="ФИО представителя  владельца" class="form-input">
+        <input v-model="phone" maxlength="20" placeholder="номер телефона представителя" class="form-input">
+        <input v-model="mail" placeholder="адрес электронной почты представителя" class="form-input">
         <section class="actions-section">
-          <button onclick="cont()" id="ContinueButton" class="ContinueButton">Продолжить</button>            
+          <button @click="cont" id="ContinueButton" class="ContinueButton">Продолжить</button>            
           <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>
         </section>
       </main>
@@ -26,9 +26,52 @@
   </body>
 
   <script>
-    function cont() {
-        window.location.href = 'BoilerWindow.html';
+    const {createApp, ref} = Vue;
+    createApp({
+      setup() {
+        const name = ref('');
+        const phone = ref('');
+        const mail = ref('');
+        const error = ref('');
+        const cont = async () => {
+          error.value = '';
+          if(!name.value.trim()) {
+            error.value = 'Введите имя';
+            return;
+          }
+          try {
+            const result = await apiRequest('/add-representative', {
+              name: name.value.trim(),
+              phone: phone.value.trim() || null,
+              mail: mail.value.trim() || null
+            });
+            if (result.status === 'OK') {
+              sessionStorage.setItem('representative', JSON.stringify({
+                id: result.id,
+                name: name.value.trim(),
+                phone: phone.value.trim(),
+                mail: mail.value.trim()
+              }));
+              window.location.href = 'BoilerWindow.html';        
+            } else {
+              error.value = result.error;
+            }
+          } catch (err) {
+            error.value = 'Ошибка' + (err.message);
+            console.error('Error:', err);        
+          }
+        };
+        return {
+          name,
+          phone,
+          mail,
+          error,
+          cont
+        };
       }
+    }).mount('#app');
+  </script>
+  <script>
     function logout() {
       window.location.href = 'checkownerwindow.html';
     }

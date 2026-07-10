@@ -79,6 +79,47 @@ app.post('/auth', (req, res) => {
   });
 });
 
+app.post('/add-representative', (req, res) => {
+  const {name, phone, mail} = req.body;
+  if(!name || !name.trim()) {
+    return res.status(400).json({ error: 'Missing Name'});
+  }
+  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  firebird.attach(config, (err, db) => {
+    if(err){
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+    const insertQuery = `
+      INSERT INTO CLIENTS (ID, NAME, PHONE, MAIL, IMPORT, CREATEDATE)
+      VALUES (GEN_ID(CLIENTS_GEN, 1), ?,?,?,1,?)
+      RETURNING ID
+    `;
+
+    db.query(insertQuery, [
+      name.trim(),
+      phone && phone.trim() ? phone.trim() : null,
+      mail && mail.trim() ? mail.trim() : null,
+      createdate
+    ], (err, result) =>{
+      db.detach();
+      if (err) {
+        console.error('Insert error', err);
+        return res.status(500).json({
+          error: 'unable to save data',
+          details: err.message
+        });
+      }
+      const newId = result && result[0] ? result[0].ID : null;
+      res.json({
+        status:  'OK',
+        message: 'Data saved',
+        id: newId
+      });
+    });
+  });
+});
+
 app.post('/update-token', (req, res) => {
   const { token } = req.body;  
   if (!token) {
@@ -193,6 +234,37 @@ app.post('/generate-act', (req, res) => {
   });
 });
 
+app.post('/update-act-building', (req, res) => {
+  const { actId, buildingId } = req.body;
+  if (!actId || !buildingId) {
+    return res.status(400).json({ error: 'actId и buildingId обязательны' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const updateQuery = `
+      UPDATE BUILD_MAINT_ACTS
+      SET BUILDING_ID = ?
+      WHERE ID = ?
+    `;
+    db.query(updateQuery, [buildingId, actId], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Update error:', err);
+        return res.status(500).json({ error: 'Update failed', details: err.message });
+      }
+      res.json({
+        status: 'OK',
+        message: 'BUILDING_ID успешно обновлён',
+        actId,
+        buildingId
+      });
+    });
+  });
+});
+
 app.post('/cities', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });
@@ -225,37 +297,6 @@ app.post('/streets', (req, res) => {
         id: r.ID, 
         name: `${r.STREET_TYPE} ${r.STREET}`.trim() 
       })));
-    });
-  });
-});
-
-app.post('/update-act-building', (req, res) => {
-  const { actId, buildingId } = req.body;
-  if (!actId || !buildingId) {
-    return res.status(400).json({ error: 'actId и buildingId обязательны' });
-  }
-  firebird.attach(config, (err, db) => {
-    if (err) {
-      console.error('DB connect error:', err);
-      return res.status(500).json({ error: 'Database connection failed' });
-    }
-    const updateQuery = `
-      UPDATE BUILD_MAINT_ACTS
-      SET BUILDING_ID = ?
-      WHERE ID = ?
-    `;
-    db.query(updateQuery, [buildingId, actId], (err, result) => {
-      db.detach();
-      if (err) {
-        console.error('Update error:', err);
-        return res.status(500).json({ error: 'Update failed', details: err.message });
-      }
-      res.json({
-        status: 'OK',
-        message: 'BUILDING_ID успешно обновлён',
-        actId,
-        buildingId
-      });
     });
   });
 });
