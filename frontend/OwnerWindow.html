@@ -8,17 +8,17 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   </head>
   <body>
-    <div class="page-wrapper">
+    <div id="app" class="page-wrapper">
       <header class="page-header">
         <h1>Инициалы владельца лицевого счета</h1>
         <div id="error" class="error-message"></div>
       </header>
       <main class="content-card">
-        <input placeholder="ФИО  владельца" class="form-input">
-        <input placeholder="номер телефона" class="form-input">
-        <input placeholder="адрес электронной почты" class="form-input">
+        <input v-model="ownerName" placeholder="ФИО владельца" class="form-input">
+        <input v-model="phone" maxlength="20" placeholder="номер телефона" class="form-input">
+        <input v-model="mail" placeholder="адрес электронной почты" class="form-input">
         <section class="actions-section">
-          <button onclick="cont()" id="ContinueButton" class="ContinueButton">Продолжить</button>            
+          <button @click="cont" id="ContinueButton" class="ContinueButton">Продолжить</button>            
           <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>
         </section>
       </main>
@@ -26,9 +26,69 @@
   </body>
 
   <script>
-    function cont() {
-        window.location.href = 'BoilerWindow.html';
-      }
+    const {createApp, ref, onMounted} = Vue;
+    createApp({
+        setup() {
+            const ownerName = ref('');
+            const phone = ref('');
+            const mail = ref('');
+            const error = ref('');
+            const g_licschet = ref(null);
+            const clientId = ref(null);
+            onMounted(async () => {                
+                const userAddress = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+                const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
+                g_licschet.value = userAddress.g_licschet || licschetData.g_licschet;             
+                if (!g_licschet.value) {
+                    error.value = 'no licschet';
+                    return;
+                }             
+                try {
+                    const result = await apiRequest('/get-owner-data', { g_licschet: g_licschet.value });
+                    if (result.found) {
+                    ownerName.value = result.ownerName || '';
+                    phone.value = result.phone || '';
+                    mail.value = result.mail || '';
+                    clientId.value = result.clientId;
+                    } else {
+                    error.value = 'Данные владельца не найдены в БД';
+                    }
+                } catch (err) {
+                    error.value = 'Ошибка загрузки: ' + (err.message || 'Неизвестная ошибка');
+                    console.error(err);
+                }
+            });
+            const cont = async () => {
+                error.value = '';
+                if (!ownerName.value.trim()) {
+                    error.value = 'Введите ФИО владельца';
+                    return;
+                }                
+                try {
+                    const result = await apiRequest('/update-owner-data', {
+                    g_licschet: g_licschet.value,
+                    clientId: clientId.value,
+                    ownerName: ownerName.value.trim(),
+                    phone: phone.value.trim() || null,
+                    mail: mail.value.trim() || null
+                    });                 
+                    if (result.status === 'OK') {
+                    window.location.href = 'BoilerWindow.html';
+                    } else {
+                    error.value = result.error || 'Ошибка сохранения';
+                    }
+                } catch (err) {
+                    error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+                    console.error(err);
+                }  
+            };
+            return {
+                    ownerName, phone, mail, error, cont
+            };
+        }
+    }).mount('#app');
+  </script>
+  <script>
     function logout() {
       window.location.href = 'checkownerwindow.html';
     }

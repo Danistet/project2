@@ -95,7 +95,6 @@ app.post('/add-representative', (req, res) => {
       VALUES (GEN_ID(CLIENTS_GEN, 1), ?,?,?,1,?)
       RETURNING ID
     `;
-
     db.query(insertQuery, [
       name.trim(),
       phone && phone.trim() ? phone.trim() : null,
@@ -118,6 +117,76 @@ app.post('/add-representative', (req, res) => {
       });
     });
   });
+});
+
+app.post('/get-owner-data', (req, res) => {
+  const { g_licschet } =req.body;
+  if (!g_licschet)
+  {
+    return res.status(400).json({error: 'g_licschet required'});
+  }
+  firebird.attach(config, (err, db) =>{
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({error: 'Database connection error'});
+    }
+    const query = `
+      SELECT 
+        C.NAME AS OWNER_NAME,
+        C.PHONE,
+        C.MAIL,
+        C.ID AS CLIENT_ID
+      FROM ABONENTS A
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      WHERE A.G_LICSCHET = ? 
+    `;
+    db.query(query, [g_licschet], (err, result) => {
+      db.detach();
+      if (err)
+      {
+        console.error('Query error', err);
+        return res.status(500).json({error: 'Query failed'});
+      }
+      if (result.length === 0)
+      {
+        return res.json({ found: false }); 
+      }
+      res.json({
+        found: true,
+        ownerName: result[0].OWNER_NAME,
+        phone: result[0].PHONE,
+        mail: result[0].MAIL,
+        clientId: result[0].CLIENT_ID 
+      });
+    });
+  });
+});
+
+app.post('/update-owner-data', (req, res) => {
+  const { g_licschet, clientId, ownerName, phone, mail } = req.body;
+  if (!g_licschet) {
+    return res.status(400).json({ error: 'g_licschet required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+    if (clientId) {
+      const updateClientQuery = `UPDATE CLIENTS SET NAME = ?, PHONE = ?, MAIL = ? WHERE ID = ?`;
+      db.query(updateClientQuery, [ownerName, phone, mail, clientId], (err) => {
+        db.detach();
+        if (err) {
+          console.error('Update client error:', err);
+          return res.status(500).json({ error: 'Update failed', details: err.message });
+        }
+        res.json({ status: 'OK', message: 'Data updated' });
+      });
+    } else {
+      db.detach();
+      res.json({ status: 'OK', message: 'Data updated (no client records)' });
+    }
+  });  
 });
 
 app.post('/update-token', (req, res) => {
