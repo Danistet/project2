@@ -44,14 +44,15 @@
     const { createApp, ref, onMounted } = Vue;
     createApp({
       setup() {
-        const showOverlay = ref(true);
+       // const showOverlay = ref(true);
+        const showOverlay = ref(false);
         const actNo = ref('');
         const actDate = ref('');
         const checkType = ref('planned');
         const error = ref('');
         const loadAct = async () => {
           try {
-            const result = await apiRequest('/generate-act', {});            
+           // const result = await apiRequest('/generate-act', {});            
             actNo.value = result.actNo;
             actDate.value = result.actDate;
             sessionStorage.setItem('currentAct', JSON.stringify({

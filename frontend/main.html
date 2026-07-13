@@ -72,7 +72,7 @@
                     <span class="detail-label">Дата проверки:</span>
                     <input v-model="editData.verifyDate" type="date" class="edit-input">
                   </div>                  
-                  <button @click="saveMeterData" class="save-btn" :disabled="saving">
+                  <button @click="saveMeterData" class="save-btn" :disabled="saving" v-if="!showContinue">
                     {{ saving ? 'Сохранение...' : 'Сохранить изменения' }}
                   </button>
                 </template>                
@@ -104,11 +104,11 @@
         <section class="actions-section">
           <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">
             Продолжить
-          </button>
-          <div id="actionButtons" class="action-buttons" v-if="selectedMeterId">
+          </button>          
+          <div id="actionButtons" class="action-buttons" v-if="selectedMeterId && !showContinue">
             <button @click="info" id="infbt" class="btn-primary">Показания</button>
-          </div>
-          <button @click="logout" id="changebutton" class="btn-secondary">Сменить адрес</button>
+          </div>          
+          <button @click="logout" id="changebutton" class="btn-secondary" v-if="!showContinue">Сменить адрес</button>
         </section>
       </main>
     </div>
@@ -344,7 +344,7 @@
             loadAddressDisplay();
             await loadMeters();
             checkSession();
-            bindBuildingToAct();
+           // bindBuildingToAct();
           });          
           return {
             meters,
