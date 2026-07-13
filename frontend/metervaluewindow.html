@@ -24,6 +24,7 @@
             <span id="PH" class="info-value">нет данных</span>
           </div>
         </section>
+        
         <section class="form-section">
           <label for="newPH" class="form-label">Текущее показание:</label>
           <input 
@@ -35,17 +36,50 @@
             inputmode="decimal" 
             placeholder="0,000"
             class="form-input"
-          >      
-          <div class="button-group">
-            <button @click="NewPH" class="btn-primary">Передать</button>
-           <!-- <button onclick="violation()" class="btn-primary">Список нарушений</button>    -->        
-            <label class="form-label checkbox-label">
-              <input type="checkbox" id="appartscheck" v-model="showApparts" class="form-checkbox">
-              <span class="checkbox-text">Список нарушений</span>
-            </label>
-            <button onclick="main()" class="btn-secondary">Назад</button>
-          </div>
+          > 
+          <label class="form-label checkbox-label">
+            <!-- Убран v-model="showApparts", так как управление будет через Vanilla JS для надёжности -->
+            <input type="checkbox" id="appartscheck" class="form-checkbox">
+            <span class="checkbox-text">Список нарушений</span>
+          </label>     
         </section>
+
+        <!-- ИЗМЕНЕНО: Форма с нарушениями изначально скрыта (style="display: none;") и использует select вместо input -->
+        <form novalidate id="violationsForm" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">Механические повреждения</label>
+            <select class="form-input" id="violation1">
+              <option value="" disabled selected>Выберите нарушение</option>
+              <option value="не плотное прилегание стекла индикатора">не плотное прилегание стекла индикатора</option>
+              <option value="не предусмотренные изготовителем отверстия или трещины">не предусмотренные изготовителем отверстия или трещины</option>
+              <option value="нарушения контрольных пломб">нарушения контрольных пломб</option>
+            </select>            
+          </div>
+          <div class="form-group">
+            <label class="form-label">2</label>
+            <select class="form-input" id="violation2">
+              <option value="" disabled selected>Выберите нарушение</option>
+              <option value="не отображение приборами учета результатов измерений">не отображение приборами учета результатов измерений</option>
+              <option value="">-- не указано --</option>
+            </select>            
+          </div>
+          <div class="form-group">
+            <label class="form-label">3</label>
+            <select class="form-input" id="violation3">
+              <option value="" disabled selected>Выберите нарушение</option>
+              <option value="истечение межповерочного интервала поверки">истечение межповерочного интервала поверки</option>
+              <option value="">-- не указано --</option>
+            </select>            
+          </div>
+          <div class="button-group">
+            <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>            
+          </div>
+        </form>
+
+        <div class="button-group">
+          <button @click="NewPH" class="btn-primary">Передать</button>                             
+          <button onclick="main()" class="btn-secondary">Назад</button>
+        </div>
       </main>
     </div>
 
@@ -64,7 +98,9 @@
         }
         return str.replace('.', ',');
       }
+
       document.addEventListener('DOMContentLoaded', () => {
+        // Логика форматирования поля показаний
         const inputPH = document.getElementById('newPH');
         if (inputPH) {
           inputPH.addEventListener('blur', (e) => {
@@ -72,6 +108,24 @@
           });
           inputPH.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
+          });
+        }
+
+        // ИЗМЕНЕНО: Логика показа/скрытия списка нарушений
+        const appartsCheck = document.getElementById('appartscheck');
+        const violationsForm = document.getElementById('violationsForm');
+        
+        if (appartsCheck && violationsForm) {
+          appartsCheck.addEventListener('change', function() {
+            if (this.checked) {
+              violationsForm.style.display = 'block';
+            } else {
+              violationsForm.style.display = 'none';
+              // Очищаем выбранные значения при снятии галочки (опционально)
+              document.getElementById('violation1').value = "";
+              document.getElementById('violation2').value = "";
+              document.getElementById('violation3').value = "";
+            }
           });
         }
       });
