@@ -23,6 +23,7 @@
         <div class="button-group">
           <button @click="login" class="btn-primary">Войти</button>
         </div>    
+        <input type="file" accept=".pdf">
         <p v-if="response" class="response-message">{{ response }}</p>
         <p v-if="error" class="error-message">{{ error }}</p>
       </div>

@@ -13,35 +13,49 @@
       <div class="form-container">
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" v-model="checkType" value="planned" />
+            <input type="radio" v-model="boilerStatus" value="present" />
             <span>В наличии</span>
           </label>
           <label class="radio-label">
-            <input type="radio" v-model="checkType" value="unscheduled" />
+            <input type="radio" v-model="boilerStatus" value="absent" />
             <span>Отсутствует</span>
           </label>
         </div>
-        <button onclick="continueAction()" class="btn-primary">Продолжить</button>
-        <button onclick="logout()" class="btn-secondary">Назад</button>
+        <button @click="continueAction" class="btn-primary">Продолжить</button>
+        <button @click="logout" class="btn-secondary">Назад</button>
         <p v-if="error" class="error-message">{{ error }}</p>
       </div>
     </div>
   </body>
-  <script>
-    function logout()
-    {
-      window.location.href = 'checkownerwindow.html';
-    }
-    function continueAction()
-    {
-      window.location.href = 'main.html';
-    }
-  </script>
-  <script>
- 
+   <script>
+    const { createApp, ref } = Vue;
+    createApp({
+      setup() {
+        const boilerStatus = ref('');
+        const error = ref('');
+        const continueAction = () => {
+          error.value = '';
+          if (!boilerStatus.value) {
+            error.value = 'Выберите статус бойлера';
+            return;
+          }
+          sessionStorage.setItem('boilerStatus', boilerStatus.value);
+          window.location.href = 'main.html';
+        };
+        const logout = () => {
+          window.location.href = 'checkownerwindow.html';
+        };
+        return {
+          boilerStatus,
+          error,
+          continueAction,
+          logout
+        };
+      }
+    }).mount('#app');
   </script>
   <style>
-      * {
+      * { 
         box-sizing: border-box;
         margin: 0;
         padding: 0;

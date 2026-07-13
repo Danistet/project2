@@ -781,6 +781,101 @@ app.get('/PH/last', (req, res) => {
   });
 });
 
+app.post('/get-meter-details', (req, res) => {
+  const {meterId} = req.body;
+  if (!meterId)
+  {
+    return res.status(400).json({error: 'meterId required'});
+  }
+  firebird.attach(config, (err,db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query =`
+      SELECT
+      M.ID,
+      M.METER_NUM,
+      M.NAME,
+      M.SEAL,
+      M.MANFDATE,
+      M.MOUNT_DATE,
+      M.VERIFY_DATE,
+      M.LS
+      FROM METERS M
+      WHERE M.ID = ?
+    `;
+    db.query(query, [meterId], (err, result) => {
+      db.detach();
+      if (err)
+      {
+        console.error('Query error', err);
+        return res.status(500).json({error: 'Query failed'});
+      }
+      if (result === 0)
+      {
+        return res.json({found: false});
+      }
+      res.json({
+        found: true,
+        id: result[0].ID,
+        meterNum: result[0].METER_NUM,
+        name: result[0].NAME,
+        seal: result[0].SEAL,
+        manfDate: result[0].MANFDATE,
+        mountDate: result[0].MOUNT_DATE,
+        verifyDate: result[0].VERIFY_DATE,
+        licschet: result[0].LS
+      });
+    });
+  });
+});
+
+app.post('/update-meter', (req, res) => {
+  const { meterId, meterNum, name, seal, manfDate, mountDate, verifyDate} = req.body;
+  if (!meterId)
+  {
+    return res.status(400).json({error: 'meterId required'});
+  }
+  firebird.attach(config, (err,db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const updateQuery =`
+      UPDATE METERS
+      SET
+        METER_NUM = ?,
+        NAME = ?,
+        SEAL = ?,
+        MANFDATE = ?,
+        MOUNT_DATE = ?,
+        VERIFY_DATE = ?
+      WHERE ID = ?  
+    `;
+    db.query(updateQuery, [
+      meterNum || null,
+      name || null,
+      seal || null,
+      manfDate || null,
+      mountDate || null,
+      verifyDate || null,
+      meterId
+    ], (err) => {
+      db.detach();
+      if (err)
+      {
+        console.error('Update error', err);
+        return res.status(500).json({error: 'Update error', details: err.message});
+      }
+      res.json({
+        status: 'OK',
+        message: 'Data updated'
+      });
+    });
+  });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
