@@ -27,7 +27,7 @@ const upload = multer({
   limits: {fileSize: 10 * 1024 * 1024}
 });
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); 
 
 
 app.post('/auth', (req, res) => {
@@ -711,15 +711,14 @@ app.post('/PH', upload.single('file'), (req, res) => {
   const { ph, meter_id, licschet, abonent_name, description } = req.body;
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id обязательны' });
-  }
-  // Форматируем текущую дату в формат, совместимый с Firebird (YYYY-MM-DD HH:MM:SS)
-  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  }  
+  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
-    }
-    const checkQuery = `SELECT ID FROM METERS WHERE METER_NUM = ?`; 
+    }  
+    const checkQuery = `SELECT ID, LS FROM METERS WHERE METER_NUM = ?`;     
     db.query(checkQuery, [meter_id], (err, checkResult) => {
       if (err) {
         db.detach();
@@ -729,61 +728,53 @@ app.post('/PH', upload.single('file'), (req, res) => {
       if (checkResult.length === 0) {
         db.detach();
         return res.status(404).json({ error: 'Счётчик не найден' });
-      }
+      }      
       const meterDbId = checkResult[0].ID;
       const dbLicschet = checkResult[0].LS;
-      const taergetLicschet = licschet || dbLicschet;
+      const targetLicschet = licschet || dbLicschet;      
       const insertQuery = `
         INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
         VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
-      `;          
-      db.query(insertQuery, [ph, meter_id, createdate], (err) => {
-        db.detach();  
+      `;                      
+      db.query(insertQuery, [ph, meterDbId, createdate], (err) => {
         if (err) {
+          db.detach();
           console.error('Insert error:', err);
           return res.status(500).json({ 
             error: 'Не удалось сохранить показание',
             details: err.message
           });
-        }
+        }        
         if (req.file) {
           const fileName = req.file.originalname;
           const fileSize = req.file.size.toString();
           const desc = description ? String(description).substring(0, 40) : 'Нарушение';
           const abName = abonent_name ? String(abonent_name).substring(0, 120) : '';
+          
           const insertFileQuery = `
             INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
-            VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?,?,?,?,?,?)
-          `;
-          db.query(insertFileQuery, [taergetLicschet, fileName, createdate, desc, abName, fileSize], (fileErr) => {
+            VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
+          `;          
+          db.query(insertFileQuery, [targetLicschet, fileName, createdate, desc, abName, fileSize], (fileErr) => {
             db.detach();
-            if (fileErr)
-            {
+            if (fileErr) {
               console.error('Insert file error', fileErr);
-              return res.status(500).json({error: 'file error:', details: fileErr.message});              
+              return res.status(500).json({ error: 'file error:', details: fileErr.message });              
             }
             res.json({
               status: 'OK',
               message: 'Показания и файл успешно сохранены',
               action: 'INSERT',
-              data: {
-                ph,
-                meter_id,
-                createdate,
-                fileName
-              }
+              data: { ph, meter_id, createdate, fileName }
             });
           });
         } else {
+          db.detach();
           res.json({
             status: 'OK',
             message: 'Показание сохранено',
             action: 'INSERT',
-            data: { 
-              ph, 
-              meter_id, 
-              createdate 
-            }
+            data: { ph, meter_id, createdate }
           });         
         }        
       });

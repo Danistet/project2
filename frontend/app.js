@@ -103,26 +103,55 @@ createApp({
         if (isNaN(numericValue)) {
           alert('Некорректное число');
           return;
-        }   
-        // сначала ищем 'activeMeter', если нет - берём 'meternum', если и его нет - пустой объект.     
+        }         
         const meterData = JSON.parse(sessionStorage.getItem('activeMeter') || sessionStorage.getItem('meternum') || '{}');
-        const meter_id = meterData.meterNum;;            
+        const meter_id = meterData.meterNum;            
         if (!meter_id) {
           alert('Не найден серийный номер счётчика');
           return;
-        }
-        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));
-        PH.value = formatted;
-        const result = await apiRequest('/PH', { 
-          ph: numericValue,
-          meter_id: meter_id 
-        });               
-        alert((result.message || 'Показания переданы'));  
+        }        
+        const formData = new FormData();
+        formData.append('ph', numericValue);
+        formData.append('meter_id', meter_id);
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput?.files?.[0];
+        const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+        const licschet = addressData.g_licschet || meterData.licschet || '';                
+        formData.append('licschet', licschet);
+        formData.append('abonent_name', addressData.town || '');
+        formData.append('description', 'NARUSHENIE');        
+        if (file) {
+          formData.append('file', file);
+        }        
+        const response = await fetch('http://localhost:3000/PH', {
+          method: 'POST',
+          body: formData
+        });        
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || `HTTP error, status: ${response.status}`);
+        }        
+        alert(result.message || 'Показания переданы');          
         const phElement = document.getElementById('PH');
         if (phElement) {
           phElement.textContent = formatted;
         }
-        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));     
+        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));                
+        if (fileInput) {
+          fileInput.value = '';
+          fileInput.classList.remove('file-selected');
+        }             
+        const violationsForm = document.getElementById('violationsForm');
+        if (violationsForm) {
+          violationsForm.style.display = 'none';
+          const appartsCheck = document.getElementById('appartscheck'); // исправлено на строчную 'c'
+          if (appartsCheck) {
+            appartsCheck.checked = false;
+          }
+          document.getElementById('violation1').value = "";
+          document.getElementById('violation2').value = "";
+          document.getElementById('violation3').value = "";
+        }
       } catch (err) {
         console.error('Error:', err);
         alert('error: ' + (err.message || 'Неизвестная ошибка'));
