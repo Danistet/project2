@@ -23,8 +23,7 @@
             <span class="info-label">Предыдущее показание:</span>
             <span id="PH" class="info-value">нет данных</span>
           </div>
-        </section>
-        
+        </section>  
         <section class="form-section">
           <label for="newPH" class="form-label">Текущее показание:</label>
           <input 
@@ -37,14 +36,12 @@
             placeholder="0,000"
             class="form-input"
           > 
-          <label class="form-label checkbox-label">
-            <!-- Убран v-model="showApparts", так как управление будет через Vanilla JS для надёжности -->
+          <label class="form-label checkbox-label">            
             <input type="checkbox" id="appartscheck" class="form-checkbox">
             <span class="checkbox-text">Список нарушений</span>
           </label>     
         </section>
-
-        <!-- ИЗМЕНЕНО: Форма с нарушениями изначально скрыта (style="display: none;") и использует select вместо input -->
+        
         <form novalidate id="violationsForm" style="display: none;">
           <div class="form-group">
             <label class="form-label">Механические повреждения</label>
@@ -60,7 +57,7 @@
             <select class="form-input" id="violation2">
               <option value="" disabled selected>Выберите нарушение</option>
               <option value="не отображение приборами учета результатов измерений">не отображение приборами учета результатов измерений</option>
-              <option value="">-- не указано --</option>
+              <option value="">не указано</option>
             </select>            
           </div>
           <div class="form-group">
@@ -68,15 +65,17 @@
             <select class="form-input" id="violation3">
               <option value="" disabled selected>Выберите нарушение</option>
               <option value="истечение межповерочного интервала поверки">истечение межповерочного интервала поверки</option>
-              <option value="">-- не указано --</option>
+              <option value="">не указано</option>
             </select>            
           </div>
           <div class="button-group">
-            <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>            
+            <label class="form-label">Прикрепить фото нарушения</label>
+            <input type="file" id="fileInput" accept="image/png">
+            <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>                        
           </div>
         </form>
 
-        <div class="button-group">
+        <div class="button-group">          
           <button @click="NewPH" class="btn-primary">Передать</button>                             
           <button onclick="main()" class="btn-secondary">Назад</button>
         </div>
@@ -99,8 +98,7 @@
         return str.replace('.', ',');
       }
 
-      document.addEventListener('DOMContentLoaded', () => {
-        // Логика форматирования поля показаний
+      document.addEventListener('DOMContentLoaded', () => {        
         const inputPH = document.getElementById('newPH');
         if (inputPH) {
           inputPH.addEventListener('blur', (e) => {
@@ -109,19 +107,15 @@
           inputPH.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
           });
-        }
-
-        // ИЗМЕНЕНО: Логика показа/скрытия списка нарушений
+        }        
         const appartsCheck = document.getElementById('appartscheck');
-        const violationsForm = document.getElementById('violationsForm');
-        
+        const violationsForm = document.getElementById('violationsForm');        
         if (appartsCheck && violationsForm) {
           appartsCheck.addEventListener('change', function() {
             if (this.checked) {
               violationsForm.style.display = 'block';
             } else {
-              violationsForm.style.display = 'none';
-              // Очищаем выбранные значения при снятии галочки (опционально)
+              violationsForm.style.display = 'none';              
               document.getElementById('violation1').value = "";
               document.getElementById('violation2').value = "";
               document.getElementById('violation3').value = "";
@@ -236,6 +230,21 @@
       window.addEventListener('DOMContentLoaded', () => {
         loadMeterData();
         loadPreviousPHFromAPI(); 
+      });
+    </script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const fileInput = document.getElementById('fileInput');    
+        if (fileInput) {
+          fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {          
+              this.classList.add('file-selected');          
+              console.log('Выбран файл:', this.files[0].name);
+            } else {          
+              this.classList.remove('file-selected');
+            }
+          });
+        }
       });
     </script>
   </body>
@@ -444,6 +453,76 @@
       font-size: 17px;
       font-weight: 500;
       color: #333333;
+    }
+
+    #fileInput {
+      width: 100%;
+      max-width: 320px; /* Совпадает с шириной кнопок */
+      min-height: 56px;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #333333;
+      background-color: #FFFFFF;
+      border: 2px solid #D1D1D1; /* Вторичный цвет для спокойного состояния */
+      border-radius: 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    #fileInput:hover {
+      border-color: #45B0E1; /* При наведении активируется основной цвет */
+      background-color: #F8FDFF;
+    }
+
+    #fileInput:active {
+      background-color: #E0F4FA;
+    }
+    
+    #fileInput::file-selector-button {
+      background-color: #45B0E1;
+      color: #FFFFFF;
+      border: none;
+      padding: 10px 20px;
+      margin-right: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background-color 0.15s ease, transform 0.05s ease;
+      white-space: nowrap;
+    }
+
+    #fileInput::file-selector-button:hover {
+      background-color: #2E8BC0;
+    }
+
+    #fileInput::file-selector-button:active {
+      background-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    #fileInput.file-selected {
+      border-style: solid;
+      border-color: #45B0E1;
+      background-color: #F8FDFF;
+    }
+    
+    @media (max-width: 480px) {
+      #fileInput {
+        min-height: 52px;
+        font-size: 15px;
+        padding: 10px 14px;
+        max-width: 100%;
+      }
+      
+      #fileInput::file-selector-button {
+        padding: 8px 16px;
+        font-size: 15px;
+        margin-right: 12px;
+      }
     }
 
     @media (max-width: 480px) {

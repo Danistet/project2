@@ -1,4 +1,7 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const firebird = require('node-firebird');
 const crypto = require('crypto');
 const cors = require('cors');
@@ -6,6 +9,23 @@ const config = require('./config');
 const { error } = require('console');
 const app = express();
 const PORT = 3000;
+
+const uploadDir = path.join(__dirname, 'images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, {recursive: true});
+}
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function(req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
+const upload = multer({
+  storage: storage,
+  limits: {fileSize: 10 * 1024 * 1024}
+});
 app.use(cors());
 app.use(express.json());
 
@@ -687,8 +707,8 @@ app.post('/meters-by-building', (req, res) => {
   });
 });
 
-app.post('/PH', (req, res) => {
-  const { ph, meter_id } = req.body;
+app.post('/PH', upload.single('file'), (req, res) => {
+  const { ph, meter_id, licschet, abonent_name, description } = req.body;
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id обязательны' });
   }
@@ -710,6 +730,9 @@ app.post('/PH', (req, res) => {
         db.detach();
         return res.status(404).json({ error: 'Счётчик не найден' });
       }
+      const meterDbId = checkResult[0].ID;
+      const dbLicschet = checkResult[0].LS;
+      const taergetLicschet = licschet || dbLicschet;
       const insertQuery = `
         INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
         VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
@@ -723,16 +746,46 @@ app.post('/PH', (req, res) => {
             details: err.message
           });
         }
-        res.json({
-          status: 'OK',
-          message: 'Показание сохранено',
-          action: 'INSERT',
-          data: { 
-            ph, 
-            meter_id, 
-            createdate 
-          }
-        });
+        if (req.file) {
+          const fileName = req.file.originalname;
+          const fileSize = req.file.size.toString();
+          const desc = description ? String(description).substring(0, 40) : 'Нарушение';
+          const abName = abonent_name ? String(abonent_name).substring(0, 120) : '';
+          const insertFileQuery = `
+            INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
+            VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?,?,?,?,?,?)
+          `;
+          db.query(insertFileQuery, [taergetLicschet, fileName, createdate, desc, abName, fileSize], (fileErr) => {
+            db.detach();
+            if (fileErr)
+            {
+              console.error('Insert file error', fileErr);
+              return res.status(500).json({error: 'file error:', details: fileErr.message});              
+            }
+            res.json({
+              status: 'OK',
+              message: 'Показания и файл успешно сохранены',
+              action: 'INSERT',
+              data: {
+                ph,
+                meter_id,
+                createdate,
+                fileName
+              }
+            });
+          });
+        } else {
+          res.json({
+            status: 'OK',
+            message: 'Показание сохранено',
+            action: 'INSERT',
+            data: { 
+              ph, 
+              meter_id, 
+              createdate 
+            }
+          });         
+        }        
       });
     });
   });
