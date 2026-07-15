@@ -17,7 +17,7 @@ createApp({
     const selectedBuildingId = ref(null);
     const selectedAppartId = ref(null);
     const houseInput = ref('');
-    const townSearch = ref('');
+    const townSearch = ref('ЛЯНТОР');
     const streetSearch = ref('');
     const houseSearch = ref('');
     const appartsSearch = ref('');
@@ -162,7 +162,7 @@ createApp({
     // В зависимости от режима (с квартирой или без) загружает список подходящих счётчиков
     // и перенаправляет пользователя на main.html.
     const saveAddressAndContinue = async () => {
-      if (!townSearch.value?.trim() || !selectedTownId.value) {
+    if (!townSearch.value?.trim() || !selectedTownId.value) {
      alert("Выберите город из списка");
         document.getElementById('townInput')?.focus();
         return;
@@ -555,7 +555,7 @@ createApp({
         sessionStorage.setItem('meternum', JSON.stringify(meterNum));
         sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
         sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
-        window.location.href = 'checktypewindow.html'; 
+        window.location.href = 'ActWindow.html'; 
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;
         console.error(err);

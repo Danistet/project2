@@ -21,11 +21,12 @@
               type="search" 
               id="townInput" 
               list="resultsTown" 
-              placeholder="Введите город" 
+              value="ЛЯНТОР"
+              placeholder="Введите город"               
               @input="onTownInput" 
               @change="onTownChange" 
               v-model="townSearch"
-              class="form-input"
+              class="form-input"              
               required
             >
             <datalist id="resultsTown">

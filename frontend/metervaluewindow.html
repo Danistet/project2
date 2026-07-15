@@ -70,7 +70,8 @@
           </div>
           <div class="button-group">
             <label class="form-label">Прикрепить фото нарушения</label>
-            <input type="file" id="fileInput" accept="image/png">
+            <input type="file" name="fileInput" id="fileInput" accept="image/png" multiple>
+            <div id="previewContainer"></div>
             <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>                        
           </div>          
         </form>
@@ -83,7 +84,7 @@
           <div class="form-group">
             <label class="form-label">ошибочная дата проверки</label>
             <select class="form-input" id="techcheck1">
-              <option value="" disabled selected></option>
+              <option value="" disabled selected>Выберите вариант</option>
               <option value="variant 1">variant 1</option>
               <option value="variant 2">variant 2</option>
               <option value="variant 3">variant 3</option>
@@ -92,15 +93,15 @@
           <div class="form-group">
             <label class="form-label">Серийный номер счетчика</label>
             <select class="form-input" id="techcheck2">
-              <option value="" disabled selected></option>
+              <option value="" disabled selected>Выберите вариант</option>
               <option value="1">1</option>
               <option value="">не указано</option>
             </select>            
           </div>
           <div class="form-group">
-            <label class="form-label">3</label>
+            <label class="form-label">333333</label>
             <select class="form-input" id="techcheck3">
-              <option value="" disabled selected></option>
+              <option value="" disabled selected>Выберите вариант</option>
               <option value="1">1</option>
               <option value="">не указано</option>
             </select>            
@@ -114,7 +115,36 @@
     </div>
 
     <script src="./app.js"></script>
+    <script>
+      const fileInput = document.getElementById('fileInput');
+      const previewContainer = document.getElementById('previewContainer');
 
+      fileInput.addEventListener('change', function() {
+        // Очищаем контейнер от старых превью при новом выборе
+        previewContainer.innerHTML = ''; 
+
+        // Превращаем List файлов в массив и перебираем
+        Array.from(this.files).forEach(file => {
+          // Проверяем, что это точно картинка
+          if (!file.type.startsWith('image/')) return; 
+
+          const reader = new FileReader();
+
+          // Когда файл прочитан, создаем элемент img
+          reader.onload = function(event) {
+            const img = document.createElement('img');
+            img.src = event.target.result;
+            img.classList.add('preview-image');
+            
+            // Добавляем картинку на экран
+            previewContainer.appendChild(img);
+          };
+
+          // Читаем файл как Base64 строку
+          reader.readAsDataURL(file); 
+        });
+      });
+    </script>
     <script>
       function formatWithThousands(value) {
         if (!value && value !== 0) return '';
@@ -502,14 +532,14 @@
 
     #fileInput {
       width: 100%;
-      max-width: 320px; /* Совпадает с шириной кнопок */
+      max-width: 320px;
       min-height: 56px;
       padding: 12px 16px;
       font-size: 16px;
       font-weight: 500;
       color: #333333;
       background-color: #FFFFFF;
-      border: 2px solid #D1D1D1; /* Вторичный цвет для спокойного состояния */
+      border: 2px solid #D1D1D1;
       border-radius: 0;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -518,7 +548,7 @@
     }
 
     #fileInput:hover {
-      border-color: #45B0E1; /* При наведении активируется основной цвет */
+      border-color: #45B0E1;
       background-color: #F8FDFF;
     }
 
@@ -553,6 +583,21 @@
       border-style: solid;
       border-color: #45B0E1;
       background-color: #F8FDFF;
+    }
+
+    #previewContainer {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .preview-image {
+      width: 100%;
+      aspect-ratio: 1 / 1; 
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #ccc;
     }
     
     @media (max-width: 480px) {
