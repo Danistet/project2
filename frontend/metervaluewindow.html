@@ -40,8 +40,8 @@
             <input type="checkbox" id="appartscheck" class="form-checkbox">
             <span class="checkbox-text">Список нарушений</span>
           </label>     
-        </section>
-        
+        </section>  
+
         <form novalidate id="violationsForm" style="display: none;">
           <div class="form-group">
             <label class="form-label">Механические повреждения</label>
@@ -72,9 +72,40 @@
             <label class="form-label">Прикрепить фото нарушения</label>
             <input type="file" id="fileInput" accept="image/png">
             <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>                        
-          </div>
+          </div>          
         </form>
 
+        <label class="form-label checkbox-label">            
+          <input type="checkbox" id="techcheck" class="form-checkbox">
+          <span class="checkbox-text">технические некоректности</span>
+        </label>  
+        <form novalidate id="techcheckForm" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">ошибочная дата проверки</label>
+            <select class="form-input" id="techcheck1">
+              <option value="" disabled selected></option>
+              <option value="variant 1">variant 1</option>
+              <option value="variant 2">variant 2</option>
+              <option value="variant 3">variant 3</option>
+            </select>            
+          </div>
+          <div class="form-group">
+            <label class="form-label">Серийный номер счетчика</label>
+            <select class="form-input" id="techcheck2">
+              <option value="" disabled selected></option>
+              <option value="1">1</option>
+              <option value="">не указано</option>
+            </select>            
+          </div>
+          <div class="form-group">
+            <label class="form-label">3</label>
+            <select class="form-input" id="techcheck3">
+              <option value="" disabled selected></option>
+              <option value="1">1</option>
+              <option value="">не указано</option>
+            </select>            
+          </div>
+        </form>
         <div class="button-group">          
           <button @click="NewPH" class="btn-primary">Передать</button>                             
           <button onclick="main()" class="btn-secondary">Назад</button>
@@ -119,6 +150,20 @@
               document.getElementById('violation1').value = "";
               document.getElementById('violation2').value = "";
               document.getElementById('violation3').value = "";
+            }
+          });
+        }
+        const techCheck = document.getElementById('techcheck');
+        const techcheckForm = document.getElementById('techcheckForm');
+        if (techCheck && techcheckForm) {
+          techCheck.addEventListener('change', function() {
+            if (this.checked) {
+              techcheckForm.style.display = 'block';
+            } else {
+              techcheckForm.style.display = 'none';
+              document.getElementById('techcheck1').value = "";
+              document.getElementById('techcheck2').value = "";
+              document.getElementById('techcheck3').value = "";
             }
           });
         }
