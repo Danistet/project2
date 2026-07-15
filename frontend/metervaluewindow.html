@@ -133,7 +133,7 @@
           showError('Сессия не найдена');
           setTimeout(() => { window.location.href = 'index.html'; }, 2000);
           return;
-        }                   
+        }
         if (!authData.token) {
           showError('Некорректные данные сессии');
           clearSession();

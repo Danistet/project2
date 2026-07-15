@@ -16,7 +16,7 @@
       <main class="content-card">
         <input v-model="name" placeholder="ФИО представителя  владельца" class="form-input">
         <input v-model="phone" maxlength="20" placeholder="номер телефона представителя" class="form-input">
-        <input v-model="mail" placeholder="адрес электронной почты представителя" class="form-input">
+        <input v-model="mail" maxlength="20" placeholder="адрес электронной почты представителя" class="form-input">
         <section class="actions-section">
           <button @click="cont" id="ContinueButton" class="ContinueButton">Продолжить</button>            
           <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>

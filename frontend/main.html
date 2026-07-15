@@ -50,15 +50,15 @@
                 <template v-if="selectedMeterId === meter.id">
                   <div class="detail-row">
                     <span class="detail-label">Место установки:</span>
-                    <input v-model="editData.name" class="edit-input" placeholder="Место установки">
+                    <input v-model="editData.name" maxlength="60" class="edit-input" placeholder="Место установки">
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Номер прибора:</span>
-                    <input v-model="editData.meterNum" class="edit-input" placeholder="Номер прибора">
+                    <input v-model="editData.meterNum" maxlength="30" class="edit-input" placeholder="Номер прибора">
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Номер пломбы:</span>
-                    <input v-model="editData.seal" class="edit-input" placeholder="Номер пломбы">
+                    <input v-model="editData.seal" maxlength="16" class="edit-input" placeholder="Номер пломбы">
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Дата изготовления:</span>
@@ -389,7 +389,7 @@
       justify-content: flex-start;
       min-height: 100vh;
       width: 100%;
-      padding: 20px 16px;
+      padding: 20px 16px;            
     }
 
     .page-wrapper {

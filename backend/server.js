@@ -718,7 +718,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }  
-    const checkQuery = `SELECT ID, LS FROM METERS WHERE METER_NUM = ?`;     
+    const checkQuery = `SELECT ID, LS, METER_NUM FROM METERS WHERE METER_NUM = ?`;
     db.query(checkQuery, [meter_id], (err, checkResult) => {
       if (err) {
         db.detach();
@@ -729,14 +729,14 @@ app.post('/PH', upload.single('file'), (req, res) => {
         db.detach();
         return res.status(404).json({ error: 'Счётчик не найден' });
       }      
-      const meterDbId = checkResult[0].ID;
+      const meterNum = checkResult[0].METER_NUM;
       const dbLicschet = checkResult[0].LS;
       const targetLicschet = licschet || dbLicschet;      
       const insertQuery = `
         INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
         VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
       `;                      
-      db.query(insertQuery, [ph, meterDbId, createdate], (err) => {
+      db.query(insertQuery, [ph, meterNum, createdate], (err) => {
         if (err) {
           db.detach();
           console.error('Insert error:', err);
@@ -745,27 +745,46 @@ app.post('/PH', upload.single('file'), (req, res) => {
             details: err.message
           });
         }        
-        if (req.file) {
-          const fileName = req.file.originalname;
-          const fileSize = req.file.size.toString();
-          const desc = description ? String(description).substring(0, 40) : 'Нарушение';
-          const abName = abonent_name ? String(abonent_name).substring(0, 120) : '';
-          
-          const insertFileQuery = `
-            INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
-            VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
+         if (req.file) {          
+          const abonentQuery = `
+            SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME 
+            FROM ABONENTS A 
+            LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID 
+            WHERE A.G_LICSCHET = ?
           `;          
-          db.query(insertFileQuery, [targetLicschet, fileName, createdate, desc, abName, fileSize], (fileErr) => {
-            db.detach();
-            if (fileErr) {
-              console.error('Insert file error', fileErr);
-              return res.status(500).json({ error: 'file error:', details: fileErr.message });              
+          db.query(abonentQuery, [targetLicschet], (err, abonentResult) => {
+            if (err) {
+              db.detach();
+              console.error('Abonent query error:', err);
+              return res.status(500).json({ error: 'Ошибка поиска абонента', details: err.message });
             }
-            res.json({
-              status: 'OK',
-              message: 'Показания и файл успешно сохранены',
-              action: 'INSERT',
-              data: { ph, meter_id, createdate, fileName }
+            let abonentId = null;
+            let clientName = abonent_name || '';
+            if (abonentResult && abonentResult.length > 0) {
+              abonentId = abonentResult[0].ABONENT_ID;
+              if (abonentResult[0].CLIENT_NAME) {
+                clientName = abonentResult[0].CLIENT_NAME;
+              }
+            }
+            const fileName = req.file.originalname;
+            const fileSize = req.file.size.toString();
+            const desc = description ? String(description).substring(0, 40) : 'Нарушение';          
+            const insertFileQuery = `
+              INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
+              VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
+            `;                      
+            db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
+              db.detach();
+              if (fileErr) {
+                console.error('Insert file error', fileErr);
+                return res.status(500).json({ error: 'file error:', details: fileErr.message });              
+              }
+              res.json({
+                status: 'OK',
+                message: 'Показания и файл успешно сохранены',
+                action: 'INSERT',
+                data: { ph, meter_id, createdate, fileName }
+              });
             });
           });
         } else {
