@@ -1,3 +1,5 @@
+//const { text } = require("body-parser");
+
 const { createApp, ref, watch } = Vue;
 createApp({
   setup() {
@@ -17,7 +19,7 @@ createApp({
     const selectedBuildingId = ref(null);
     const selectedAppartId = ref(null);
     const houseInput = ref('');
-    const townSearch = ref('ЛЯНТОР');
+    const townSearch = ref('');
     const streetSearch = ref('');
     const houseSearch = ref('');
     const appartsSearch = ref('');
@@ -144,7 +146,7 @@ createApp({
         const violationsForm = document.getElementById('violationsForm');
         if (violationsForm) {
           violationsForm.style.display = 'none';
-          const appartsCheck = document.getElementById('appartscheck'); // исправлено на строчную 'c'
+          const appartsCheck = document.getElementById('appartscheck');
           if (appartsCheck) {
             appartsCheck.checked = false;
           }
@@ -188,8 +190,7 @@ createApp({
       let appartsValue = null;
       let appartsIdValue = null;
       if (showApparts.value) {
-        appartsValue = appartsSearch.value?.trim();
-        if (!appartsValue) {
+        if (!appartsSearch.value?.trim()) {
           alert("Введите номер квартиры");
           const input = document.getElementById('appartsInput');
           if (input) { input.focus(); input.select(); }
@@ -201,6 +202,8 @@ createApp({
           if (input) { input.focus(); input.select(); }
           return;
         }
+        const selectedAppart = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
+        appartsValue = selectedAppart?.rawHouse || appartsSearch.value?.trim();
         appartsIdValue = selectedAppartId.value;
       } else {
         appartsValue = "-1";
@@ -304,14 +307,26 @@ createApp({
       }
       try {
         const result = await apiRequest(`/apparts?buildingId=${buildingId}`);
-        apparts.value = result;
         const emptyAppart = result.find(appr => 
           (!appr.house || appr.house.trim() === '') && appr.g_licschet
         );
-        currentBuildingLicschet.value = emptyAppart?.g_licschet || null;              
+        currentBuildingLicschet.value = emptyAppart?.g_licschet || null;
+        apparts.value = result
+          .filter(appr => appr.house && appr.house.trim() !== '') 
+          .map(appr => {
+            const baseName = appr.house;
+            const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
+            return {
+              ...appr,
+              displayHouse: uniqueName,
+              rawHouse: baseName
+            };
+          });
+
       } catch (err) {
         console.error('Failed to load apartments:', err);
         currentBuildingLicschet.value = null;
+        apparts.value = [];
       }
     };
 
@@ -361,12 +376,31 @@ createApp({
       }
     };
 
-    const onAppartsInput = (e) => {
+    const getSelectedOptionData = (e, dataListId) => {
       const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsApparts option')]
-        .find(o => o.value === val);
-      if (option) selectedAppartId.value = option.dataset.id;
+      if (!val) return null;
+      const options = document.querySelectorAll(`#${dataListId} option`);
+      for (let i = 0; i < options.length; i++) {
+        const opt = options[i];
+        if(opt.value === val || opt.dataset.id === String(val)) {
+          return {
+            id: opt.dataset.id,
+            licschet: opt.dataset.licschet,
+            text: opt.text || opt.value
+          };
+        }
+      }
+      return null;
     };
+
+    const onAppartsInput = (e) => {
+    const data = getSelectedOptionData(e, 'resultsApparts');
+    if (data) {
+      selectedAppartId.value = data.id;
+    } else {
+      selectedAppartId.value = null;
+    }
+  };
 
     const clearMeterDataToSession = () => {
       sessionStorage.setItem('meternum', JSON.stringify({meterNum: null }));
@@ -477,24 +511,19 @@ createApp({
     };
 
     const onAppartsChange = async (e) => {
-      const val = e.target.value;
-      let option = [...document.querySelectorAll('#resultsApparts option')]
-        .find(o => o.value === val && o.dataset.id);    
-      selectedAppartId.value = option?.dataset.id || null;
-      appartsSearch.value = val; 
+      const data = getSelectedOptionData(e, 'resultsApparts');      
+      selectedAppartId.value = data?.id || null;
+      appartsSearch.value = data?.text || e.target.value; 
       showMeterSelect.value = false;
       selectedMeter.value = null;
-      if (selectedAppartId.value && option?.dataset?.licschet?.trim()) {
-        const g_licschet = option.dataset.licschet;
+      const g_licschet = data?.licschet?.trim();
+      if (selectedAppartId.value && g_licschet) {
         await loadMetersByLicschet(g_licschet);
-      } 
-      else if (!selectedAppartId.value && selectedBuildingId.value && currentBuildingLicschet.value) {   
+      } else if (!selectedAppartId.value && selectedBuildingId.value && currentBuildingLicschet.value) {   
         await loadMetersByLicschet(currentBuildingLicschet.value);
-      }
-      else if (!selectedAppartId.value && selectedBuildingId.value) {
+      } else if (!selectedAppartId.value && selectedBuildingId.value) {
         await loadMetersByBuilding(selectedBuildingId.value);
-      }
-      else {
+      } else {
         meters.value = [];
         clearMeterDataToSession();
         showMeterSelect.value = false;

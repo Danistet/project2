@@ -20,8 +20,7 @@
             <input 
               type="search" 
               id="townInput" 
-              list="resultsTown" 
-              value="ЛЯНТОР"
+              list="resultsTown"               
               placeholder="Введите город"               
               @input="onTownInput" 
               @change="onTownChange" 
@@ -97,7 +96,7 @@
             <datalist id="resultsApparts">
               <option v-for="appr in apparts" 
                   :key="appr.id" 
-                  :value="appr.house" 
+                  :value="appr.displayHouse"
                   :data-id="appr.id" 
                   :data-licschet="appr.g_licschet">
               </option>
@@ -116,8 +115,7 @@
       function tologin() {
         sessionStorage.clear();
         window.location.href = 'index.html';
-      }
-      //------------------------------------------different meters, one appart
+      }      
     </script>
   </body>
 

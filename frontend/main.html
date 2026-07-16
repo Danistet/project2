@@ -136,11 +136,21 @@
           
           const formatDate = (dateStr) => {
             if (!dateStr) return 'Не указана';
-            try {
-              return new Date(dateStr).toLocaleDateString('ru-RU');
-            } catch {
-              return 'Не указана';
-            }
+            const str = String(dateStr).trim();                        
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(str)) return str;
+            const date = new Date(str);                        
+            if (isNaN(date.getTime())) {
+              const parts = str.match(/\d+/g);
+              if (parts && parts.length >= 3) {
+                if (parts[0].length === 4) return `${parts[2].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[0]}`;
+                if (parts[2].length === 4) return `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[2]}`;
+              }
+              return str;
+            }                        
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
           };
           
           const loadAddressDisplay = () => {
@@ -197,31 +207,26 @@
           const loadMeterDetails = async (meterId) => {
             try {
               const result = await apiRequest('/get-meter-details', { meterId });
-              if (result.found) {                
+              if (result.found) {    
+                console.log('Сырые даты с сервера -> manfDate:', result.manfDate, '| verifyDate:', result.verifyDate);            
                 const formatDateForInput = (dateStr) => {
-                  if (!dateStr) return '';                  
-                  if (dateStr.includes('T')) {
-                    return dateStr.split('T')[0];
-                  }                  
-                  if (dateStr.includes(' ')) {
-                    return dateStr.split(' ')[0];
-                  }                  
-                  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                    return dateStr;
-                  }                  
-                  try {
-                    const date = new Date(dateStr);
-                    if (!isNaN(date.getTime())) {
-                      const year = date.getFullYear();
-                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                      const day = String(date.getDate()).padStart(2, '0');
-                      return `${year}-${month}-${day}`;
+                  if (!dateStr) return '';
+                  const str = String(dateStr).trim();                  
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;                  
+                  const date = new Date(str);
+                  if (isNaN(date.getTime())) {
+                    const parts = str.match(/\d+/g);
+                    if (parts && parts.length >= 3) {
+                      if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                      if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                     }
-                  } catch (e) {
-                    console.warn('Failed to parse date:', dateStr);
+                    return '';
                   }
-                  return '';
-                };                
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const year = date.getFullYear();
+                  return `${year}-${month}-${day}`;
+                };             
                 editData.value = {
                   name: result.name || '',
                   meterNum: result.meterNum || '',
