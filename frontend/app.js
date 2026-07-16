@@ -1,5 +1,3 @@
-//const { text } = require("body-parser");
-
 const { createApp, ref, watch } = Vue;
 createApp({
   setup() {

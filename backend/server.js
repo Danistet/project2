@@ -54,7 +54,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, (err, meterResult) => {        
         const now = Date.now();
-        const minute = 1200000;        
+        const minute = 2400000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
           db.detach();
           res.json({ 
@@ -69,7 +69,7 @@ app.post('/auth', (req, res) => {
         const meterNum = meterResult?.[0]?.METER_NUM || null;
         const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
         const verifyDate = meterResult?.[0]?.VERIFY_DATE || null; 
-        // Логика обновления токена: если с момента последней авторизации прошло больше 20 минут (1200000 мс),
+        // Логика обновления токена: если с момента последней авторизации прошло больше 40 минут (2400000 мс),
         // генерируем новый токен. Иначе просто обновляем дату авторизации, сохраняя старый токен.               
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');

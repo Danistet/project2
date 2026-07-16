@@ -118,29 +118,17 @@
     <script>
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
-
-      fileInput.addEventListener('change', function() {
-        // Очищаем контейнер от старых превью при новом выборе
-        previewContainer.innerHTML = ''; 
-
-        // Превращаем List файлов в массив и перебираем
-        Array.from(this.files).forEach(file => {
-          // Проверяем, что это точно картинка
+      fileInput.addEventListener('change', function() {        
+        previewContainer.innerHTML = '';         
+        Array.from(this.files).forEach(file => {          
           if (!file.type.startsWith('image/')) return; 
-
-          const reader = new FileReader();
-
-          // Когда файл прочитан, создаем элемент img
+          const reader = new FileReader();          
           reader.onload = function(event) {
             const img = document.createElement('img');
             img.src = event.target.result;
-            img.classList.add('preview-image');
-            
-            // Добавляем картинку на экран
+            img.classList.add('preview-image');                        
             previewContainer.appendChild(img);
-          };
-
-          // Читаем файл как Base64 строку
+          };          
           reader.readAsDataURL(file); 
         });
       });

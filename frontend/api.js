@@ -21,7 +21,7 @@ function checkSession() {
   if (!authData) return false;  
   const data = JSON.parse(authData);
   const now = Date.now();
-  const minute = 1200000; 
+  const minute = 2400000; 
   return (now - data.authDate) <= minute;
 }
 
