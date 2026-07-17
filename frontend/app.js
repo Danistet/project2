@@ -1,9 +1,82 @@
+const DB_NAME = 'MeterOfflineStorage';
+const STORE_NAME = 'pendingReadings';
+const DB_VERSION = 2;
+
+function openLocalDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+async function saveReadingLocally(readingData) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.add(readingData);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getPendingReadings() {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deletePendingReading(id) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function generateFileName(meterNum, originalname) {
+  const now = new Date();
+  const dateStr = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  const ext = originalname.split('.').pop() || 'jpg';
+  return `METER_${meterNum}_${dateStr}_${randomStr}.${ext}`;
+}
+
+function base64ToBlob(base64, mimeType) {
+  const byteCharacters = atob(base64.split(',')[1]);
+  const byteArrays = [];
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    byteArrays.push(new Uint8Array(byteNumbers));
+  }
+  return new Blob(byteArrays, { type: mimeType });
+}
+// ==========================================================
+
+
 const { createApp, ref, watch } = Vue;
+
 createApp({
   setup() {
-    const DB_NAME = 'MeterOfflineStorage';
-    const STORE_NAME = 'pendiReadings';
-    const DB_VERSION = 1;
     const password = ref('');
     const response = ref('');
     const error = ref('');
@@ -63,75 +136,22 @@ createApp({
     });
 
     // Отслеживание переключения режима "вводить квартиру" / "не вводить".
-    // Если режим выключен, пытаемся загрузить счётчик по зданию, иначе фокусируемся на поле квартиры.
     watch(showApparts, (newVal) => {
-      if (!newVal)
-      {
+      if (!newVal) {
         appartsSearch.value = '';
         selectedAppartId.value = null;
         sessionStorage.removeItem('licschet');
         if (selectedBuildingId.value) {
           loadMeterByBuilding(selectedBuildingId.value);
         }
-      }
-      else
-      {
+      } else {
         setTimeout(() => {
           const input = document.getElementById('appartsInput');
           if (input) input.focus();
         }, 100);
       }
     });
-    ////////////////////////////////////////////////
-    function openLocalDB()
-    {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-          const db =event.target.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true});
-          }
-        };
-        request.onsuccess = (event) => resolve(event.target.result);
-        request.onerror = (event) => reject(event.target.error);
-      });
-    }
 
-    async function saveReadingLocally(readingData) {
-      const db = await openLocalDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.add(readingData);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    async function getPendingReadings() {
-      const db = await openLocalDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'redonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    async function deletePendingReadings(id) {
-      const db = await openLocalDB();
-      return new Promise((resolve,reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    ////////////////////////////////////////////////
     // заменяем точку на запятую, добавляем ",000", если дробной части нет.
     const formatWithThousands = (value) => {
       if (!value && value !== 0) return '';
@@ -141,8 +161,7 @@ createApp({
       if (/^\d+$/.test(str)) return `${str},000`;
       return str.replace('.', ',');
     };
-    
-    //Считывает значение из поля, форматирует его, валидирует и отправляет на сервер
+
     const NewPH = async () => {
       try {
         const inputEl = document.getElementById('newPH');
@@ -150,73 +169,100 @@ createApp({
         if (!rawValue) {
           alert("Введите показания");
           return;
-        }      
+        }              
         const formatted = formatWithThousands(rawValue);
         const numericValue = parseFloat(rawValue.replace(',', '.'));
         if (isNaN(numericValue)) {
           alert('Некорректное число');
           return;
-        }         
+        }                 
         const meterData = JSON.parse(sessionStorage.getItem('activeMeter') || sessionStorage.getItem('meternum') || '{}');
         const meter_id = meterData.meterNum;            
         if (!meter_id) {
           alert('Не найден серийный номер счётчика');
           return;
-        }        
-        const formData = new FormData();
-        formData.append('ph', numericValue);
-        formData.append('meter_id', meter_id);
+        }                
         const fileInput = document.getElementById('fileInput');
         const file = fileInput?.files?.[0];
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
-        const licschet = addressData.g_licschet || meterData.licschet || '';                
-        formData.append('licschet', licschet);
-        formData.append('abonent_name', addressData.town || '');
-        formData.append('description', 'NARUSHENIE');        
+        const licschet = addressData.g_licschet || meterData.licschet || '';                        
+        let fileDataForStorage = null;
+        let fileNameForServer = 'no_file.jpg';
+        let fileType = 'image/jpeg';        
         if (file) {
-          formData.append('file', file);
-        }        
-        const response = await fetch('http://localhost:3000/PH', {
-          method: 'POST',
-          body: formData
-        });        
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || `HTTP error, status: ${response.status}`);
-        }        
-        alert(result.message || 'Показания переданы');          
-        const phElement = document.getElementById('PH');
-        if (phElement) {
-          phElement.textContent = formatted;
+          fileNameForServer = generateFileName(meter_id, file.name);
+          fileType = file.type;                    
+          fileDataForStorage = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
         }
-        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));                
+        const payload = {
+          ph: numericValue,
+          meter_id: meter_id,
+          licschet: licschet,
+          abonent_name: addressData.town || '',
+          description: 'NARUSHENIE',
+          fileName: fileNameForServer,
+          fileType: fileType,
+          fileBase64: fileDataForStorage,
+          createdate: new Date().toISOString().replace('T', ' ').slice(0, 19)
+        };        
+        
+        await saveReadingLocally(payload);        
+        
+        if (navigator.onLine) {          
+          const formData = new FormData();
+          formData.append('ph', payload.ph);
+          formData.append('meter_id', payload.meter_id);
+          formData.append('licschet', payload.licschet);
+          formData.append('abonent_name', payload.abonent_name);
+          formData.append('description', payload.description);          
+          if (payload.fileBase64) {
+            const blob = base64ToBlob(payload.fileBase64, payload.fileType);
+            formData.append('file', blob, payload.fileName);
+          }
+          const response = await fetch('http://localhost:3000/PH', {
+            method: 'POST',
+            body: formData
+          });                  
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || `HTTP error, status: ${response.status}`);
+          }                  
+          alert(result.message || 'Показания и фото успешно переданы на сервер!');
+        } else {          
+          alert('Интернет отсутствует. Показания и фото СОХРАНЕНЫ ВНУТРИ ПРИЛОЖЕНИЯ. Они будут отправлены автоматически при появлении связи.');
+        }        
+        
+        const phElement = document.getElementById('PH');
+        if (phElement) phElement.textContent = formatted;
+        sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));                        
         if (fileInput) {
           fileInput.value = '';
           fileInput.classList.remove('file-selected');
-        }             
+          document.getElementById('previewContainer').innerHTML = '';
+        }                     
         const violationsForm = document.getElementById('violationsForm');
         if (violationsForm) {
           violationsForm.style.display = 'none';
           const appartsCheck = document.getElementById('appartscheck');
-          if (appartsCheck) {
-            appartsCheck.checked = false;
-          }
+          if (appartsCheck) appartsCheck.checked = false;
           document.getElementById('violation1').value = "";
           document.getElementById('violation2').value = "";
           document.getElementById('violation3').value = "";
-        }
+        }        
+        inputEl.value = '';
       } catch (err) {
         console.error('Error:', err);
-        alert('error: ' + (err.message || 'Неизвестная ошибка'));
+        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка') + '. Данные сохранены локально и будут отправлены позже.');
       }
     };
 
-    // Валидирует введённый адрес (город, улица, дом, квартира) и сохраняет его в sessionStorage.
-    // В зависимости от режима (с квартирой или без) загружает список подходящих счётчиков
-    // и перенаправляет пользователя на main.html.
     const saveAddressAndContinue = async () => {
-    if (!townSearch.value?.trim() || !selectedTownId.value) {
-     alert("Выберите город из списка");
+      if (!townSearch.value?.trim() || !selectedTownId.value) {
+        alert("Выберите город из списка");
         document.getElementById('townInput')?.focus();
         return;
       }
@@ -260,9 +306,7 @@ createApp({
         appartsValue = "-1";
         appartsIdValue = null;
       }
-      // 1. Если выбрана квартира и у неё есть лицевой счёт - ищем по л/с.
-      // 2. Если квартира не выбрана, но у здания есть дефолтный л/с - ищем по нему.
-      // 3. Иначе ищем все счётчики по зданию (фильтруя пустые квартиры, если режим без квартир).
+      
       let allMeters = [];
       try {
         if (showApparts.value && selectedAppartId.value) {
@@ -373,7 +417,6 @@ createApp({
               rawHouse: baseName
             };
           });
-
       } catch (err) {
         console.error('Failed to load apartments:', err);
         currentBuildingLicschet.value = null;
@@ -445,13 +488,13 @@ createApp({
     };
 
     const onAppartsInput = (e) => {
-    const data = getSelectedOptionData(e, 'resultsApparts');
-    if (data) {
-      selectedAppartId.value = data.id;
-    } else {
-      selectedAppartId.value = null;
-    }
-  };
+      const data = getSelectedOptionData(e, 'resultsApparts');
+      if (data) {
+        selectedAppartId.value = data.id;
+      } else {
+        selectedAppartId.value = null;
+      }
+    };
 
     const clearMeterDataToSession = () => {
       sessionStorage.setItem('meternum', JSON.stringify({meterNum: null }));
@@ -476,17 +519,13 @@ createApp({
       }
     };
 
-    // Загружает ОДИН счётчик по ID здания через /meter-by-building
-    // и сохраняет его данные в sessionStorage.
     const loadMeterByBuilding = async (buildingId) => {
       if (!buildingId) {
         clearMeterDataToSession();
         return;
       }
       try {
-        const meterData = await apiRequest('/meter-by-building', { 
-          buildingId: buildingId 
-        });
+        const meterData = await apiRequest('/meter-by-building', { buildingId });
         saveMeterDataToSession(meterData);
       } catch (err) {
         console.error("error building lookup", err);
@@ -494,9 +533,6 @@ createApp({
       }
     };
 
-    // Загружает СПИСОК счётчиков по ID здания через /meters-by-building.
-    // Если найден один счётчик — автоматически выбирает его.
-    // Если несколько — показывает диалог выбора. Если ни одного — очищает данные.
     const loadMetersByBuilding = async (buildingId) => {
       if (!buildingId) {
         meters.value = [];
@@ -522,7 +558,6 @@ createApp({
       }
     };
 
-    //Загружает СПИСОК счётчиков по лицевому счёту через /meters-by-licschet.
     const loadMetersByLicschet = async (g_licschet) => {
       if (!g_licschet?.trim()) {
         meters.value = [];
@@ -548,8 +583,6 @@ createApp({
       }
     };
 
-    // Финализирует выбор конкретного счётчика: сохраняет его в sessionStorage,
-    // обновляет адресные данные и скрывает диалог выбора.
     const selectMeter = (meter) => {
       selectedMeter.value = meter;
       saveSelectedMeter(meter);
@@ -594,47 +627,17 @@ createApp({
         return;
       }   
       try {
-        let result;      
-          result = await apiRequest('/auth', {
-            userpswd: password.value,
-            meternum: meternum.value
-          });
+        let result = await apiRequest('/auth', {
+          userpswd: password.value,
+          meternum: meternum.value
+        });
         sessionStorage.setItem('authData', JSON.stringify({
           token: result.token,
           authDate: result.authDate
         }));
-        sessionStorage.setItem('meterNum', JSON.stringify({
-          meterNum: result.meterNum
-        }));
-        sessionStorage.setItem('mountDate', JSON.stringify({
-          mountDate: result.mountDate
-        }));
-        sessionStorage.setItem('verifyDate', JSON.stringify({
-          verifyDate: result.verifyDate
-        }));        
-        if (!result.token) {
-          throw new Error('Сервер не вернул token');
-        }
-        if (!result.authDate) {
-          throw new Error('Сервер не вернул authDate');
-        }
-        const authData = {
-          token: result.token,
-          authDate: result.authDate
-        };
-        const meterNum = {
-          meterNum: result.meterNum
-        };
-        const mountDate = {
-          mountDate: result.mountDate
-        };
-        const verifyDate = {
-          verifyDate: result.verifyDate
-        };
-        sessionStorage.setItem('authData', JSON.stringify(authData));
-        sessionStorage.setItem('meternum', JSON.stringify(meterNum));
-        sessionStorage.setItem('mountdate', JSON.stringify(mountDate));
-        sessionStorage.setItem('verifydate', JSON.stringify(verifyDate));
+        sessionStorage.setItem('meternum', JSON.stringify({ meterNum: result.meterNum }));
+        sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: result.mountDate }));
+        sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: result.verifyDate }));
         window.location.href = 'ActWindow.html'; 
       } catch (err) {
         error.value = `Ошибка: ${err.message}`;

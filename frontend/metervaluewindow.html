@@ -27,7 +27,7 @@
         <section class="form-section">
           <label for="newPH" class="form-label">Текущее показание:</label>
           <input 
-            maxlength="15" 
+            maxlength="9" 
             required 
             type="text" 
             id="newPH" 
@@ -290,9 +290,55 @@
           window.location.href = 'index.html';
         }
       }   
+      // === 4. АВТОМАТИЧЕСКАЯ ФОНОВАЯ СИНХРОНИЗАЦИЯ ===
+      async function syncPendingReadings() {
+        if (!navigator.onLine) return;
+
+        const pending = await getPendingReadings();
+        if (pending.length === 0) return;
+
+        console.log(`Найдено ${pending.length} записей для фоновой синхронизации...`);
+
+        for (const record of pending) {
+          try {
+            const formData = new FormData();
+            formData.append('ph', record.ph);
+            formData.append('meter_id', record.meter_id);
+            formData.append('licschet', record.licschet);
+            formData.append('abonent_name', record.abonent_name);
+            formData.append('description', record.description);
+            
+            // Если есть сохраненный файл, восстанавливаем его из Base64 и добавляем в FormData
+            if (record.fileBase64) {
+              const blob = base64ToBlob(record.fileBase64, record.fileType);
+              formData.append('file', blob, record.fileName);
+            }
+
+            const response = await fetch('http://localhost:3000/PH', {
+              method: 'POST',
+              body: formData
+            });
+
+            if (response.ok) {              
+              await deletePendingReading(record.id);
+              console.log(`Запись ID ${record.id} успешно синхронизирована и удалена из локального хранилища.`);
+            } else {
+              console.warn(`Не удалось отправить запись ID ${record.id}. Оставлена в очереди.`);
+            }
+          } catch (err) {
+            console.error(`Ошибка синхронизации записи ID ${record.id}:`, err);
+          }
+        }
+      }
+      
+      window.addEventListener('online', () => {
+        console.log('Сеть восстановлена. Запуск фоновой синхронизации...');
+        syncPendingReadings();
+      });
       window.addEventListener('DOMContentLoaded', () => {
         loadMeterData();
         loadPreviousPHFromAPI(); 
+        syncPendingReadings();
       });
     </script>
     <script>
