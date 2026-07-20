@@ -4,70 +4,90 @@
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Введите адрес</title>
+    <link rel="icon" href="data:,">
     <script src="./api.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>      
+      .loading-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(255, 255, 255, 0.85);
+        z-index: 10;
+        border-radius: 8px;
+        color: #45B0E1;
+        font-weight: 600;
+        font-size: 18px;
+      }
+      .spinner {
+        width: 48px; height: 48px;
+        border: 5px solid #E0F4FA;
+        border-top: 5px solid #45B0E1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }      
+      .content-card { position: relative; }
+    </style>
   </head>
   <body>
     <div id="app" class="page-wrapper">
       <header class="page-header">
         <h1>Введите адрес</h1>
-      </header>
-
-      <main class="content-card">
-        <form @submit.prevent="saveAddressAndContinue" novalidate>
+      </header>      
+      <main class="content-card" style="position: relative;">                
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Загрузка данных...</p>
+        </div>        
+        <form 
+          @submit.prevent="saveAddressAndContinue" 
+          novalidate
+          :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto', transition: 'opacity 0.2s ease' }"
+        >
           <div class="form-group">
             <label for="townInput" class="form-label">Город</label>
             <input 
-              type="search" 
-              id="townInput" 
-              list="resultsTown"               
+              type="search" id="townInput" list="resultsTown"               
               placeholder="Введите город"               
-              @input="onTownInput" 
-              @change="onTownChange" 
-              v-model="townSearch"
-              class="form-input"              
-              required
+              @input="onTownInput" @change="onTownChange" 
+              v-model="townSearch" class="form-input" required
             >
             <datalist id="resultsTown">
               <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
             </datalist>
-          </div>
+          </div>          
           <div class="form-group">
             <label for="streetInput" class="form-label">Улица</label>
             <input 
-              type="search" 
-              id="streetInput" 
-              list="resultsStreet" 
+              type="search" id="streetInput" list="resultsStreet" 
               placeholder="Введите улицу" 
-              @input="onStreetInput" 
-              @change="onStreetChange" 
-              :disabled="!selectedTownId" 
-              v-model="streetSearch"
-              class="form-input"
-              :required="!!selectedTownId"
+              @input="onStreetInput" @change="onStreetChange" 
+              :disabled="!selectedTownId" v-model="streetSearch" class="form-input" :required="!!selectedTownId"
             >
             <datalist id="resultsStreet">
               <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
             </datalist>
-          </div>
+          </div>          
           <div class="form-group">
             <label for="houseInput" class="form-label">Дом</label>
             <input 
-              type="search" 
-              id="houseInput" 
-              list="resultsHome" 
+              type="search" id="houseInput" list="resultsHome" 
               placeholder="Введите номер дома" 
-              @input="onHouseInput" 
-              @change="onHouseChange" 
-              :disabled="!selectedStreetId" 
-              v-model="houseSearch"
-              class="form-input"
-              :required="!!selectedStreetId"
+              @input="onHouseInput" @change="onHouseChange" 
+              :disabled="!selectedStreetId" v-model="houseSearch" class="form-input" :required="!!selectedStreetId"
             >
             <datalist id="resultsHome">
               <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
             </datalist>
-          </div>
+          </div>          
           <div class="form-group">
             <label class="form-label checkbox-label">
               <input type="checkbox" id="appartscheck" v-model="showApparts" class="form-checkbox">
@@ -82,16 +102,10 @@
                 height: showApparts ? 'auto' : '0',
                 overflow: 'hidden'
               }" 
-              type="search" 
-              id="appartsInput" 
-              list="resultsApparts" 
-              placeholder="Введите номер квартиры"
-              :required="showApparts" 
-              @input="onAppartsInput" 
-              @change="onAppartsChange" 
-              v-model="appartsSearch"
-              class="form-input"
-              tabindex="-1"
+              type="search" id="appartsInput" list="resultsApparts" 
+              placeholder="Введите номер квартиры" :required="showApparts" 
+              @input="onAppartsInput" @change="onAppartsChange" 
+              v-model="appartsSearch" class="form-input" tabindex="-1"
             >
             <datalist id="resultsApparts">
               <option v-for="appr in apparts" 
@@ -101,7 +115,7 @@
                   :data-licschet="appr.g_licschet">
               </option>
             </datalist>
-          </div>
+          </div>          
           <div class="button-group">
             <button type="submit" class="btn-primary">Подтвердить</button>
             <button type="button" onclick="tologin()" class="btn-secondary">Назад</button>
@@ -109,7 +123,6 @@
         </form>
       </main>
     </div>
-
     <script src="./app.js"></script>
     <script>
       function tologin() {
@@ -302,6 +315,33 @@
     datalist {
       font-size: 16px;
     }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(255, 255, 255, 0.85);
+        z-index: 10;
+        border-radius: 8px;
+        color: #45B0E1;
+        font-weight: 600;
+        font-size: 18px;
+      }
+      .spinner {
+        width: 48px; height: 48px;
+        border: 5px solid #E0F4FA;
+        border-top: 5px solid #45B0E1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
 
     @media (max-width: 480px) {
       body {

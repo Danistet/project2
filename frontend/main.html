@@ -4,6 +4,7 @@
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Главная страница</title>
+    <link rel="icon" href="data:,">
     <script src="./api.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   </head>
@@ -24,92 +25,99 @@
             <span class="address-part">{{ house }}</span>
             <span class="address-part">{{ apparts }}</span>
           </div>
-        </section>        
-        <section class="meters-section">
-          <div class="meters-container">
-            <div v-if="!meters || meters.length === 0" class="no-meters">
-              Счётчики не найдены
-            </div>            
-            <div 
-              v-for="meter in meters" 
-              :key="meter.id" 
-              class="meter-block"
-              :class="{ selected: selectedMeterId === meter.id }"
-              :style="{ opacity: selectedMeterId && selectedMeterId !== meter.id ? '0.5' : '1' }"
-            >
-              <h4>{{ meter.clientName || 'Не указано' }}</h4>              
-              <div class="meter-details">
-                <div class="detail-row">
-                  <span class="detail-label">Лицевой счёт:</span>
-                  <span class="detail-value">{{ meter.licschet || 'Не указан' }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Услуга:</span>
-                  <span class="detail-value">{{ meter.groupName ? meter.groupName.trim() : 'Услуга не указана' }}</span>
-                </div>                                
-                <template v-if="selectedMeterId === meter.id">
-                  <div class="detail-row">
-                    <span class="detail-label">Место установки:</span>
-                    <input v-model="editData.name" maxlength="60" class="edit-input" placeholder="Место установки">
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Номер прибора:</span>
-                    <input v-model="editData.meterNum" maxlength="30" class="edit-input" placeholder="Номер прибора">
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Номер пломбы:</span>
-                    <input v-model="editData.seal" maxlength="16" class="edit-input" placeholder="Номер пломбы">
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Дата изготовления:</span>
-                    <input v-model="editData.manfDate" type="date" class="edit-input">
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Дата установки:</span>
-                    <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Дата проверки:</span>
-                    <input v-model="editData.verifyDate" type="date" class="edit-input">
-                  </div>                  
-                  <button @click="saveMeterData" class="save-btn" :disabled="saving" v-if="!showContinue">
-                    {{ saving ? 'Сохранение...' : 'Сохранить изменения' }}
-                  </button>
-                </template>                
-                <template v-else>
-                  <div class="detail-row">
-                    <span class="detail-label">Серийный номер:</span>
-                    <span class="detail-value">{{ meter.meterNum || 'Не указан' }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Дата установки:</span>
-                    <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Дата проверки:</span>
-                    <span class="detail-value">{{ formatDate(meter.verifyDate) }}</span>
-                  </div>
-                </template>
-              </div>              
-              <button 
-                v-if="selectedMeterId !== meter.id" 
-                @click="selectMeter(meter)" 
-                class="select-btn"
+        </section>  
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Загрузка данных счётчика...</p>
+        </div>        
+        <template v-else>
+          <section class="meters-section">
+            <div class="meters-container">
+              <div v-if="!meters || meters.length === 0" class="no-meters">
+                Счётчики не найдены
+              </div>            
+              <div 
+                v-for="meter in meters" 
+                :key="meter.id" 
+                class="meter-block"
+                :class="{ selected: selectedMeterId === meter.id }"
+                :style="{ opacity: selectedMeterId && selectedMeterId !== meter.id ? '0.5' : '1' }"
               >
-                Выбрать
-              </button>
+                <h4>{{ meter.clientName || 'Не указано' }}</h4>              
+                <div class="meter-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Лицевой счёт:</span>
+                    <span class="detail-value">{{ meter.licschet || 'Не указан' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Услуга:</span>
+                    <span class="detail-value">{{ meter.groupName ? meter.groupName.trim() : 'Услуга не указана' }}</span>
+                  </div>                                
+                  <template v-if="selectedMeterId === meter.id">
+                    <div class="detail-row">
+                      <span class="detail-label">Место установки:</span>
+                      <input v-model="editData.name" maxlength="60" class="edit-input" placeholder="Место установки">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Номер прибора:</span>
+                      <input v-model="editData.meterNum" maxlength="30" class="edit-input" placeholder="Номер прибора">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Номер пломбы:</span>
+                      <input v-model="editData.seal" maxlength="16" class="edit-input" placeholder="Номер пломбы">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата изготовления:</span>
+                      <input v-model="editData.manfDate" type="date" class="edit-input">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата установки:</span>
+                      <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата проверки:</span>
+                      <input v-model="editData.verifyDate" type="date" class="edit-input">
+                    </div>                  
+                    <button @click="saveMeterData" class="save-btn" :disabled="saving" v-if="!showContinue">
+                      {{ saving ? 'Сохранение...' : 'Сохранить изменения' }}
+                    </button>
+                  </template>                
+                  <template v-else>
+                    <div class="detail-row">
+                      <span class="detail-label">Серийный номер:</span>
+                      <span class="detail-value">{{ meter.meterNum || 'Не указан' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата установки:</span>
+                      <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата проверки:</span>
+                      <span class="detail-value">{{ formatDate(meter.verifyDate) }}</span>
+                    </div>
+                  </template>
+                </div>              
+                <button 
+                  v-if="selectedMeterId !== meter.id" 
+                  @click="selectMeter(meter)" 
+                  class="select-btn"
+                >
+                  Выбрать
+                </button>
+              </div>
             </div>
-          </div>
-        </section>        
-        <section class="actions-section">
-          <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">
-            Продолжить
-          </button>          
-          <div id="actionButtons" class="action-buttons" v-if="selectedMeterId && !showContinue">
-            <button @click="info" id="infbt" class="btn-primary">Показания</button>
-          </div>          
-          <button @click="logout" id="changebutton" class="btn-secondary" v-if="!showContinue">Сменить адрес</button>
-        </section>
+          </section>        
+          
+          <section class="actions-section">
+            <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">
+              Продолжить
+            </button>          
+            <div id="actionButtons" class="action-buttons" v-if="selectedMeterId && !showContinue">
+              <button @click="info" id="infbt" class="btn-primary">Показания</button>
+            </div>          
+            <button @click="logout" id="changebutton" class="btn-secondary" v-if="!showContinue">Сменить адрес</button>
+          </section>
+        </template>
       </main>
     </div>
     <script>
@@ -132,6 +140,7 @@
           const streetName = ref('');
           const house = ref('');
           const apparts = ref('');
+          const isLoading = ref(false); 
           
           const formatDate = (dateStr) => {
             if (!dateStr) return 'Не указана';
@@ -164,10 +173,11 @@
           };
           
           const loadMeters = async () => {
-            let loadedMeters = getAllMeters ? getAllMeters() : [];            
-            if (!loadedMeters || loadedMeters.length === 0) {
-              const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
-              try {
+            isLoading.value = true;
+            try {
+              let loadedMeters = getAllMeters ? getAllMeters() : [];            
+              if (!loadedMeters || loadedMeters.length === 0) {
+                const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
                 if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
                   loadedMeters = await getMetersByLicschet(addressData.g_licschet);
                 } else if (addressData?.buildingId && typeof getMetersByBuilding === 'function') {
@@ -176,31 +186,38 @@
                 if (loadedMeters?.length && typeof saveAllMeters === 'function') {
                   saveAllMeters(loadedMeters);
                 }
-              } catch (err) {
-                console.error('Failed to load meters:', err);
-                error.value = 'Ошибка загрузки счётчиков';
-                return;
+              }              
+              meters.value = loadedMeters || [];                        
+              const activeMeter = getActiveMeter ? getActiveMeter() : null;
+              if (activeMeter) {
+                selectedMeterId.value = activeMeter.id;
+                await loadMeterDetails(activeMeter.id);
               }
-            }
-            
-            meters.value = loadedMeters || [];                        
-            const activeMeter = getActiveMeter ? getActiveMeter() : null;
-            if (activeMeter) {
-              selectedMeterId.value = activeMeter.id;
-              await loadMeterDetails(activeMeter.id);
+            } catch (err) {
+              console.error('Failed to load meters:', err);
+              error.value = 'Ошибка загрузки счётчиков';
+            } finally {
+              isLoading.value = false;
             }
           };
           
           const selectMeter = async (meter) => {
-            selectedMeterId.value = meter.id;                      
-            saveActiveMeter(meter);
-            sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meter.meterNum }));
-            sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: meter.mountDate }));
-            sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: meter.verifyDate }));
-            if (meter.licschet) {
-              sessionStorage.setItem('licschet', JSON.stringify({ g_licschet: meter.licschet }));
-            }                        
-            await loadMeterDetails(meter.id);
+            isLoading.value = true;
+            try {
+              selectedMeterId.value = meter.id;                      
+              saveActiveMeter(meter);
+              sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meter.meterNum }));
+              sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: meter.mountDate }));
+              sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: meter.verifyDate }));
+              if (meter.licschet) {
+                sessionStorage.setItem('licschet', JSON.stringify({ g_licschet: meter.licschet }));
+              }                        
+              await loadMeterDetails(meter.id);
+            } catch (err) {
+              console.error('Failed to select meter:', err);
+            } finally {
+              isLoading.value = false;
+            }
           };
           
           const loadMeterDetails = async (meterId) => {
@@ -354,6 +371,7 @@
             editData,
             error,
             saving,
+            isLoading,
             showContinue,
             streetType,
             streetName,
@@ -634,6 +652,34 @@
 
     .ContinueButton {
       visibility: visible;
+    }
+
+    .loading-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      color: #45B0E1;
+      font-weight: 600;
+      font-size: 18px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid #E0F4FA;
+      border-top: 5px solid #45B0E1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     @media (max-width: 480px) {
