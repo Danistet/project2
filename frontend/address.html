@@ -7,35 +7,6 @@
     <link rel="icon" href="data:,">
     <script src="./api.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <style>      
-      .loading-overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(255, 255, 255, 0.85);
-        z-index: 10;
-        border-radius: 8px;
-        color: #45B0E1;
-        font-weight: 600;
-        font-size: 18px;
-      }
-      .spinner {
-        width: 48px; height: 48px;
-        border: 5px solid #E0F4FA;
-        border-top: 5px solid #45B0E1;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }      
-      .content-card { position: relative; }
-    </style>
   </head>
   <body>
     <div id="app" class="page-wrapper">

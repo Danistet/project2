@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фиксация нарушений</title>
+    <link rel="icon" href="data:,">
+    <script src="./api.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="page-header">
+        <h1>Фиксация нарушений</h1>
+        <div id="error" class="error-message"></div>
+      </header>
+      <main class="content-wrapper">
+        <section class="info-card">
+          <div class="info-row">
+            <span class="info-label">Серийный номер:</span>
+            <span id="meterNum" class="info-value">Загрузка...</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Предыдущее показание:</span>
+            <span id="PH" class="info-value">нет данных</span>
+          </div>
+        </section>  
+        <input type="hidden" id="newPH" value="0,000">
+        <section class="form-section" style="align-items: flex-start;">
+          <form novalidate id="violationsForm" style="width: 100%;">
+            <div class="form-group">
+              <label class="form-label">1. Механические повреждения</label>
+              <select class="form-input" id="violation1" style="text-align: left;">
+                <option value="" disabled selected>Выберите нарушение</option>
+                <option value="не плотное прилегание стекла индикатора">Не плотное прилегание стекла индикатора</option>
+                <option value="не предусмотренные изготовителем отверстия или трещины">Не предусмотренные отверстия или трещины</option>
+                <option value="нарушения контрольных пломб">Нарушения контрольных пломб</option>
+              </select>            
+            </div>
+            <div class="form-group">
+              <label class="form-label">2. Проблемы с отображением</label>
+              <select class="form-input" id="violation2" style="text-align: left;">
+                <option value="" disabled selected>Выберите нарушение</option>
+                <option value="не отображение прибором результатов измерений">Не отображение результатов измерений</option>
+                <option value="не указано">Не указано</option>
+              </select>            
+            </div>
+            <div class="form-group">
+              <label class="form-label">3. Поверка</label>
+              <select class="form-input" id="violation3" style="text-align: left;">
+                <option value="" disabled selected>Выберите нарушение</option>
+                <option value="истечение межповерочного интервала">Истечение межповерочного интервала</option>
+                <option value="не указано">Не указано</option>
+              </select>            
+            </div>
+          </form>
+          <label class="form-label checkbox-label" style="margin-top: 16px;">            
+            <input type="checkbox" id="techcheck" class="form-checkbox">
+            <span class="checkbox-text">Технические некорректности</span>
+          </label>  
+          <form novalidate id="techcheckForm" style="display: none; width: 100%;">
+            <div class="form-group">
+              <label class="form-label">1. Ошибочная дата проверки</label>
+              <select class="form-input" id="techcheck1" style="text-align: left;">
+                <option value="" disabled selected>Выберите вариант</option>
+                <option value="variant 1">Дата в будущем</option>
+                <option value="variant 2">Дата не соответствует акту</option>
+                <option value="variant 3">Отметка о поверке отсутствует</option>
+              </select>            
+            </div>
+            <div class="form-group">
+              <label class="form-label">2. Серийный номер счетчика</label>
+              <select class="form-input" id="techcheck2" style="text-align: left;">
+                <option value="" disabled selected>Выберите вариант</option>
+                <option value="не совпадает с паспортом">Не совпадает с паспортом</option>
+                <option value="нечитаем">Нечитаем</option>
+                <option value="не указано">Не указано</option>
+              </select>            
+            </div>
+          </form>
+          <div class="form-group" style="width: 100%; margin-top: 16px;">
+            <label class="form-label">Прикрепить фото нарушения</label>
+            <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" class="form-input" style="padding: 10px; text-align: left;">
+            <div id="previewContainer"></div>
+          </divZN>
+        </section>
+        <div class="button-group">          
+          <button @click="NewPH" class="btn-primary">Отправить отчет о нарушении</button>                             
+          <button onclick="main()" class="btn-secondary">Назад к списку</button>
+        </div>      
+      </main>
+    </div>
+    <script src="./app.js"></script>
+    <script>
+        function main() {
+            window.location.href = 'address.html';
+        }
+    </script>
+    <script>
+      window.addEventListener('DOMContentLoaded', async () => {
+        const meterNumElement = document.getElementById('meterNum');
+        const phElement = document.getElementById('PH');
+        let meterData = getActiveMeter ? getActiveMeter() : null;
+        if (!meterData) {
+          const stored = sessionStorage.getItem('meternum');
+          if (stored) { try { meterData = JSON.parse(stored); } catch (e) {} }
+        }      
+        if (meterData?.meterNum) {
+          meterNumElement.textContent = meterData.meterNum;
+          if (typeof saveActiveMeter === 'function') saveActiveMeter(meterData);
+        } else {
+          meterNumElement.textContent = 'Не указан';
+        }
+      });
+      
+      const fileInput = document.getElementById('fileInput');
+      const previewContainer = document.getElementById('previewContainer');
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {        
+          previewContainer.innerHTML = '';         
+          Array.from(this.files).forEach(file => {          
+            if (!file.type.startsWith('image/')) return; 
+            const reader = new FileReader();          
+            reader.onload = function(event) {
+              const img = document.createElement('img');
+              img.src = event.target.result;
+              img.classList.add('preview-image');                        
+              previewContainer.appendChild(img);
+            };          
+            reader.readAsDataURL(file); 
+          });
+          this.classList.toggle('file-selected', this.files.length > 0);
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const techCheck = document.getElementById('techcheck');
+        const techcheckForm = document.getElementById('techcheckForm');
+        if (techCheck && techcheckForm) {
+          techCheck.addEventListener('change', function() {
+            techcheckForm.style.display = this.checked ? 'block' : 'none';
+            if (!this.checked) {
+              document.getElementById('techcheck1').value = "";
+              document.getElementById('techcheck2').value = "";
+            }
+          });
+        }
+      });
+    </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 20px 16px;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+
+    .page-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 15px;
+      color: #C62828;
+      min-height: 22px;
+      text-align: center;
+    }
+
+    .content-wrapper {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .info-card {
+      width: 100%;
+      border: 2px solid #45B0E1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #FFFFFF;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .info-label {
+      font-weight: 500;
+      color: #333333;
+      font-size: 17px;
+    }
+
+    .info-value {
+      font-weight: 700;
+      color: #000000;
+      font-size: 18px;
+      word-break: break-word;
+      text-align: right;
+      min-width: 120px;
+    }
+
+    .form-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .form-label {
+      font-weight: 500;
+      color: #333333;
+      font-size: 17px;
+      align-self: flex-start;
+      margin-left: 4px;
+    }
+
+    .form-input {
+      width: 100%;
+      min-height: 56px;
+      padding: 16px 20px;
+      font-size: 20px;
+      font-weight: 500;
+      color: #000000;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      text-align: right;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .form-input::placeholder {
+      color: #999999;
+      font-weight: 400;
+    }
+
+    .form-input:focus {
+      border-color: #2E8BC0;
+      background-color: #F8FDFF;
+    }
+
+    .button-group {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    button {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      text-align: center;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+
+    button:active {
+      background-color: #1A6B96;
+      border-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+
+    .btn-secondary:active {
+      background-color: #E0F4FA;
+    }
+
+    .checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+    }
+
+    .form-checkbox {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      accent-color: #45B0E1;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    .checkbox-text {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
+    }
+
+    #fileInput {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #333333;
+      background-color: #FFFFFF;
+      border: 2px solid #D1D1D1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    #fileInput:hover {
+      border-color: #45B0E1;
+      background-color: #F8FDFF;
+    }
+
+    #fileInput:active {
+      background-color: #E0F4FA;
+    }
+    
+    #fileInput::file-selector-button {
+      background-color: #45B0E1;
+      color: #FFFFFF;
+      border: none;
+      padding: 10px 20px;
+      margin-right: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background-color 0.15s ease, transform 0.05s ease;
+      white-space: nowrap;
+    }
+
+    #fileInput::file-selector-button:hover {
+      background-color: #2E8BC0;
+    }
+
+    #fileInput::file-selector-button:active {
+      background-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    #fileInput.file-selected {
+      border-style: solid;
+      border-color: #45B0E1;
+      background-color: #F8FDFF;
+    }
+
+    #previewContainer {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .preview-image {
+      width: 100%;
+      aspect-ratio: 1 / 1; 
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    
+    @media (max-width: 480px) {
+      #fileInput {
+        min-height: 52px;
+        font-size: 15px;
+        padding: 10px 14px;
+        max-width: 100%;
+      }
+      
+      #fileInput::file-selector-button {
+        padding: 8px 16px;
+        font-size: 15px;
+        margin-right: 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      .page-header h1 {
+        font-size: 24px;
+      }
+      
+      .info-card {
+        padding: 18px 20px;
+      }
+      
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      
+      .info-value {
+        text-align: left;
+        width: 100%;
+      }
+      
+      .form-input {
+        min-height: 52px;
+        font-size: 19px;
+        padding: 14px 18px;
+      }
+      
+      button {
+        min-height: 52px;
+        font-size: 17px;
+        max-width: 100%;
+      }
+    }
+
+
+    .server-response {
+      white-space: pre-line;
+    }
+  </style>
+</html>

@@ -52,7 +52,9 @@ app.post('/auth', (req, res) => {
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
-      db.query(meterQuery, (err, meterResult) => {        
+      db.query(meterQuery, (err, meterResult) => {   
+        // Логика обновления токена: если с момента последней авторизации прошло больше 40 минут (2400000 мс),
+        // генерируем новый токен. Иначе просто обновляем дату авторизации, сохраняя старый токен.        
         const now = Date.now();
         const minute = 2400000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
@@ -68,9 +70,7 @@ app.post('/auth', (req, res) => {
         };        
         const meterNum = meterResult?.[0]?.METER_NUM || null;
         const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
-        const verifyDate = meterResult?.[0]?.VERIFY_DATE || null; 
-        // Логика обновления токена: если с момента последней авторизации прошло больше 40 минут (2400000 мс),
-        // генерируем новый токен. Иначе просто обновляем дату авторизации, сохраняя старый токен.               
+        const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;                     
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
@@ -433,22 +433,22 @@ app.post('/apparts', (req, res) => {
         A.G_LICSCHET
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
-        AND (
-          NOT EXISTS (
-            SELECT 1 FROM METERS M WHERE M.LS = A.G_LICSCHET
-          )
-          OR
-          EXISTS (
-            SELECT 1 
-            FROM METERS M
-            INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-            INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
-            INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
-            WHERE M.LS = A.G_LICSCHET
-              AND RS.ID = 1
-              AND S.GROUP_ID IN (537, 555, 597)
-          )
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM METERS M WHERE M.LS = A.G_LICSCHET
         )
+        OR
+        EXISTS (
+          SELECT 1 
+          FROM METERS M
+          INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+          INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+          INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
+          WHERE M.LS = A.G_LICSCHET
+            AND RS.ID = 1
+            AND S.GROUP_ID IN (537, 555, 597)
+        )
+      )
     `;    
     db.query(query, [buildingId], (err, result) => {
       db.detach();
