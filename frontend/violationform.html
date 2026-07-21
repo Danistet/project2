@@ -63,9 +63,9 @@
               <label class="form-label">1. Ошибочная дата проверки</label>
               <select class="form-input" id="techcheck1" style="text-align: left;">
                 <option value="" disabled selected>Выберите вариант</option>
-                <option value="variant 1">Дата в будущем</option>
-                <option value="variant 2">Дата не соответствует акту</option>
-                <option value="variant 3">Отметка о поверке отсутствует</option>
+                <option value="Дата в будущем">Дата в будущем</option>
+                <option value="Дата не соответствует акту">Дата не соответствует акту</option>
+                <option value="Отметка о поверке отсутствует">Отметка о поверке отсутствует</option>
               </select>            
             </div>
             <div class="form-group">
@@ -85,7 +85,7 @@
           </divZN>
         </section>
         <div class="button-group">          
-          <button @click="NewPH" class="btn-primary">Отправить отчет о нарушении</button>                             
+          <button @click="submitViolationReport" class="btn-primary">Отправить отчет о нарушении</button>
           <button onclick="main()" class="btn-secondary">Назад к списку</button>
         </div>      
       </main>
@@ -93,7 +93,7 @@
     <script src="./app.js"></script>
     <script>
         function main() {
-            window.location.href = 'address.html';
+            window.location.href = 'violationwindow.html';
         }
     </script>
     <script>
@@ -111,8 +111,7 @@
         } else {
           meterNumElement.textContent = 'Не указан';
         }
-      });
-      
+      });      
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
       if (fileInput) {
@@ -132,7 +131,6 @@
           this.classList.toggle('file-selected', this.files.length > 0);
         });
       }
-
       document.addEventListener('DOMContentLoaded', () => {
         const techCheck = document.getElementById('techcheck');
         const techcheckForm = document.getElementById('techcheckForm');
@@ -147,6 +145,56 @@
         }
       });
     </script>
+    <script>
+        async function loadPreviousPHForViolation() {
+            const phElement = document.getElementById('PH');
+            if (!phElement) return;            
+            let meterData = null;
+            if (typeof getActiveMeter === 'function') meterData = getActiveMeter();
+            if (!meterData && typeof getSelectedMeter === 'function') meterData = getSelectedMeter();
+            if (!meterData) {
+                const stored = sessionStorage.getItem('meternum');
+                if (stored) { 
+                    try { meterData = JSON.parse(stored); } catch (e) {} 
+                }
+            }            
+            const meter_id = meterData?.meterNum;
+            if (!meter_id) {
+                phElement.textContent = 'нет данных';
+                return;
+            }
+            try {
+            const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();            
+            if (result.found && result.ph) {
+                phElement.textContent = result.ph;
+            } else {
+                phElement.textContent = 'нет данных';
+            }
+            } catch (err) {
+                console.error('Failed to load previous PH:', err);
+                phElement.textContent = 'нет данных';
+            }
+        }
+        window.addEventListener('DOMContentLoaded', () => {
+            const meterNumElement = document.getElementById('meterNum');
+            let meterData = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+            if (!meterData) {
+                const stored = sessionStorage.getItem('meternum');
+                if (stored) { try { meterData = JSON.parse(stored); } catch (e) {} }
+            }      
+            if (meterData?.meterNum) {
+                meterNumElement.textContent = meterData.meterNum;
+                if (typeof saveActiveMeter === 'function') saveActiveMeter(meterData);
+            } else {
+                meterNumElement.textContent = 'Не указан';
+            }
+            loadPreviousPHForViolation();
+        });
+  </script>
 
   <style>
     * {

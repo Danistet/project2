@@ -222,7 +222,7 @@
           
           const loadMeterDetails = async (meterId) => {
             try {
-              const result = await apiRequest('/get-meter-details', { meterId });
+              const result = await apiRequest('/get-meter-details', {  meterId: meterId });
               if (result.found) {                    
                 const formatDateForInput = (dateStr) => {
                   if (!dateStr) return '';

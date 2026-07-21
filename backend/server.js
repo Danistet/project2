@@ -727,7 +727,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
       }
       if (checkResult.length === 0) {
         db.detach();
-        return res.status(404).json({ error: 'Счётчик не найден' });
+        return res.status(500).json({ error: 'no meter' });
       }      
       const meterNum = checkResult[0].METER_NUM;
       const dbLicschet = checkResult[0].LS;
@@ -841,6 +841,81 @@ app.get('/PH/last', (req, res) => {
         id: result[0].ID
       });
     });
+  });
+});
+
+app.post('/save-violation',upload.single('file'), (req, res) => {
+  const { meterNum, licschet, violations} = req.body;
+  if (!meterNum) {
+    return res.status(400).json({error: 'meternum required'});
+  }
+  let parsedviolations = [];
+  try {
+    parsedviolations = violations ? JSON.parse(violations) : [];
+  } catch (e) {
+    return res.status(400).json({error: 'wrong format'});
+  }
+  if (parsedviolations.length === 0) {
+    return res.status(400).json({eror: 'no violation'});
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const meterQuery = `SELECT ID, LS FROM METERS WHERE METER_NUM = ?`;
+    db.query(meterQuery, [meterNum], (err, meterResult) => {
+      if (err || !meterResult || meterResult.length === 0) {
+        db.detach();
+        return res.status(500).json({ error: 'no meter' });
+      }
+      const meterId = meterResult[0].ID;
+      const dbLicschet = licschet || meterResult[0].LS;
+      const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      const abonentQuery = `SELECT ID FROM ABONENTS WHERE G_LICSCHET = ?`;
+      db.query(abonentQuery, [dbLicschet], (err, abonentResult) => {
+        if (err) {
+          db.detach();
+          return res.status(500).json({ error: 'error' });
+        }
+        const abonentId = (abonentResult && abonentResult.length > 0) ? abonentResult[0].ID : null;
+        const insertQuery = `
+          INSERT INTO VIOLATIONS (ID, NAME, DESCRIPTION, ABONENT_ID, METERS_ID, CREATEDATE)
+          VALUES (GEN_ID(VIOLATIONS_GEN, 1), ?, ?, ?, ?, ?)
+        `;
+        let completed = 0;
+        let hasError = false;
+        parsedviolations.forEach((v) => {
+          db.query(insertQuery, [v.name, v.description, abonentId, meterId, createdate], (err) => {
+            if (err && !hasError) {
+              hasError = true;
+              db.detach();
+              console.error('Insert violation error:', err);
+              return res.status(500).json({ error: 'Ошибка сохранения нарушения', details: err.message });
+            }
+            completed++;
+            if (completed === parsedviolations.length && !hasError) {
+              if (req.file) {
+                const fileName = req.file.originalname;
+                const fileSize = req.file.size.toString();
+                const fileQuery = `
+                  INSERT INTO ABONENT_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, FILESIZE)
+                  VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, 'violationfile', ?)
+                `;
+                db.query(fileQuery, [abonentId, fileName, createdate, fileSize], (fileErr) => {
+                  db.detach();
+                  if (fileErr) console.error('File insert error', fileErr);
+                  res.json({ status: 'OK', message: 'saved' });
+                });              
+              } else {
+                db.detach();
+                res.json({ status: 'OK', message: 'saved' });
+              }
+            }
+          });  
+        });                
+      });  
+    });    
   });
 });
 

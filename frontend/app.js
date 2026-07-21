@@ -187,7 +187,7 @@ createApp({
         }
         const payload = {
           ph: numericValue, meter_id, licschet,
-          abonent_name: addressData.town || '', description: 'NARUSHENIE',
+          abonent_name: addressData.town || '', description: 'file',
           fileName: fileNameForServer, fileType, fileBase64: fileDataForStorage,
           createdate: new Date().toISOString().replace('T', ' ').slice(0, 19)
         };        
@@ -216,8 +216,7 @@ createApp({
           document.getElementById('previewContainer').innerHTML = '';
         }                     
         const violationsForm = document.getElementById('violationsForm');
-        if (violationsForm) {
-          violationsForm.style.display = 'none';
+        if (violationsForm) {          
           const appartsCheck = document.getElementById('appartscheck');
           if (appartsCheck) appartsCheck.checked = false;
           document.getElementById('violation1').value = "";
@@ -493,6 +492,90 @@ createApp({
       else { meters.value = []; clearMeterDataToSession(); showMeterSelect.value = false; }
     };
 
+    const submitViolationReport = async () => {
+      try {
+        const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+        const meterNum = meterData.meterNum; 
+        const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+        const licschet = addressData.g_licschet || '';
+        if (!meterNum) {
+          alert('Не найден серийный номер счётчика');
+          return;
+        }
+        const violations = [];
+        const v1 = document.getElementById('violation1')?.value;
+        if (v1 && v1 !== "") violations.push({ name: 'Механические повреждения', description: v1 });
+        const v2 = document.getElementById('violation2')?.value;
+        if (v2 && v2 !== "") violations.push({ name: 'Проблемы с отображением', description: v2 });
+        const v3 = document.getElementById('violation3')?.value;
+        if (v3 && v3 !== "") violations.push({ name: 'Поверка', description: v3 });
+        const techCheck = document.getElementById('techcheck')?.checked;
+        if (techCheck) {
+          const t1 = document.getElementById('techcheck1')?.value;
+          if (t1 && t1 !== "") violations.push({ name: 'Ошибочная дата проверки', description: t1 });
+          const t2 = document.getElementById('techcheck2')?.value;
+          if (t2 && t2 !== "") violations.push({ name: 'Серийный номер счетчика', description: t2 });
+        }
+        if (violations.length === 0) {
+          alert('Пожалуйста, выберите хотя бы одно нарушение');
+          return;
+        }
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput?.files?.[0];
+        let fileDataForStorage = null;
+        let fileNameForServer = 'no_file.jpg';
+        let fileType = 'image/jpeg';
+        if (file) {
+          fileNameForServer = generateFileName(meterNum, file.name);
+          fileType = file.type;
+          fileDataForStorage = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+        }
+        const payload = {
+          meterNum,
+          licschet,
+          violations: JSON.stringify(violations),
+          fileName: fileNameForServer,
+          fileType,
+          fileBase64: fileDataForStorage,
+          isViolation: true 
+        };
+        await saveReadingLocally(payload);
+        if (navigator.onLine) {
+          const formData = new FormData();
+          formData.append('meterNum', meterNum);
+          formData.append('licschet', licschet);
+          formData.append('violations', JSON.stringify(violations));
+          if (fileDataForStorage) {
+            const blob = base64ToBlob(fileDataForStorage, fileType);
+            formData.append('file', blob, fileNameForServer);
+          }
+          const response = await fetch('http://localhost:3000/save-violation', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
+          alert(result.message || 'Отчет о нарушении успешно отправлен!');
+        } else {
+          alert('Интернет отсутствует. Отчет о нарушении СОХРАНЕН ВНУТРИ ПРИЛОЖЕНИЯ и будет отправлен при появлении сети.');
+        }
+        document.getElementById('violationsForm')?.reset();
+        document.getElementById('techcheckForm')?.reset();
+        document.getElementById('techcheckForm').style.display = 'none';
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileInput').classList.remove('file-selected');
+        document.getElementById('previewContainer').innerHTML = '';
+        window.location.href = 'main.html'; 
+      } catch (err) {
+        console.error('Error submitting violation:', err);
+        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка') + '. Данные сохранены локально.');
+      }
+    };
+
     const login = async (e) => {
       error.value = ''; response.value = '';
       const passwordValue = password.value.trim();
@@ -520,6 +603,7 @@ createApp({
       NewPH, onTownInput, onTownChange, onStreetInput, onStreetChange,
       onHouseInput, onHouseChange, onAppartsInput, onAppartsChange,
       login, saveAddressAndContinue,
+      submitViolationReport,
       isLoading
     };
   }

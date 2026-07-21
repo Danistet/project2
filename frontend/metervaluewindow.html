@@ -4,6 +4,7 @@
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Передать показания</title>
+    <link rel="icon" href="data:,">
     <script src="./api.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   </head>
@@ -36,77 +37,11 @@
             placeholder="0,000"
             class="form-input"
           > 
-          <label class="form-label checkbox-label">            
-            <input type="checkbox" id="appartscheck" class="form-checkbox">
-            <span class="checkbox-text">Список нарушений</span>
-          </label>     
-        </section>  
-
-        <form novalidate id="violationsForm" style="display: none;">
-          <div class="form-group">
-            <label class="form-label">Механические повреждения</label>
-            <select class="form-input" id="violation1">
-              <option value="" disabled selected>Выберите нарушение</option>
-              <option value="не плотное прилегание стекла индикатора">не плотное прилегание стекла индикатора</option>
-              <option value="не предусмотренные изготовителем отверстия или трещины">не предусмотренные изготовителем отверстия или трещины</option>
-              <option value="нарушения контрольных пломб">нарушения контрольных пломб</option>
-            </select>            
-          </div>
-          <div class="form-group">
-            <label class="form-label">2</label>
-            <select class="form-input" id="violation2">
-              <option value="" disabled selected>Выберите нарушение</option>
-              <option value="не отображение приборами учета результатов измерений">не отображение приборами учета результатов измерений</option>
-              <option value="">не указано</option>
-            </select>            
-          </div>
-          <div class="form-group">
-            <label class="form-label">3</label>
-            <select class="form-input" id="violation3">
-              <option value="" disabled selected>Выберите нарушение</option>
-              <option value="истечение межповерочного интервала поверки">истечение межповерочного интервала поверки</option>
-              <option value="">не указано</option>
-            </select>            
-          </div>
           <div class="button-group">
-            <label class="form-label">Прикрепить фото нарушения</label>
+            <label class="form-label">Прикрепить фото счетчика</label>
             <input type="file" name="fileInput" id="fileInput" accept="image/png" multiple>
-            <div id="previewContainer"></div>
-            <button type="button" class="btn-primary" onclick="console.log('Подтвердить нарушения')">Подтвердить</button>                        
+            <div id="previewContainer"></div>            
           </div>          
-        </form>
-
-        <label class="form-label checkbox-label">            
-          <input type="checkbox" id="techcheck" class="form-checkbox">
-          <span class="checkbox-text">технические некоректности</span>
-        </label>  
-        <form novalidate id="techcheckForm" style="display: none;">
-          <div class="form-group">
-            <label class="form-label">ошибочная дата проверки</label>
-            <select class="form-input" id="techcheck1">
-              <option value="" disabled selected>Выберите вариант</option>
-              <option value="variant 1">variant 1</option>
-              <option value="variant 2">variant 2</option>
-              <option value="variant 3">variant 3</option>
-            </select>            
-          </div>
-          <div class="form-group">
-            <label class="form-label">Серийный номер счетчика</label>
-            <select class="form-input" id="techcheck2">
-              <option value="" disabled selected>Выберите вариант</option>
-              <option value="1">1</option>
-              <option value="">не указано</option>
-            </select>            
-          </div>
-          <div class="form-group">
-            <label class="form-label">333333</label>
-            <select class="form-input" id="techcheck3">
-              <option value="" disabled selected>Выберите вариант</option>
-              <option value="1">1</option>
-              <option value="">не указано</option>
-            </select>            
-          </div>
-        </form>
         <div class="button-group">          
           <button @click="NewPH" class="btn-primary">Передать</button>                             
           <button onclick="main()" class="btn-secondary">Назад</button>
@@ -157,34 +92,6 @@
             e.target.value = e.target.value.replace(/[^0-9,\.]/g, '');
           });
         }        
-        const appartsCheck = document.getElementById('appartscheck');
-        const violationsForm = document.getElementById('violationsForm');        
-        if (appartsCheck && violationsForm) {
-          appartsCheck.addEventListener('change', function() {
-            if (this.checked) {
-              violationsForm.style.display = 'block';
-            } else {
-              violationsForm.style.display = 'none';              
-              document.getElementById('violation1').value = "";
-              document.getElementById('violation2').value = "";
-              document.getElementById('violation3').value = "";
-            }
-          });
-        }
-        const techCheck = document.getElementById('techcheck');
-        const techcheckForm = document.getElementById('techcheckForm');
-        if (techCheck && techcheckForm) {
-          techCheck.addEventListener('change', function() {
-            if (this.checked) {
-              techcheckForm.style.display = 'block';
-            } else {
-              techcheckForm.style.display = 'none';
-              document.getElementById('techcheck1').value = "";
-              document.getElementById('techcheck2').value = "";
-              document.getElementById('techcheck3').value = "";
-            }
-          });
-        }
       });
     </script>
 
@@ -239,9 +146,6 @@
       function main() {                
         window.location.href = 'main.html';
       }
-      function violation() {
-        window.location.href = 'violationwindow.html';
-      }
       function showError(message) {
         const errorContainer = document.getElementById('error');
         errorContainer.innerHTML = `<div style="color: red;">${message}</div>`;
@@ -292,12 +196,9 @@
       }         
       async function syncPendingReadings() {
         if (!navigator.onLine) return;
-
         const pending = await getPendingReadings();
         if (pending.length === 0) return;
-
         console.log(`Найдено ${pending.length} записей для фоновой синхронизации...`);
-
         for (const record of pending) {
           try {
             const formData = new FormData();
@@ -305,19 +206,16 @@
             formData.append('meter_id', record.meter_id);
             formData.append('licschet', record.licschet);
             formData.append('abonent_name', record.abonent_name);
-            formData.append('description', record.description);
-            
+            formData.append('description', record.description);            
             // Если есть сохраненный файл, восстанавливаем его из Base64 и добавляем в FormData
             if (record.fileBase64) {
               const blob = base64ToBlob(record.fileBase64, record.fileType);
               formData.append('file', blob, record.fileName);
             }
-
             const response = await fetch('http://localhost:3000/PH', {
               method: 'POST',
               body: formData
             });
-
             if (response.ok) {              
               await deletePendingReading(record.id);
               console.log(`Запись ID ${record.id} успешно синхронизирована и удалена из локального хранилища.`);
