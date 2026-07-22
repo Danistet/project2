@@ -48,13 +48,11 @@ app.post('/auth', (req, res) => {
       }
       if (authResult.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'неправильный пароль'});
+        return res.status(401).json({ error: 'wrong password'});
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
-      db.query(meterQuery, (err, meterResult) => {   
-        // Логика обновления токена: если с момента последней авторизации прошло больше 40 минут (2400000 мс),
-        // генерируем новый токен. Иначе просто обновляем дату авторизации, сохраняя старый токен.        
+      db.query(meterQuery, (err, meterResult) => {                          
         const now = Date.now();
         const minute = 2400000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
@@ -326,7 +324,7 @@ app.post('/generate-act', (req, res) => {
 app.post('/update-act-building', (req, res) => {
   const { actId, buildingId } = req.body;
   if (!actId || !buildingId) {
-    return res.status(400).json({ error: 'actId и buildingId обязательны' });
+    return res.status(400).json({ error: 'actId и buildingId required' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
@@ -346,7 +344,7 @@ app.post('/update-act-building', (req, res) => {
       }
       res.json({
         status: 'OK',
-        message: 'BUILDING_ID успешно обновлён',
+        message: 'BUILDING_ID updated',
         actId,
         buildingId
       });
@@ -422,9 +420,7 @@ app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connection failed' });
-    // выбираем квартиры, для которых либо вообще нет счётчиков,
-    // либо есть счётчики с определённым статусом (RS.ID = 1) и группой услуг (537, 555, 597).   
+    if (err) return res.status(500).json({ error: 'DB connection failed' });    
     const query = `
       SELECT 
         A.ID, 
@@ -592,9 +588,7 @@ app.post('/meter-by-building', (req, res) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
-    }
-    // SQL-запрос ищет счётчик по зданию, игнорируя квартиры (APPARTS IS NULL),
-    // и берёт только первую запись (ROWS 1), отсортированную по дате установки.
+    }    
     const query = `
       SELECT 
         M.METER_NUM, 
@@ -710,7 +704,7 @@ app.post('/meters-by-building', (req, res) => {
 app.post('/PH', upload.single('file'), (req, res) => {
   const { ph, meter_id, licschet, abonent_name, description } = req.body;
   if (ph === undefined || ph === null || !meter_id) {
-    return res.status(400).json({ error: 'ph и meter_id обязательны' });
+    return res.status(400).json({ error: 'ph и meter_id required' });
   }  
   const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);  
   firebird.attach(config, (err, db) => {
@@ -741,7 +735,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
           db.detach();
           console.error('Insert error:', err);
           return res.status(500).json({ 
-            error: 'Не удалось сохранить показание',
+            error: 'error',
             details: err.message
           });
         }        
@@ -756,7 +750,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
             if (err) {
               db.detach();
               console.error('Abonent query error:', err);
-              return res.status(500).json({ error: 'Ошибка поиска абонента', details: err.message });
+              return res.status(500).json({ error: 'error', details: err.message });
             }
             let abonentId = null;
             let clientName = abonent_name || '';
@@ -768,7 +762,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
             }
             const fileName = req.file.originalname;
             const fileSize = req.file.size.toString();
-            const desc = description ? String(description).substring(0, 40) : 'Нарушение';          
+            const desc = description ? String(description).substring(0, 40) : 'file';          
             const insertFileQuery = `
               INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
               VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
@@ -781,7 +775,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
               }
               res.json({
                 status: 'OK',
-                message: 'Показания и файл успешно сохранены',
+                message: 'Saved',
                 action: 'INSERT',
                 data: { ph, meter_id, createdate, fileName }
               });
@@ -791,7 +785,7 @@ app.post('/PH', upload.single('file'), (req, res) => {
           db.detach();
           res.json({
             status: 'OK',
-            message: 'Показание сохранено',
+            message: 'Saved',
             action: 'INSERT',
             data: { ph, meter_id, createdate }
           });         
@@ -844,19 +838,19 @@ app.get('/PH/last', (req, res) => {
   });
 });
 
-app.post('/save-violation',upload.single('file'), (req, res) => {
-  const { meterNum, licschet, violations} = req.body;
+app.post('/save-violation', upload.single('file'), (req, res) => {
+  const { meterNum, licschet, violations } = req.body;
   if (!meterNum) {
-    return res.status(400).json({error: 'meternum required'});
+    return res.status(400).json({ error: 'meternum required' });
   }
   let parsedviolations = [];
   try {
     parsedviolations = violations ? JSON.parse(violations) : [];
   } catch (e) {
-    return res.status(400).json({error: 'wrong format'});
+    return res.status(400).json({ error: 'wrong format' });
   }
   if (parsedviolations.length === 0) {
-    return res.status(400).json({eror: 'no violation'});
+    return res.status(400).json({ error: 'no violation' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
@@ -867,18 +861,30 @@ app.post('/save-violation',upload.single('file'), (req, res) => {
     db.query(meterQuery, [meterNum], (err, meterResult) => {
       if (err || !meterResult || meterResult.length === 0) {
         db.detach();
-        return res.status(500).json({ error: 'no meter' });
+        return res.status(404).json({ error: 'no meter' });
       }
       const meterId = meterResult[0].ID;
       const dbLicschet = licschet || meterResult[0].LS;
       const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
-      const abonentQuery = `SELECT ID FROM ABONENTS WHERE G_LICSCHET = ?`;
+      const abonentQuery = `
+        SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME 
+        FROM ABONENTS A 
+        LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID 
+        WHERE A.G_LICSCHET = ?
+      `;
       db.query(abonentQuery, [dbLicschet], (err, abonentResult) => {
         if (err) {
           db.detach();
-          return res.status(500).json({ error: 'error' });
+          return res.status(500).json({ error: 'error finding abonent' });
         }
-        const abonentId = (abonentResult && abonentResult.length > 0) ? abonentResult[0].ID : null;
+        let abonentId = null;
+        let clientName = ''; 
+        if (abonentResult && abonentResult.length > 0) {
+          abonentId = abonentResult[0].ABONENT_ID;
+          if (abonentResult[0].CLIENT_NAME) {
+            clientName = abonentResult[0].CLIENT_NAME;
+          }
+        }
         const insertQuery = `
           INSERT INTO VIOLATIONS (ID, NAME, DESCRIPTION, ABONENT_ID, METERS_ID, CREATEDATE)
           VALUES (GEN_ID(VIOLATIONS_GEN, 1), ?, ?, ?, ?, ?)
@@ -891,25 +897,29 @@ app.post('/save-violation',upload.single('file'), (req, res) => {
               hasError = true;
               db.detach();
               console.error('Insert violation error:', err);
-              return res.status(500).json({ error: 'Ошибка сохранения нарушения', details: err.message });
+              return res.status(500).json({ error: 'error', details: err.message });
             }
             completed++;
             if (completed === parsedviolations.length && !hasError) {
               if (req.file) {
-                const fileName = req.file.originalname;
+                const fileName = req.file.originalname; 
                 const fileSize = req.file.size.toString();
-                const fileQuery = `
-                  INSERT INTO ABONENT_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, FILESIZE)
-                  VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, 'violationfile', ?)
+                const desc = 'violationfile';
+                const insertFileQuery = `
+                  INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
+                  VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
                 `;
-                db.query(fileQuery, [abonentId, fileName, createdate, fileSize], (fileErr) => {
-                  db.detach();
-                  if (fileErr) console.error('File insert error', fileErr);
-                  res.json({ status: 'OK', message: 'saved' });
+                db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
+                  db.detach(); 
+                  if (fileErr) {
+                    console.error('File insert error:', fileErr);
+                    return res.status(500).json({ error: 'error', details: fileErr.message });
+                  }
+                  res.json({ status: 'OK', message: 'Saved' });
                 });              
               } else {
                 db.detach();
-                res.json({ status: 'OK', message: 'saved' });
+                res.json({ status: 'OK', message: 'Saved' });
               }
             }
           });  

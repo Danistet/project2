@@ -144,57 +144,68 @@
           });
         }
       });
-    </script>
-    <script>
-        async function loadPreviousPHForViolation() {
-            const phElement = document.getElementById('PH');
-            if (!phElement) return;            
-            let meterData = null;
-            if (typeof getActiveMeter === 'function') meterData = getActiveMeter();
-            if (!meterData && typeof getSelectedMeter === 'function') meterData = getSelectedMeter();
-            if (!meterData) {
+      </script>
+      <script>
+          async function loadPreviousPHForViolation() {
+              const phElement = document.getElementById('PH');
+              if (!phElement) return;            
+              let meterData = null;
+              if (typeof getActiveMeter === 'function') meterData = getActiveMeter();
+              if (!meterData && typeof getSelectedMeter === 'function') meterData = getSelectedMeter();
+              if (!meterData) {
                 const stored = sessionStorage.getItem('meternum');
                 if (stored) { 
-                    try { meterData = JSON.parse(stored); } catch (e) {} 
+                  try { meterData = JSON.parse(stored); } catch (e) {} 
                 }
-            }            
-            const meter_id = meterData?.meterNum;
-            if (!meter_id) {
+              }            
+              const meter_id = meterData?.meterNum;
+              if (!meter_id) {
                 phElement.textContent = 'нет данных';
                 return;
-            }
-            try {
-            const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+              }
+              try {
+              const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
-            });
-            const result = await response.json();            
-            if (result.found && result.ph) {
+              });
+              const result = await response.json();            
+              if (result.found && result.ph) {
                 phElement.textContent = result.ph;
-            } else {
+              } else {
                 phElement.textContent = 'нет данных';
-            }
-            } catch (err) {
+              }
+              } catch (err) {
                 console.error('Failed to load previous PH:', err);
                 phElement.textContent = 'нет данных';
-            }
-        }
-        window.addEventListener('DOMContentLoaded', () => {
-            const meterNumElement = document.getElementById('meterNum');
-            let meterData = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+              }
+          }
+          window.addEventListener('DOMContentLoaded', () => {
+              const meterNumElement = document.getElementById('meterNum');
+              let meterData = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
             if (!meterData) {
-                const stored = sessionStorage.getItem('meternum');
-                if (stored) { try { meterData = JSON.parse(stored); } catch (e) {} }
+              const stored = sessionStorage.getItem('meternum');
+              if (stored) { try { meterData = JSON.parse(stored); } catch (e) {} }
             }      
             if (meterData?.meterNum) {
-                meterNumElement.textContent = meterData.meterNum;
-                if (typeof saveActiveMeter === 'function') saveActiveMeter(meterData);
+              meterNumElement.textContent = meterData.meterNum;
+              if (typeof saveActiveMeter === 'function') saveActiveMeter(meterData);
             } else {
-                meterNumElement.textContent = 'Не указан';
+              meterNumElement.textContent = 'Не указан';
             }
             loadPreviousPHForViolation();
-        });
-  </script>
+          });
+    </script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        if (typeof syncPendingReadings === 'function') {
+          syncPendingReadings();
+        }
+      });
+      window.addEventListener('online', () => {
+        console.log('Сеть восстановлена. Запуск фонов');
+      });
+    </script>
+  </body>
 
   <style>
     * {

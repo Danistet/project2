@@ -175,7 +175,7 @@
           const loadMeters = async () => {
             isLoading.value = true;
             try {
-              let loadedMeters = getAllMeters ? getAllMeters() : [];            
+              let loadedMeters = typeof getAllMeters === 'function' ? getAllMeters() : [];            
               if (!loadedMeters || loadedMeters.length === 0) {
                 const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
                 if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
@@ -188,10 +188,21 @@
                 }
               }              
               meters.value = loadedMeters || [];                        
-              const activeMeter = getActiveMeter ? getActiveMeter() : null;
+              const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
               if (activeMeter) {
-                selectedMeterId.value = activeMeter.id;
-                await loadMeterDetails(activeMeter.id);
+                let targetMeterId = activeMeter.id;
+                if (!targetMeterId && activeMeter.meterNum) {
+                  const foundMeter = meters.value.find(m => m.meterNum === activeMeter.meterNum);
+                  if (foundMeter) {
+                    targetMeterId = foundMeter.id;
+                  }
+                }
+                if (targetMeterId) {
+                  selectedMeterId.value = targetMeterId;
+                  await loadMeterDetails(targetMeterId);
+                } else {
+                  console.warn('Не удалось определить ID активного счётчика для загрузки деталей');
+                }
               }
             } catch (err) {
               console.error('Failed to load meters:', err);
@@ -219,10 +230,14 @@
               isLoading.value = false;
             }
           };
-          
+
           const loadMeterDetails = async (meterId) => {
+            if (!meterId) {
+              console.warn('no meterId');
+              return;
+            }
             try {
-              const result = await apiRequest('/get-meter-details', {  meterId: meterId });
+              const result = await apiRequest('/get-meter-details', { meterId: meterId });
               if (result.found) {                    
                 const formatDateForInput = (dateStr) => {
                   if (!dateStr) return '';
@@ -252,6 +267,7 @@
               }
             } catch (err) {
               console.error('Failed to load meter details:', err);
+              error.value = 'Ошибка загрузки деталей счётчика';
             }
           };
           

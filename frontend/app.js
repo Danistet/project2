@@ -25,7 +25,7 @@ async function saveReadingLocally(readingData) {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.add(readingData);
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => resolve(request.result); 
     request.onerror = () => reject(request.error);
   });
 }
@@ -206,7 +206,7 @@ createApp({
           if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
           alert(result.message || 'Показания и фото успешно переданы на сервер!');
         } else {          
-          alert('Интернет отсутствует. Показания и фото СОХРАНЕНЫ ВНУТРИ ПРИЛОЖЕНИЯ.');
+          alert('Интернет отсутствует, сохранено локально, ожидание сети');
         }        
         const phElement = document.getElementById('PH');
         if (phElement) phElement.textContent = formatted;
@@ -543,7 +543,7 @@ createApp({
           fileBase64: fileDataForStorage,
           isViolation: true 
         };
-        await saveReadingLocally(payload);
+        const recordId = await saveReadingLocally(payload);
         if (navigator.onLine) {
           const formData = new FormData();
           formData.append('meterNum', meterNum);
@@ -559,9 +559,13 @@ createApp({
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
+          if (recordId) {
+            await deletePendingReading(recordId);
+            console.log(`Запись нарушения ID ${recordId} удалена из IndexedDB после успешной отправки.`);
+          }
           alert(result.message || 'Отчет о нарушении успешно отправлен!');
         } else {
-          alert('Интернет отсутствует. Отчет о нарушении СОХРАНЕН ВНУТРИ ПРИЛОЖЕНИЯ и будет отправлен при появлении сети.');
+          alert('Интернет отсутствует, сохранено локально, ожидание сети');
         }
         document.getElementById('violationsForm')?.reset();
         document.getElementById('techcheckForm')?.reset();
@@ -569,7 +573,6 @@ createApp({
         document.getElementById('fileInput').value = '';
         document.getElementById('fileInput').classList.remove('file-selected');
         document.getElementById('previewContainer').innerHTML = '';
-        window.location.href = 'main.html'; 
       } catch (err) {
         console.error('Error submitting violation:', err);
         alert('Ошибка: ' + (err.message || 'Неизвестная ошибка') + '. Данные сохранены локально.');
