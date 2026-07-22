@@ -33,6 +33,7 @@
           <button @click="closeOverlay" class="btn-primary">Продолжить</button>
         </div>
       </div>
+      <div class="status" id="statusDiv"></div>
     </div>
   </body>
   <script>
@@ -93,6 +94,36 @@
         };
       }
     }).mount('#app');
+  </script>
+  <script>
+    let statusTimeout;    
+    let isInitialLoad = true;
+    function updateStatus(isOnline) {
+      var statusDiv = document.getElementById("statusDiv");
+      if (!statusDiv) return;
+      clearTimeout(statusTimeout);
+      if (isOnline) {
+        if (!isInitialLoad) {
+          statusDiv.style.backgroundColor = "#44ff00";
+          statusDiv.textContent = "Подключено";
+          statusDiv.classList.remove("status-hidden");        
+          statusTimeout = setTimeout(function() {
+            statusDiv.classList.add("status-hidden");
+          }, 5000);
+        }
+      } else {
+        statusDiv.style.backgroundColor = "#ff0007";
+        statusDiv.textContent = "Нет подключения";
+        statusDiv.classList.remove("status-hidden");
+        statusTimeout = setTimeout(function() {
+          statusDiv.classList.add("status-hidden");
+        }, 5000);
+      }
+      isInitialLoad = false;
+    }   
+    updateStatus(navigator.onLine);
+    window.addEventListener("online", () => updateStatus(true));
+    window.addEventListener("offline", () => updateStatus(false));
   </script>
   <style>
       * {
@@ -230,6 +261,29 @@
         max-width: 200px;
         margin: 0 auto;
       }
+
+    .status {    
+      position: fixed;
+      bottom: 0;      
+      left: 0;        
+      right: 0;       
+      width: 100%;    
+      text-align: center;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 12px 0;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
+      
+    .status.status-hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none; 
+    }
 
       @media (max-width: 480px) {
         body {

@@ -9,18 +9,19 @@
     <script src="./api.js"></script>
   </head>
     <body>
-        <div id="app">
-            <h1>владелец лицевого счета присутствует?</h1>
-        </div>
-        <div>
-            <div class="form-container"> 
-                <div class="button-group">
-                    <button type="button" onclick="wihtowner()">да</button>
-                    <button type="button" onclick="noowner()">нет</button><br>
-                    <button type="button" onclick="tologin()" class="btn-secondary">Назад</button>
-                </div>
+      <div id="app">
+        <div class="form-container">
+          <h1>владелец лицевого счета присутствует?</h1>
+          <div class="form-container"> 
+            <div class="button-group">
+              <button type="button" onclick="wihtowner()">да</button>
+              <button type="button" onclick="noowner()">нет</button>
+              <button type="button" onclick="tologin()" class="btn-secondary">Назад</button>
             </div>
-        </div>    
+          </div>
+          <div class="status" id="statusDiv"></div> 
+        </div>  
+      </div>    
     </body>
 
     <script src="./app.js"></script>
@@ -35,6 +36,36 @@
       function noowner() {
         window.location.href = 'Representativewindow.html';
       }
+    </script>
+    <script>
+      let statusTimeout;    
+      let isInitialLoad = true;
+      function updateStatus(isOnline) {
+        var statusDiv = document.getElementById("statusDiv");
+        if (!statusDiv) return;
+        clearTimeout(statusTimeout);
+        if (isOnline) {
+          if (!isInitialLoad) {
+            statusDiv.style.backgroundColor = "#44ff00";
+            statusDiv.textContent = "Подключено";
+            statusDiv.classList.remove("status-hidden");        
+            statusTimeout = setTimeout(function() {
+              statusDiv.classList.add("status-hidden");
+            }, 5000);
+          }
+        } else {
+          statusDiv.style.backgroundColor = "#ff0007";
+          statusDiv.textContent = "Нет подключения";
+          statusDiv.classList.remove("status-hidden");
+          statusTimeout = setTimeout(function() {
+            statusDiv.classList.add("status-hidden");
+          }, 5000);
+        }
+        isInitialLoad = false;
+      }   
+      updateStatus(navigator.onLine);
+      window.addEventListener("online", () => updateStatus(true));
+      window.addEventListener("offline", () => updateStatus(false));
     </script>
 
     <style>
@@ -96,6 +127,7 @@
     .button-group {
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 12px;
       margin-top: 8px;
     }
@@ -146,6 +178,29 @@
       font-size: 14px;
       margin-top: 8px;
       word-break: break-word;
+    }
+
+    .status {    
+      position: fixed;
+      bottom: 0;      
+      left: 0;        
+      right: 0;       
+      width: 100%;    
+      text-align: center;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 12px 0;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
+      
+    .status.status-hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none; 
     }
 
     @media (max-width: 480px) {

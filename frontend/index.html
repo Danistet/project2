@@ -4,6 +4,7 @@
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход</title>
+    <base href="/frontend/">
     <link rel="icon" href="data:,">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./api.js"></script>
@@ -32,26 +33,34 @@
     <script src="./app.js"></script>
   </body>
   <script>
-    let statusTimeout;
-    function updateStatus() {
-      var statusDiv = document.getElementById("statusDiv");                
+    let statusTimeout;    
+    let isInitialLoad = true;
+    function updateStatus(isOnline) {
+      var statusDiv = document.getElementById("statusDiv");
+      if (!statusDiv) return;
       clearTimeout(statusTimeout);
-      if (navigator.onLine) {
-        statusDiv.style.backgroundColor = "#44ff00";
-        statusDiv.textContent = "online";
-        statusDiv.classList.remove("status-hidden");        
+      if (isOnline) {
+        if (!isInitialLoad) {
+          statusDiv.style.backgroundColor = "#44ff00";
+          statusDiv.textContent = "Подключено";
+          statusDiv.classList.remove("status-hidden");        
+          statusTimeout = setTimeout(function() {
+            statusDiv.classList.add("status-hidden");
+          }, 5000);
+        }
+      } else {
+        statusDiv.style.backgroundColor = "#ff0007";
+        statusDiv.textContent = "Нет подключения";
+        statusDiv.classList.remove("status-hidden");
         statusTimeout = setTimeout(function() {
           statusDiv.classList.add("status-hidden");
         }, 5000);
-      } else {
-        statusDiv.style.backgroundColor = "#ff0007";
-        statusDiv.textContent = "offline";
-        statusDiv.classList.remove("status-hidden");
       }
+      isInitialLoad = false;
     }   
-    updateStatus();
-    window.addEventListener("online", updateStatus);
-    window.addEventListener("offline", updateStatus);
+    updateStatus(navigator.onLine);
+    window.addEventListener("online", () => updateStatus(true));
+    window.addEventListener("offline", () => updateStatus(false));
   </script>
   <style>
     * {
@@ -61,21 +70,21 @@
     }
 
     .status {    
-        position: fixed;
-        bottom: 0;      
-        left: 0;        
-        right: 0;       
-        width: 100%;    
-        text-align: center;
-        color: #000000;
-        font-size: 16px;
-        font-weight: 600;
-        padding: 12px 0;
-        z-index: 1000;
-        transition: transform 0.5s ease, opacity 0.5s ease;
-        transform: translateY(0);
-        opacity: 1;
-      }
+      position: fixed;
+      bottom: 0;      
+      left: 0;        
+      right: 0;       
+      width: 100%;    
+      text-align: center;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 12px 0;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
       
     .status.status-hidden {
       transform: translateY(100%);
