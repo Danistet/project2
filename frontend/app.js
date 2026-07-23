@@ -189,13 +189,16 @@ createApp({
           ph: numericValue, meter_id, licschet,
           abonent_name: addressData.town || '', description: 'file',
           fileName: fileNameForServer, fileType, fileBase64: fileDataForStorage,
-          createdate: new Date().toISOString().replace('T', ' ').slice(0, 19)
-        };        
-        await saveReadingLocally(payload);        
+          createdate: new Date().toISOString().replace('T', ' ').slice(0, 19),
+          isViolation: false
+        };          
+        const recordId = await saveReadingLocally(payload);         
         if (navigator.onLine) {          
           const formData = new FormData();
-          formData.append('ph', payload.ph); formData.append('meter_id', payload.meter_id);
-          formData.append('licschet', payload.licschet); formData.append('abonent_name', payload.abonent_name);
+          formData.append('ph', payload.ph); 
+          formData.append('meter_id', payload.meter_id);
+          formData.append('licschet', payload.licschet); 
+          formData.append('abonent_name', payload.abonent_name);
           formData.append('description', payload.description);          
           if (payload.fileBase64) {
             const blob = base64ToBlob(payload.fileBase64, payload.fileType);
@@ -204,10 +207,14 @@ createApp({
           const response = await fetch('http://localhost:3000/PH', { method: 'POST', body: formData });                  
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
+          if (recordId) {
+            await deletePendingReading(recordId);
+            console.log(`Показание ID ${recordId} удалено из IndexedDB после успешной отправки.`);
+          }
           alert(result.message || 'Показания и фото успешно переданы на сервер!');
         } else {          
-          alert('Интернет отсутствует, сохранено локально, ожидание сети');
-        }        
+          alert('Интернет отсутствует. Показания и фото сохранены локально.');
+        }       
         const phElement = document.getElementById('PH');
         if (phElement) phElement.textContent = formatted;
         sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));                        
@@ -561,7 +568,7 @@ createApp({
           if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
           if (recordId) {
             await deletePendingReading(recordId);
-            console.log(`Запись нарушения ID ${recordId} удалена из IndexedDB после успешной отправки.`);
+            console.log(`Нарушение ID ${recordId} удалено из IndexedDB после успешной отправки.`);
           }
           alert(result.message || 'Отчет о нарушении успешно отправлен!');
         } else {
@@ -574,8 +581,8 @@ createApp({
         document.getElementById('fileInput').classList.remove('file-selected');
         document.getElementById('previewContainer').innerHTML = '';
       } catch (err) {
-        console.error('Error submitting violation:', err);
-        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка') + '. Данные сохранены локально.');
+        console.error('Error submitting:', err);
+        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
       }
     };
 

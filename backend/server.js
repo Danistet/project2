@@ -230,8 +230,7 @@ app.post('/update-token', (req, res) => {
       }    
       const now = Date.now();
       const newToken = token;
-      const newAuthDate = now;
-      // Обновляем по токену
+      const newAuthDate = now;      
       const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE TOKEN = ?`;    
       db.query(updateQuery, [newAuthDate, token], (upderr) => {
         db.detach();         
