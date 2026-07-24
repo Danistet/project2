@@ -1,3 +1,4 @@
+
 const DB_NAME = 'MeterOfflineStorage';
 const STORE_NAME = 'pendingReadings';
 const DB_VERSION = 2;
@@ -103,7 +104,8 @@ createApp({
     const meters = ref([]);
     const showMeterSelect = ref(false);
     const selectedMeter = ref(null);        
-    const isLoading = ref(false);    
+    const isLoading = ref(false); 
+    const showContinue = ref(false);   
     const { onMounted } = Vue;
 
     watch(townSearch, (newVal) => {
@@ -601,7 +603,53 @@ createApp({
       } catch (err) { error.value = `Ошибка: ${err.message}`; console.error(err); }
     };
 
-    onMounted(() => { loadTowns(); });
+    const checkSession = () => {
+      const path = window.location.pathname.toLowerCase();
+      const href = window.location.href.toLowerCase();
+      console.log(path);
+      console.log(href);
+      if (
+        path.includes('index.html') || 
+        path.includes('oldtokenwindow.html') || 
+        href.includes('index.html') || 
+        href.includes('oldtokenwindow.html') ||
+        path === '/' || 
+        path === '/frontend' ||    
+        path === '/frontend/' 
+      ) {
+        return true;
+      }
+      const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
+      if (!authData) {
+        error.value = 'Сессия не найдена';
+        showContinue.value = true;
+        setTimeout(() => window.location.href = 'index.html', 2000);
+        return false;
+      }
+      const now = Date.now();
+      const EXPIRY_MS = 2400000;
+      if (now - authData.authDate > EXPIRY_MS)
+      {
+        error.value = 'Истёк срок сессии';
+        showContinue.value = true;
+        sessionStorage.setItem('lastAuthDate', authData.authDate);
+        return false;
+      }
+      showContinue.value = false;
+      return true;
+    };
+
+    const cont = () => {
+      sessionStorage.removeItem('authData');
+      window.location.href = 'oldtokenwindow.html';
+    };
+
+    onMounted(() => {
+      if (document.getElementById('townInput')) {
+        loadTowns();
+      }
+      checkSession();
+    });
 
     return { 
       password, response, error, meternum, mountdate, verifydate,
@@ -614,7 +662,9 @@ createApp({
       onHouseInput, onHouseChange, onAppartsInput, onAppartsChange,
       login, saveAddressAndContinue,
       submitViolationReport,
-      isLoading
+      isLoading,
+      showContinue,
+      cont
     };
   }
 }).mount('#app');

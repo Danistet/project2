@@ -21,6 +21,7 @@
         <form 
           @submit.prevent="saveAddressAndContinue" 
           novalidate
+          :disabled="showContinue"
           :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto', transition: 'opacity 0.2s ease' }"
         >
           <div class="form-group">
@@ -88,8 +89,9 @@
             </datalist>
           </div>          
           <div class="button-group">
-            <button type="submit" class="btn-primary">Подтвердить</button>
-            <button type="button" onclick="tologin()" class="btn-secondary">Назад</button>
+            <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
+            <button type="submit" class="btn-primary" :disabled="showContinue">Подтвердить</button>
+            <button type="button" onclick="tologin()" class="btn-secondary" :disabled="showContinue">Назад</button>
           </div>
         </form>
         <div class="status" id="statusDiv"></div> 

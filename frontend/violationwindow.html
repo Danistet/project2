@@ -17,6 +17,7 @@
         <div class="form-container"> 
           <section>
             <div class="button-group">
+              <button id="ContinueButton" class="btn-secondary ContinueButton" style="display:none;" onclick="handleExpiredSessionContinue()">Продолжить</button>
               <button onclick="mainwindow()" class="btn-primary">Передать показания</button>
               <button onclick="violationwindow()" class="btn-primary">Список нарушений</button>
               <button onclick="exit()" class="btn-secondary">Назад</button>
@@ -71,7 +72,41 @@
       window.addEventListener("online", () => updateStatus(true));
       window.addEventListener("offline", () => updateStatus(false));
     </script>
-
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const authData = sessionStorage.getItem('authData') ? JSON.parse(sessionStorage.getItem('authData')) : null;
+        const errorEl = document.getElementById('error');
+        if (!authData) {
+          if (errorEl) errorEl.textContent = 'Сессия не найдена';
+          setTimeout(() => window.location.href = 'index.html', 2000);
+          return;
+        }
+        const now = Date.now();
+        if (now - authData.authDate > 2400000) {
+          if (errorEl) errorEl.textContent = 'Истёк срок сессии';
+          sessionStorage.setItem('lastAuthDate', authData.authDate);          
+          let btn = document.getElementById('ContinueButton');
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'ContinueButton';
+            btn.className = 'btn-secondary ContinueButton';
+            btn.textContent = 'Продолжить';
+            btn.style.marginTop = '10px';
+            btn.onclick = () => {
+              sessionStorage.removeItem('authData');
+              window.location.href = 'oldtokenwindow.html';
+            };
+            const container = document.querySelector('.form-container');
+            if (container) container.insertBefore(btn, container.firstChild);
+          } else {
+            btn.style.display = 'inline-block';
+          }
+          document.querySelectorAll('button').forEach(b => {
+            if (b.id !== 'ContinueButton') b.disabled = true;
+          });
+        }
+      });
+    </script>
     <style>
       * { 
         box-sizing: border-box;

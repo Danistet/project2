@@ -33,6 +33,7 @@
     const { createApp, ref } = Vue;
     createApp({
       setup() {
+        const showContinue = ref(false);
         const boilerStatus = ref('');
         const error = ref('');
         const continueAction = () => {
@@ -47,11 +48,35 @@
         const logout = () => {
           window.location.href = 'address.html';
         };
+        const checkSession = () => {
+          const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
+          if (!authData) {
+            error.value = 'Сессия не найдена';
+            showContinue.value = true;
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return false;
+          }
+          const now = Date.now();
+          const EXPIRY_MS = 2400000;
+          if (now - authData.authDate > EXPIRY_MS) {
+            error.value = 'Истёк срок сессии';
+            showContinue.value = true;
+            sessionStorage.setItem('lastAuthDate', authData.authDate);
+            return false;
+          }
+          showContinue.value = false;
+          return true;
+        };
+        const cont = () => {
+          sessionStorage.removeItem('authData');
+          window.location.href = 'oldtokenwindow.html';
+        };
         return {
           boilerStatus,
           error,
           continueAction,
-          logout
+          logout,
+          showContinue, cont
         };
       }
     }).mount('#app');

@@ -12,15 +12,16 @@
     <div id="app" class="page-wrapper">
       <header class="page-header">
         <h1>Введите инициалы представителя владельца лицевого счета</h1>
-        <div id="error" class="error-message"></div>
+        <div id="error" class="error-message" v-if="error">{{ error }}</div>
       </header>
       <main class="content-card">
-        <input v-model="name" placeholder="ФИО представителя  владельца" class="form-input">
-        <input v-model="phone" maxlength="20" placeholder="номер телефона представителя" class="form-input">
-        <input v-model="mail" maxlength="20" placeholder="адрес электронной почты представителя" class="form-input">
+        <input v-model="name" placeholder="ФИО представителя владельца" class="form-input" :disabled="showContinue">
+        <input v-model="phone" maxlength="20" placeholder="номер телефона представителя" class="form-input" :disabled="showContinue">
+        <input v-model="mail" maxlength="20" placeholder="адрес электронной почты представителя" class="form-input" :disabled="showContinue">
         <section class="actions-section">
-          <button @click="cont" id="ContinueButton" class="ContinueButton">Продолжить</button>            
-          <button onclick="logout()" id="changebutton" class="btn-secondary">Назад</button>
+          <button @click="saveRepresentative" class="btn-primary" v-if="!showContinue">Продолжить</button>            
+          <button @click="handleExpiredSession" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>            
+          <button onclick="logout()" id="changebutton" class="btn-secondary" :disabled="showContinue">Назад</button>
         </section>
       </main>
       <div class="status" id="statusDiv"></div>
@@ -28,14 +29,18 @@
   </body>
 
   <script>
-    const {createApp, ref} = Vue;
+    const {createApp, ref, onMounted} = Vue;
     createApp({
       setup() {
+        const showContinue = ref(false);
         const name = ref('');
         const phone = ref('');
         const mail = ref('');
         const error = ref('');
-        const cont = async () => {
+        onMounted(() => {
+            checkSession();
+        });
+        const saveRepresentative = async () => {
           error.value = '';
           if(!name.value.trim()) {
             error.value = 'Введите имя';
@@ -59,16 +64,41 @@
               error.value = result.error;
             }
           } catch (err) {
-            error.value = 'Ошибка' + (err.message);
+            error.value = 'Ошибка: ' + (err.message);
             console.error('Error:', err);        
           }
+        };
+        const checkSession = () => {
+          const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
+          if (!authData) {
+            error.value = 'Сессия не найдена';
+            showContinue.value = true;
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return false;
+          }
+          const now = Date.now();
+          const EXPIRY_MS = 2400000;
+          if (now - authData.authDate > EXPIRY_MS) {
+            error.value = 'Истёк срок сессии';
+            showContinue.value = true;
+            sessionStorage.setItem('lastAuthDate', authData.authDate);
+            return false;
+          }
+          showContinue.value = false;
+          return true;
+        };
+        const handleExpiredSession = () => {
+          sessionStorage.removeItem('authData');
+          window.location.href = 'oldtokenwindow.html';
         };
         return {
           name,
           phone,
           mail,
           error,
-          cont
+          showContinue,
+          saveRepresentative,
+          handleExpiredSession
         };
       }
     }).mount('#app');

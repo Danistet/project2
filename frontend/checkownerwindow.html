@@ -14,6 +14,7 @@
           <h1>владелец лицевого счета присутствует?</h1>
           <div class="form-container"> 
             <div class="button-group">
+              <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
               <button type="button" onclick="wihtowner()">да</button>
               <button type="button" onclick="noowner()">нет</button>
               <button type="button" onclick="tologin()" class="btn-secondary">Назад</button>

@@ -9,11 +9,11 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./api.js"></script>
   </head>
-
   <body>
     <div id="app">
       <h1>Вход</h1>       
-      <div class="form-container">      
+      <form @submit.prevent="login" class="form-container">
+        <input type="text" name="username" autocomplete="username" style="display:none;" tabindex="-1" aria-hidden="true">
         <input 
           v-model="password" 
           type="password" 
@@ -21,15 +21,16 @@
           maxlength="15" 
           required
           class="form-input"
+          autocomplete="current-password"
         />     
         <div class="button-group">
-          <button @click="login" class="btn-primary">Войти</button>
+          <button type="submit" class="btn-primary">Войти</button>
         </div>                    
         <p v-if="response" class="response-message">{{ response }}</p>
         <p v-if="error" class="error-message">{{ error }}</p>
         <div class="status" id="statusDiv"></div>  
-      </div>
-    </div>   
+      </form>
+    </div>  
     <script src="./app.js"></script>
   </body>
   <script>
@@ -61,6 +62,22 @@
     updateStatus(navigator.onLine);
     window.addEventListener("online", () => updateStatus(true));
     window.addEventListener("offline", () => updateStatus(false));
+  </script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const authData = sessionStorage.getItem('authData');
+      if (authData) {
+        try {
+          const data = JSON.parse(authData);
+          const now = Date.now();
+          if (now - data.authDate > 2400000) {
+            sessionStorage.removeItem('authData');
+          }
+        } catch (e) {
+          sessionStorage.removeItem('authData');
+        }
+      }
+    });
   </script>
   <style>
     * {
