@@ -211,7 +211,6 @@ createApp({
           if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
           if (recordId) {
             await deletePendingReading(recordId);
-            console.log(`Показание ID ${recordId} удалено из IndexedDB после успешной отправки.`);
           }
           alert(result.message || 'Показания и фото успешно переданы на сервер!');
         } else {          
@@ -570,7 +569,6 @@ createApp({
           if (!response.ok) throw new Error(result.error || 'Ошибка сервера');
           if (recordId) {
             await deletePendingReading(recordId);
-            console.log(`Нарушение ID ${recordId} удалено из IndexedDB после успешной отправки.`);
           }
           alert(result.message || 'Отчет о нарушении успешно отправлен!');
         } else {
@@ -606,8 +604,6 @@ createApp({
     const checkSession = () => {
       const path = window.location.pathname.toLowerCase();
       const href = window.location.href.toLowerCase();
-      console.log(path);
-      console.log(href);
       if (
         path.includes('index.html') || 
         path.includes('oldtokenwindow.html') || 

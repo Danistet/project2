@@ -19,9 +19,9 @@
         <input v-model="phone" maxlength="20" placeholder="номер телефона" class="form-input" :disabled="showContinue">
         <input v-model="mail" maxlength="20" placeholder="адрес электронной почты" class="form-input" :disabled="showContinue">
         <section class="actions-section">
+          <button @click="handleExpiredSession" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
           <button @click="saveOwnerData" class="btn-primary" v-if="!showContinue">Продолжить</button>            
-          <button @click="handleExpiredSession" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>            
-          <button onclick="logout()" id="changebutton" class="btn-secondary" :disabled="showContinue">Назад</button>
+          <button onclick="logout()" id="changebutton" class="btn-secondary" v-if="!showContinue">Назад</button>
         </section>
       </main>
       <div class="status" id="statusDiv"></div> 

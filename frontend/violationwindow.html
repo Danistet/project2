@@ -41,6 +41,10 @@
       {
         window.location.href = 'address.html';
       }
+      function handleExpiredSessionContinue() {
+        sessionStorage.removeItem('authData');
+        window.location.href = 'oldtokenwindow.html';
+      }
     </script>
     <script>
       let statusTimeout;    
@@ -102,7 +106,7 @@
             btn.style.display = 'inline-block';
           }
           document.querySelectorAll('button').forEach(b => {
-            if (b.id !== 'ContinueButton') b.disabled = true;
+            if (b.id !== 'ContinueButton') b.style.display = 'none';
           });
         }
       });

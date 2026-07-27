@@ -28,7 +28,8 @@
             <label for="townInput" class="form-label">Город</label>
             <input 
               type="search" id="townInput" list="resultsTown"               
-              placeholder="Введите город"               
+              placeholder="Введите город" 
+              autocomplete="off"              
               @input="onTownInput" @change="onTownChange" 
               v-model="townSearch" class="form-input" required
             >
@@ -41,6 +42,7 @@
             <input 
               type="search" id="streetInput" list="resultsStreet" 
               placeholder="Введите улицу" 
+              autocomplete="off"
               @input="onStreetInput" @change="onStreetChange" 
               :disabled="!selectedTownId" v-model="streetSearch" class="form-input" :required="!!selectedTownId"
             >
@@ -53,6 +55,7 @@
             <input 
               type="search" id="houseInput" list="resultsHome" 
               placeholder="Введите номер дома" 
+              autocomplete="off"
               @input="onHouseInput" @change="onHouseChange" 
               :disabled="!selectedStreetId" v-model="houseSearch" class="form-input" :required="!!selectedStreetId"
             >
@@ -76,6 +79,7 @@
               }" 
               type="search" id="appartsInput" list="resultsApparts" 
               placeholder="Введите номер квартиры" :required="showApparts" 
+              autocomplete="off"
               @input="onAppartsInput" @change="onAppartsChange" 
               v-model="appartsSearch" class="form-input" tabindex="-1"
             >
@@ -90,8 +94,8 @@
           </div>          
           <div class="button-group">
             <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
-            <button type="submit" class="btn-primary" :disabled="showContinue">Подтвердить</button>
-            <button type="button" onclick="tologin()" class="btn-secondary" :disabled="showContinue">Назад</button>
+            <button type="submit" class="btn-primary" v-if="!showContinue">Подтвердить</button>
+            <button type="button" onclick="tologin()" class="btn-secondary" v-if="!showContinue">Назад</button>
           </div>
         </form>
         <div class="status" id="statusDiv"></div> 

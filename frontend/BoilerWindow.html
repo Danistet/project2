@@ -22,8 +22,9 @@
             <span>Отсутствует</span>
           </label>
         </div>
-        <button @click="continueAction" class="btn-primary">Продолжить</button>
-        <button @click="logout" class="btn-secondary">Назад</button>
+        <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
+        <button @click="continueAction" v-if="!showContinue" class="btn-primary">Продолжить</button>
+        <button @click="logout" v-if="!showContinue" class="btn-secondary">Назад</button>
         <p v-if="error" class="error-message">{{ error }}</p>
       </div>
       <div class="status" id="statusDiv"></div> 
