@@ -9,7 +9,6 @@ const config = require('./config');
 const { error } = require('console');
 const app = express();
 const PORT = 3000;
-
 const uploadDir = path.join(__dirname, 'images');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {recursive: true});
@@ -40,7 +39,7 @@ app.post('/auth', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = `SELECT TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;  
+    const authQuery = `SELECT ID, TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;  
     db.query(authQuery, [userpswd], (err, authResult) => {
       if (err) {
         db.detach();
@@ -55,7 +54,7 @@ app.post('/auth', (req, res) => {
       db.query(meterQuery, (err, meterResult) => {                          
         const now = Date.now();
         const minute = 2400000;        
-        const finishResponse = (token, authDate, meterNum, mountDate, verifyDate) => {
+        const finishResponse = (token, authDate, meterNum, mountDate, verifyDate, controllerId) => {
           db.detach();
           res.json({ 
             status: 'OK', 
@@ -63,9 +62,11 @@ app.post('/auth', (req, res) => {
             authDate,
             meterNum,
             verifyDate,
-            mountDate
+            mountDate,
+            controllerId
           });
-        };        
+        };    
+        const controllerId = authResult[0].ID;    
         const meterNum = meterResult?.[0]?.METER_NUM || null;
         const mountDate = meterResult?.[0]?.MOUNT_DATE || null;
         const verifyDate = meterResult?.[0]?.VERIFY_DATE || null;                     
@@ -79,7 +80,7 @@ app.post('/auth', (req, res) => {
               console.error('Update error:', upderr);
               return res.status(500).json({ error: 'Update error'});
             }       
-            finishResponse(newToken, now, meterNum, mountDate, verifyDate);
+            finishResponse(newToken, now, meterNum, mountDate, verifyDate, controllerId);
           });
         } else {
           const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE CONTROLLER_PSWD = ?`;       
@@ -89,10 +90,97 @@ app.post('/auth', (req, res) => {
               console.error('Update error', upderr);
               return res.status(500).json({ error: 'Update error'});
             }     
-            finishResponse(existingToken, now, meterNum, mountDate, verifyDate);
+            finishResponse(existingToken, now, meterNum, mountDate, verifyDate, controllerId);
           });
         }
       });
+    });
+  });
+});
+
+app.post('/controller-addresses', (req, res) => {
+  const { controllerId } = req.body;
+  if (!controllerId) {
+    return res.status(400).json({ error: 'controllerId required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT
+        M.ID AS METER_ID,
+        M.VERIFY_DATE,
+        A.APPARTS,
+        A.LETTER,
+        A.BUILDINGS_ID,
+      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+      CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+      CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+      CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+      RS.ID AS STREET_ID,
+      CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+      CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
+      INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
+      ORDER BY RS.STREET_TYPE, RS.STREET, B.HOUSE, A.APPARTS, A.LETTER
+    `;        
+    const ctrlIdNum = parseInt(controllerId, 10);
+    if (isNaN(ctrlIdNum)) {
+      db.detach();
+      return res.status(400).json({ error: 'Invalid controllerId' });
+    }
+    db.query(query, [ctrlIdNum], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }            
+      res.json(result.map(r => {
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
+        const namePart = r.CLIENT_NAME || `ФИО не указано`;
+        const phonePart = r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : '';
+        const streetName = `${r.STREET_TYPE} ${r.STREET_NAME}`.trim();
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        const houseName = `${r.HOUSE} ${corpsPart}`.trim();
+        return {
+          meterId: r.METER_ID,
+          verifyDate: r.VERIFY_DATE,
+          buildingsId: r.BUILDINGS_ID,
+          streetId: r.STREET_ID,
+          streetName: streetName,
+          houseName: houseName,
+          displayText: `${appartsPart}, ${namePart}${phonePart}`
+        };
+      }));
+    });
+  });
+});
+
+app.post('/update-verify-date', (req, res) => {
+  const { meterId, verifyDate } = req.body;
+  if (!meterId) {
+    return res.status(400).json({ error: 'meterId required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const updateQuery = `UPDATE METERS SET VERIFY_DATE = ? WHERE ID = ?`;
+    db.query(updateQuery, [verifyDate || null, meterId], (err) => {
+      db.detach();
+      if (err) {
+        console.error('Update error:', err);
+        return res.status(500).json({ error: 'Update failed', details: err.message });
+      }
+      res.json({ status: 'OK', message: 'Дата проверки обновлена' });
     });
   });
 });

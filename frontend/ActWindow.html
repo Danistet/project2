@@ -3,87 +3,207 @@
   <head>
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Выберите тип проверки</title>
+    <title>Формирование списка</title>
     <link rel="icon" href="data:,">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./api.js"></script>
   </head>
   <body>
     <div id="app">
-      <h1>Выберите тип проверки</h1>
-      <div class="form-container">
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" v-model="checkType" value="planned" />
-            <span>Плановая</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" v-model="checkType" value="unscheduled" />
-            <span>Внеплановая</span>
-          </label>
-        </div>
-        <button @click="continueAction" class="btn-primary">Продолжить</button>
-        <button onclick="logout()">Выход</button>
-        <p v-if="error" class="error-message">{{ error }}</p>
+      <h1>Формирование списка</h1>
+      <div v-if="showContinue" class="session-expired-block">
+        <p class="error-message">{{ error }}</p>
+        <button @click="cont" class="btn-primary">Продолжить</button>
       </div>
-      <div v-if="showOverlay" class="overlay" @click.self="closeOverlay">
-        <div class="overlay-content">
-          <h2 class="act">Акт № {{ actNo }}</h2>
-          <p class="datetime">{{ actDate }}</p>
-          <button @click="closeOverlay" class="btn-primary">Продолжить</button>
+      <form v-else @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
+        <div class="form-group">
+          <label for="streetInput" class="form-label">Улица</label>
+          <input
+            type="search" id="streetInput" list="resultsStreet"
+            placeholder="Введите улицу"
+            autocomplete="off"
+            v-model="streetSearch" 
+            class="form-input" 
+            :disabled="isLoading || streets.length === 0"
+          >
+          <datalist id="resultsStreet">
+            <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
+          </datalist>
         </div>
-      </div>
-      <div class="status" id="statusDiv"></div>
-    </div>
-  </body>
+        <div class="form-group">
+          <label for="houseInput" class="form-label">Дом</label>
+          <input
+            type="search" id="houseInput" list="resultsHome"
+            placeholder="Введите номер дома"
+            autocomplete="off"
+            v-model="houseSearch" 
+            class="form-input" 
+            :disabled="isLoading || !selectedStreetId"
+          >
+          <datalist id="resultsHome">
+            <option v-for="bld in buildings" :key="bld.id" :value="bld.name" :data-id="bld.id"></option>
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label for="listInput" class="form-label">Список адресов</label>
+          <input
+            type="search" id="listInput" list="resultsList"
+            placeholder="Выберите адрес из списка"
+            autocomplete="off"
+            @change="onListChange"
+            v-model="selectedAddressText" 
+            class="form-input" 
+            :disabled="isLoading || !selectedBuildingId"
+          >
+          <datalist id="resultsList">
+            <option v-for="addr in filteredAddressList" :key="addr.meterId" :value="addr.displayText"></option>
+          </datalist>
+        </div>
+        <div v-if="selectedAddress" class="meter-block selected">
+          <h4>Выбранный объект</h4>
+          <div class="meter-details">
+            <div class="detail-row">
+              <span class="detail-label">Адрес:</span>
+              <span class="detail-value">{{ selectedAddress.displayText }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Дата проверки:</span>
+              <input v-model="editData.verifyDate" type="date" class="edit-input" :disabled="saving">
+            </div>
+            <button type="submit" class="save-btn" :disabled="saving">
+              {{ saving ? 'Сохранение...' : 'Сохранить дату проверки' }}
+            </button>
+          </div>
+        </div>  
+        <div v-if="error" class="error-message" style="margin-top: 16px;">{{ error }}</div>
+      </form>
+    <div class="status" id="statusDiv"></div>
+  </div>
   <script>
-    function logout()
-    {
-      window.location.href = 'index.html';
-    }
-  </script>
-  <script>
-    const { createApp, ref, onMounted } = Vue;
+    const { createApp, ref, onMounted, watch } = Vue;
     createApp({
       setup() {
         const showContinue = ref(false);
-       // const showOverlay = ref(true);
-        const showOverlay = ref(false);
-        const actNo = ref('');
-        const actDate = ref('');
-        const checkType = ref('planned');
         const error = ref('');
-        const loadAct = async () => {
+        const isLoading = ref(false);
+        const saving = ref(false);
+        const allAddresses = ref([]);
+        const streets = ref([]);
+        const buildings = ref([]);
+        const filteredAddressList = ref([]);
+        const selectedStreetId = ref(null);
+        const streetSearch = ref('');
+        const selectedBuildingId = ref(null);
+        const houseSearch = ref('');
+        const selectedAddressText = ref('');
+        const selectedAddress = ref(null);
+        const editData = ref({ meterId: null, verifyDate: '' });
+        const loadData = async () => {
+          isLoading.value = true;
           try {
-           // const result = await apiRequest('/generate-act', {});            
-            actNo.value = result.actNo;
-            actDate.value = result.actDate;
-            sessionStorage.setItem('currentAct', JSON.stringify({
-              actId: result.actId,
-              actNo: result.actNo,
-              actDate: result.actDate,
-              actBdate: result.actBdate,
-              actEdate: result.actEdate
-            }));
+            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+            const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+            if (!controllerId) {
+              error.value = 'Не найден ID контроллера. Выполните вход заново.';
+              return;
+            }
+            const data = await getControllerAddresses(controllerId);
+            allAddresses.value = data;
+            const streetMap = new Map();
+            data.forEach(addr => {
+              if (!streetMap.has(addr.streetId)) {
+                streetMap.set(addr.streetId, addr.streetName);
+              }
+            });
+            streets.value = Array.from(streetMap, ([id, name]) => ({ id, name }));
           } catch (err) {
-            console.error('Failed to generate act:', err);
-            error.value = 'Ошибка генерации акта: ' + (err.message || 'неизвестная ошибка');
+            console.error(err);
+            error.value = 'Ошибка загрузки адресов';
+          } finally {
+            isLoading.value = false;
           }
         };
-        const closeOverlay = () => {
-          showOverlay.value = false;
-        };
-        const continueAction = () => {
-          if (!checkType.value) {
-            error.value = 'Выберите тип проверки';
-            return;
+        watch(streetSearch, () => {
+          const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === streetSearch.value);
+          selectedStreetId.value = option?.dataset.id || null;
+          buildings.value = [];
+          selectedBuildingId.value = null;
+          houseSearch.value = '';
+          filteredAddressList.value = [];
+          selectedAddress.value = null;
+          selectedAddressText.value = '';
+          if (selectedStreetId.value) {
+            const bldMap = new Map();
+            allAddresses.value
+            .filter(a => String(a.streetId) === String(selectedStreetId.value))
+            .forEach(addr => {
+              if (!bldMap.has(addr.buildingsId)) {
+                bldMap.set(addr.buildingsId, addr.houseName);
+              }
+            });
+            buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
           }
-          sessionStorage.setItem('checkType', checkType.value);
-          window.location.href = 'address.html';
+        });
+        watch(houseSearch, () => {
+          const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === houseSearch.value);
+          selectedBuildingId.value = option?.dataset.id || null;
+          filteredAddressList.value = [];
+          selectedAddress.value = null;
+          selectedAddressText.value = '';
+          if (selectedBuildingId.value) {
+            filteredAddressList.value = allAddresses.value.filter(
+              a => String(a.buildingsId) === String(selectedBuildingId.value)
+            );
+          }
+        });
+        const onListChange = () => {
+          const found = filteredAddressList.value.find(a => a.displayText === selectedAddressText.value);
+          if (found) {
+            selectedAddress.value = found;
+            editData.value.meterId = found.meterId;
+            let vDate = found.verifyDate;
+            if (vDate) {
+              const str = String(vDate).trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                editData.value.verifyDate = str;
+              } else {
+                const date = new Date(str);
+                if (!isNaN(date.getTime())) {
+                  const y = date.getFullYear();
+                  const m = String(date.getMonth() + 1).padStart(2, '0');
+                  const d = String(date.getDate()).padStart(2, '0');
+                  editData.value.verifyDate = `${y}-${m}-${d}`;
+                } else {
+                  editData.value.verifyDate = '';
+                }
+              }
+            } else {
+              editData.value.verifyDate = '';
+            }
+          } else {
+            selectedAddress.value = null;
+          }
+        };
+        const saveVerifyDate = async () => {
+          if (!editData.value.meterId) return;
+          saving.value = true;
+          error.value = '';
+          try {
+            await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
+            alert('Дата проверки успешно обновлена');
+            const idx = allAddresses.value.findIndex(a => a.meterId === editData.value.meterId);
+            if (idx !== -1) {
+              allAddresses.value[idx].verifyDate = editData.value.verifyDate;
+            }
+          } catch (err) {
+            error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+          } finally {
+            saving.value = false;
+          }
         };
         const checkSession = () => {
-          const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
-          if (!authData) {
+          const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+          if (!authData || !authData.token) {
             error.value = 'Сессия не найдена';
             showContinue.value = true;
             setTimeout(() => window.location.href = 'index.html', 2000);
@@ -94,7 +214,6 @@
           if (now - authData.authDate > EXPIRY_MS) {
             error.value = 'Истёк срок сессии';
             showContinue.value = true;
-            sessionStorage.setItem('lastAuthDate', authData.authDate);
             return false;
           }
           showContinue.value = false;
@@ -105,21 +224,23 @@
           window.location.href = 'oldtokenwindow.html';
         };
         onMounted(() => {
-          loadAct();
+          if (checkSession()) {
+            loadData();
+          }
         });
         return {
-          showOverlay,
-          actNo,
-          actDate,
-          checkType,
-          error,
-          closeOverlay,
-          continueAction,
-          showContinue, cont
+          showContinue, error, isLoading, saving,
+          streets, buildings, filteredAddressList,
+          streetSearch, houseSearch, selectedAddressText,
+          selectedStreetId, selectedBuildingId,
+          selectedAddress, editData,
+          onListChange, saveVerifyDate,
+          cont
         };
       }
     }).mount('#app');
   </script>
+
   <script>
     let statusTimeout;    
     let isInitialLoad = true;
@@ -150,177 +271,207 @@
     window.addEventListener("online", () => updateStatus(true));
     window.addEventListener("offline", () => updateStatus(false));
   </script>
+  </body> 
   <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
 
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-        font-size: 16px;
-        line-height: 1.5;
-        color: #000000;
-        background-color: #FFFFFF;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100vh;
-        padding: 24px 16px;
-      }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+      font-size: 16px; 
+      line-height: 1.5; 
+      color: #000000; 
+      background-color: #FFFFFF; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 24px 16px; 
+    }
 
-      h1 {
-        font-size: 24px;
-        font-weight: 600;
-        margin-bottom: 24px;
-        text-align: center;
-      }
-
-      .form-container {
-        width: 100%;
-        max-width: 400px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .radio-group {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding: 16px;
-        border: 2px solid #45B0E1;
-      }
-
-      .radio-label {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        cursor: pointer;
-        font-size: 16px;
-        padding: 8px;
-        border-radius: 4px;
-        transition: background-color 0.2s ease;
-      }
-
-      .radio-label:hover {
-        background-color: #F0F9FC;
-      }
-
-      .radio-label input[type="radio"] {
-        width: 18px;
-        height: 18px;
-        accent-color: #45B0E1;
-        cursor: pointer;
-      }
-
-      button {
-        width: 100%;
-        padding: 14px 16px;
-        font-size: 16px;
-        font-weight: 500;
-        color: #FFFFFF;
-        background-color: #45B0E1;
-        border: 2px solid #45B0E1;
-        border-radius: 0;
-        cursor: pointer;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
-        text-align: center;
-      }
-
-      button:hover {
-        background-color: #2E8BC0;
-        border-color: #2E8BC0;
-      }
-
-      button:active {
-        background-color: #1A6B96;
-        border-color: #1A6B96;
-      }
-
-      .error-message {
-        color: #C62828;
-        font-size: 14px;
-        margin-top: 8px;
-        word-break: break-word;
-      }
-
-      .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .overlay-content {
-        background: #FFFFFF;
-        padding: 30px 40px;
-        border-radius: 8px;
-        text-align: center;
-        max-width: 90%;
-        min-width: 280px;
-        border: 2px solid #45B0E1;
-      }
-
-      .overlay-content .act {
-        font-size: 22px;
-        font-weight: 600;
-        margin-bottom: 12px;
-        color: #000000;
-      }
-
-      .overlay-content .datetime {
-        font-size: 16px;
-        color: #333333;
-        margin-bottom: 20px;
-      }
-
-      .overlay-content button {
-        max-width: 200px;
-        margin: 0 auto;
-      }
-
-    .status {    
-      position: fixed;
-      bottom: 0;      
-      left: 0;        
-      right: 0;       
-      width: 100%;    
-      text-align: center;
-      color: #000000;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 12px 0;
-      z-index: 1000;
-      transition: transform 0.5s ease, opacity 0.5s ease;
-      transform: translateY(0);
-      opacity: 1;
+    h1 { 
+      font-size: 24px; 
+      font-weight: 600; 
+      margin-bottom: 24px; 
+      text-align: center; 
     }
       
-    .status.status-hidden {
-      transform: translateY(100%);
-      opacity: 0;
-      pointer-events: none; 
+    button { 
+      width: 100%; 
+      padding: 14px 16px; 
+      font-size: 16px; 
+      font-weight: 500; 
+      color: #FFFFFF; 
+      background-color: #45B0E1; 
+      border: 2px solid #45B0E1; 
+      border-radius: 0; 
+      cursor: pointer; 
+      transition: background-color 0.2s ease, border-color 0.2s ease; text-align: center; 
     }
 
-      @media (max-width: 480px) {
-        body {
-          padding: 16px 12px;
-        }
-        h1 {
-          font-size: 22px;
-          margin-bottom: 20px;
-        }
-        button {
-          padding: 12px 14px;
-        }
-      }
-    </style>
+    button:hover { 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    button:active { 
+      background-color: #1A6B96; 
+      border-color: #1A6B96; 
+    }
+      
+    button:disabled { 
+      background-color: #A0D8EF; 
+      cursor: not-allowed; 
+    }
+      
+    .error-message { 
+      color: #C62828; 
+      font-size: 14px; 
+      margin-top: 8px; 
+      word-break: break-word; 
+      text-align: center; 
+    }
+      
+    form { 
+      width: 100%; 
+      max-width: 500px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 20px; 
+    }
+      
+    .form-group { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 8px; 
+      position: relative; 
+    }
+      
+    .form-label { 
+      font-size: 17px; 
+      font-weight: 500; 
+      color: #333333; 
+    }
+      
+    .form-input { 
+      width: 100%; 
+      min-height: 56px; 
+      padding: 16px 20px; 
+      font-size: 18px; 
+      color: #000000; 
+      background-color: #FFFFFF; 
+      border: 2px solid #45B0E1; 
+      border-radius: 0; 
+      outline: none; 
+      transition: border-color 0.2s ease, background-color 0.2s ease; 
+    }
+      
+    .form-input::placeholder { 
+      color: #999999; 
+    }
+      
+    .form-input:focus { 
+      border-color: #2E8BC0; 
+      background-color: #F8FDFF; 
+    }
+      
+    .form-input:disabled { 
+      background-color: #F5F5F5; 
+      border-color: #CCCCCC; 
+      color: #999999; 
+      cursor: not-allowed; 
+    }
+      
+    .meter-block.selected { 
+      margin-top: 20px; 
+      padding: 20px; 
+      border: 2px solid #45B0E1; 
+      background-color: #F8FDFF; 
+    }
+      
+    .meter-block h4 { 
+      margin-bottom: 16px; 
+      font-size: 18px; 
+      color: #2E8BC0; 
+    }
+      
+    .meter-details { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+    }
+      
+    .detail-row { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+    }
+      
+    .detail-label { 
+      font-size: 14px; 
+      font-weight: 600; 
+      color: #555555; 
+    }
+      
+    .detail-value { 
+      font-size: 16px; 
+      color: #000000; 
+    }
+      
+    .edit-input { 
+      width: 100%; 
+      min-height: 40px; 
+      padding: 8px 12px; 
+      font-size: 16px; 
+      border: 1px solid #45B0E1; 
+      outline: none; 
+    }
+      
+    .edit-input:focus { 
+      border-color: #2E8BC0; 
+    }
+      
+    .save-btn { 
+      margin-top: 12px; 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    .save-btn:hover { 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    .status { 
+      position: fixed; 
+      bottom: 0; 
+      left: 0; 
+      right: 0; 
+      width: 100%; 
+      text-align: center; 
+      color: #000000; 
+      font-size: 16px; 
+      font-weight: 600; 
+      padding: 12px 0; 
+      z-index: 1000; 
+      transition: transform 0.5s ease, opacity 0.5s ease; 
+      transform: translateY(0); 
+      opacity: 1; 
+    }
+      
+    .status.status-hidden { 
+      transform: translateY(100%); 
+      opacity: 0; 
+      pointer-events: none; 
+    }
+      
+    @media (max-width: 480px) { 
+      body { padding: 16px 12px; } 
+      h1 { font-size: 22px; margin-bottom: 20px; } 
+      button { padding: 12px 14px; } 
+    }
+  </style>
 </html>

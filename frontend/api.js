@@ -42,6 +42,14 @@ async function getMetersByBuilding(buildingId) {
   return await apiRequest('/meters-by-building', {buildingId});
 }
 
+async function getControllerAddresses(controllerId) {
+  return await apiRequest('/controller-addresses', { controllerId });
+}
+
+async function updateVerifyDate(meterId, verifyDate) {
+  return await apiRequest('/update-verify-date', { meterId, verifyDate });
+}
+
 function getSelectedMeter() {
   const data = sessionStorage.getItem('selectedMeter');
   return data ? JSON.parse(data) : null;

@@ -82,7 +82,7 @@
             <label class="form-label">Прикрепить фото нарушения</label>
             <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" class="form-input" style="padding: 10px; text-align: left;">
             <div id="previewContainer"></div>
-          </divZN>
+          </div>
         </section>
         <div class="button-group"> 
           <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>         
@@ -282,6 +282,10 @@
       color: #C62828;
       min-height: 22px;
       text-align: center;
+    }
+
+    img {
+      -webkit-touch-callout: none;
     }
 
     .content-wrapper {
