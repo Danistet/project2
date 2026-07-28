@@ -910,9 +910,9 @@ app.get('/PH/last', (req, res) => {
       const phRaw = result[0].PH;
       const phFormatted = phRaw !== null && phRaw !== undefined
         ? Number(phRaw).toLocaleString('ru-RU', { 
-            minimumFractionDigits: 3, 
-            maximumFractionDigits: 3 
-          })
+          minimumFractionDigits: 3, 
+          maximumFractionDigits: 3 
+        })
       : null;     
       res.json({
         found: true,

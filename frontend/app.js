@@ -105,7 +105,10 @@ createApp({
     const showMeterSelect = ref(false);
     const selectedMeter = ref(null);        
     const isLoading = ref(false); 
-    const showContinue = ref(false);   
+    const showContinue = ref(false);
+    const showOverlay = ref(false);
+    const actNo = ref('');
+    const actDate = ref('');   
     const { onMounted } = Vue;
 
     watch(townSearch, (newVal) => {
@@ -277,8 +280,25 @@ createApp({
         appartsIdValue = null;
       }            
       isLoading.value = true;
-      let allMeters = [];
+
       try {
+        const actResult = await apiRequest('/generate-act', {});
+        actNo.value = actResult.actNo;
+        actDate.value = actResult.actDate;
+        await apiRequest('/update-act-building', {
+          actId: actResult.actId,
+          buildingId: selectedBuildingId.value
+        });
+        sessionStorage.setItem('currentAct', JSON.stringify({
+          actId: actResult.actId,
+          actNo: actResult.actNo,
+          actDate: actResult.actDate,
+          actBdate: actResult.actBdate,
+          actEdate: actResult.actEdate,
+          buildingId: selectedBuildingId.value
+        }));
+
+        let allMeters = [];
         if (showApparts.value && selectedAppartId.value) {
           const selectedAppart = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
           if (selectedAppart?.g_licschet) allMeters = await getMetersByLicschet(selectedAppart.g_licschet);
@@ -290,12 +310,6 @@ createApp({
             allMeters = allMeters.filter(m => !m.apparts || String(m.apparts).trim() === '');
           }
         }      
-      } catch (err) {
-        console.warn('Failed to load meters list:', err);
-        allMeters = [];
-      } finally {        
-        isLoading.value = false;
-      }
       if (!allMeters || allMeters.length === 0) {
         clearMeterDataToSession();
         alert(!showApparts.value ? "Для выбранного дома не найдено счётчиков." : "Для выбранной квартиры не найдено счётчиков.");
@@ -315,7 +329,19 @@ createApp({
         g_licschet, buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      window.location.href = 'checkownerwindow.html';
+      //window.location.href = 'checkownerwindow.html';
+      showOverlay.value = true;
+      } catch (err) {
+        console.error('Error during address save:', err);
+        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
+    const continueFromOverlay = () => {
+      showOverlay.value = false;
+      window.location.href = 'main.html';
     };
 
     const loadTowns = async () => {
@@ -659,8 +685,10 @@ createApp({
       onHouseInput, onHouseChange, onAppartsInput, onAppartsChange,
       login, saveAddressAndContinue,
       submitViolationReport,
+      showOverlay, actNo, actDate,
       isLoading,
       showContinue,
+      continueFromOverlay,
       cont
     };
   }
