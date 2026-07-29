@@ -175,25 +175,38 @@ createApp({
         const meter_id = meterData.meterNum;            
         if (!meter_id) { alert('Не найден серийный номер счётчика'); return; }                
         const fileInput = document.getElementById('fileInput');
-        const file = fileInput?.files?.[0];
+        const files = fileInput?.files;
+        if (files && files.length > 5) {
+          alert('Можно выбрать не более 5 файлов.');
+          fileInput.value = '';
+          return;
+        }
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
         const licschet = addressData.g_licschet || meterData.licschet || '';                        
-        let fileDataForStorage = null;
-        let fileNameForServer = 'no_file.jpg';
-        let fileType = 'image/jpeg';        
-        if (file) {
-          fileNameForServer = generateFileName(meter_id, file.name);
-          fileType = file.type;                    
-          fileDataForStorage = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-          });
+        let filesDataForStorage = [];
+        let fileNamesForServer = [];
+        if (files && files.length > 0) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileName = generateFileName(meter_id, file.name);
+            fileNamesForServer.push(fileName);
+            const fileData = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve({
+                fileName,
+                fileType: file.type,
+                fileBase64: reader.result
+              });
+              reader.readAsDataURL(file);
+            });
+            filesDataForStorage.push(fileData);
+          }
         }
         const payload = {
           ph: numericValue, meter_id, licschet,
           abonent_name: addressData.town || '', description: 'file',
-          fileName: fileNameForServer, fileType, fileBase64: fileDataForStorage,
+          fileNames: fileNamesForServer, 
+          filesData: filesDataForStorage,
           createdate: new Date().toISOString().replace('T', ' ').slice(0, 19),
           isViolation: false
         };          
@@ -205,9 +218,11 @@ createApp({
           formData.append('licschet', payload.licschet); 
           formData.append('abonent_name', payload.abonent_name);
           formData.append('description', payload.description);          
-          if (payload.fileBase64) {
-            const blob = base64ToBlob(payload.fileBase64, payload.fileType);
-            formData.append('file', blob, payload.fileName);
+          if (filesDataForStorage.length > 0) {
+            filesDataForStorage.forEach(f => {
+              const blob = base64ToBlob(f.fileBase64, f.fileType);
+              formData.append('files', blob, f.fileName);
+            });
           }
           const response = await fetch('http://localhost:3000/PH', { method: 'POST', body: formData });                  
           const result = await response.json();
@@ -223,7 +238,8 @@ createApp({
         if (phElement) phElement.textContent = formatted;
         sessionStorage.setItem('ph', JSON.stringify({ PH: formatted }));                        
         if (fileInput) {
-          fileInput.value = ''; fileInput.classList.remove('file-selected');
+          fileInput.value = ''; 
+          fileInput.classList.remove('file-selected');
           document.getElementById('previewContainer').innerHTML = '';
         }                     
         const violationsForm = document.getElementById('violationsForm');
@@ -328,8 +344,7 @@ createApp({
         house: houseInput.value || '', apparts: appartsValue, appartsId: appartsIdValue, 
         g_licschet, buildingId: selectedBuildingId.value
       };
-      sessionStorage.setItem('userAddress', JSON.stringify(addressData));
-      //window.location.href = 'checkownerwindow.html';
+      sessionStorage.setItem('userAddress', JSON.stringify(addressData));      
       showOverlay.value = true;
       } catch (err) {
         console.error('Error during address save:', err);
@@ -341,7 +356,7 @@ createApp({
 
     const continueFromOverlay = () => {
       showOverlay.value = false;
-      window.location.href = 'main.html';
+      window.location.href = 'checkownerwindow.html';
     };
 
     const loadTowns = async () => {
@@ -553,40 +568,54 @@ createApp({
         if (violations.length === 0) {
           alert('Пожалуйста, выберите хотя бы одно нарушение');
           return;
-        }
+        }       
         const fileInput = document.getElementById('fileInput');
-        const file = fileInput?.files?.[0];
-        let fileDataForStorage = null;
-        let fileNameForServer = 'no_file.jpg';
-        let fileType = 'image/jpeg';
-        if (file) {
-          fileNameForServer = generateFileName(meterNum, file.name);
-          fileType = file.type;
-          fileDataForStorage = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-          });
+        const files = fileInput?.files;
+        if (files && files.length > 5) {
+          alert('Можно выбрать не более 5 файлов.');
+          fileInput.value = '';
+          document.getElementById('previewContainer').innerHTML = '';
+          return;
+        }
+        let filesDataForStorage = [];
+        let fileNamesForServer = [];      
+        if (files && files.length > 0) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileName = generateFileName(meterNum, file.name);
+            fileNamesForServer.push(fileName);          
+            const fileData = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve({
+                fileName,
+                fileType: file.type,
+                fileBase64: reader.result
+              });
+              reader.readAsDataURL(file);
+            });
+            filesDataForStorage.push(fileData);
+          }
         }
         const payload = {
           meterNum,
           licschet,
           violations: JSON.stringify(violations),
-          fileName: fileNameForServer,
-          fileType,
-          fileBase64: fileDataForStorage,
+          fileNames: fileNamesForServer,
+          filesData: filesDataForStorage,
           isViolation: true 
-        };
-        const recordId = await saveReadingLocally(payload);
+        };       
+        const recordId = await saveReadingLocally(payload);     
         if (navigator.onLine) {
           const formData = new FormData();
           formData.append('meterNum', meterNum);
           formData.append('licschet', licschet);
-          formData.append('violations', JSON.stringify(violations));
-          if (fileDataForStorage) {
-            const blob = base64ToBlob(fileDataForStorage, fileType);
-            formData.append('file', blob, fileNameForServer);
-          }
+          formData.append('violations', JSON.stringify(violations));         
+          if (filesDataForStorage.length > 0) {
+            filesDataForStorage.forEach(f => {
+              const blob = base64ToBlob(f.fileBase64, f.fileType);
+              formData.append('files', blob, f.fileName);
+            });
+          }        
           const response = await fetch('http://localhost:3000/save-violation', {
             method: 'POST',
             body: formData
@@ -599,19 +628,20 @@ createApp({
           alert(result.message || 'Отчет о нарушении успешно отправлен!');
         } else {
           alert('Интернет отсутствует, сохранено локально, ожидание сети');
-        }
+        }     
         document.getElementById('violationsForm')?.reset();
         document.getElementById('techcheckForm')?.reset();
         document.getElementById('techcheckForm').style.display = 'none';
-        document.getElementById('fileInput').value = '';
-        document.getElementById('fileInput').classList.remove('file-selected');
+        if (fileInput) {
+          fileInput.value = '';
+          fileInput.classList.remove('file-selected');
+        }
         document.getElementById('previewContainer').innerHTML = '';
       } catch (err) {
         console.error('Error submitting:', err);
         alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
       }
     };
-
     const login = async (e) => {
       error.value = ''; response.value = '';
       const passwordValue = password.value.trim();

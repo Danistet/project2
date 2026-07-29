@@ -788,95 +788,72 @@ app.post('/meters-by-building', (req, res) => {
   });
 });
 
-app.post('/PH', upload.single('file'), (req, res) => {
+app.post('/PH', upload.array('files', 5), (req, res) => {
   const { ph, meter_id, licschet, abonent_name, description } = req.body;
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id required' });
-  }  
-  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);  
+  }
+  const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
-    }  
+    }
     const checkQuery = `SELECT ID, LS, METER_NUM FROM METERS WHERE METER_NUM = ?`;
     db.query(checkQuery, [meter_id], (err, checkResult) => {
       if (err) {
         db.detach();
-        console.error('Check meter error:', err);
         return res.status(500).json({ error: 'Database query error' });
       }
       if (checkResult.length === 0) {
         db.detach();
         return res.status(500).json({ error: 'no meter' });
-      }      
+      }
       const meterNum = checkResult[0].METER_NUM;
       const dbLicschet = checkResult[0].LS;
-      const targetLicschet = licschet || dbLicschet;      
-      const insertQuery = `
-        INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) 
-        VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)
-      `;                      
+      const targetLicschet = licschet || dbLicschet;
+      const insertQuery = `INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)`;
       db.query(insertQuery, [ph, meterNum, createdate], (err) => {
         if (err) {
           db.detach();
-          console.error('Insert error:', err);
-          return res.status(500).json({ 
-            error: 'error',
-            details: err.message
-          });
-        }        
-         if (req.file) {          
-          const abonentQuery = `
-            SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME 
-            FROM ABONENTS A 
-            LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID 
-            WHERE A.G_LICSCHET = ?
-          `;          
+          return res.status(500).json({ error: 'error', details: err.message });
+        }
+        if (req.files && req.files.length > 0) {
+          const abonentQuery = `SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME FROM ABONENTS A LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID WHERE A.G_LICSCHET = ?`;
           db.query(abonentQuery, [targetLicschet], (err, abonentResult) => {
             if (err) {
               db.detach();
-              console.error('Abonent query error:', err);
               return res.status(500).json({ error: 'error', details: err.message });
             }
             let abonentId = null;
             let clientName = abonent_name || '';
             if (abonentResult && abonentResult.length > 0) {
               abonentId = abonentResult[0].ABONENT_ID;
-              if (abonentResult[0].CLIENT_NAME) {
-                clientName = abonentResult[0].CLIENT_NAME;
-              }
+              if (abonentResult[0].CLIENT_NAME) clientName = abonentResult[0].CLIENT_NAME;
             }
-            const fileName = req.file.originalname;
-            const fileSize = req.file.size.toString();
-            const desc = description ? String(description).substring(0, 40) : 'file';          
-            const insertFileQuery = `
-              INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
-              VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
-            `;                      
-            db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
-              db.detach();
-              if (fileErr) {
-                console.error('Insert file error', fileErr);
-                return res.status(500).json({ error: 'file error:', details: fileErr.message });              
-              }
-              res.json({
-                status: 'OK',
-                message: 'Saved',
-                action: 'INSERT',
-                data: { ph, meter_id, createdate, fileName }
+            const insertFileQuery = `INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE) VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)`;
+            let fileCompleted = 0;
+            let fileError = null;
+            req.files.forEach((file) => {
+              if (fileError) return;
+              const fileName = file.originalname;
+              const fileSize = file.size.toString();
+              const desc = description ? String(description).substring(0, 40) : 'file';
+              db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
+                if (fileErr && !fileError) fileError = fileErr;
+                fileCompleted++;
+                if (fileCompleted === req.files.length) {
+                  db.detach();
+                  if (fileError) return res.status(500).json({ error: 'file error:', details: fileError.message });
+                  res.json({ status: 'OK', message: 'Saved', action: 'INSERT', data: { ph, meter_id, createdate, fileCount: req.files.length } });
+                }
               });
             });
           });
         } else {
           db.detach();
-          res.json({
-            status: 'OK',
-            message: 'Saved',
-            action: 'INSERT',
-            data: { ph, meter_id, createdate }
-          });         
-        }        
+          res.json({ status: 'OK', message: 'Saved', action: 'INSERT', data: { ph, meter_id, createdate } });
+        }
       });
     });
   });
@@ -925,25 +902,15 @@ app.get('/PH/last', (req, res) => {
   });
 });
 
-app.post('/save-violation', upload.single('file'), (req, res) => {
+app.post('/save-violation', upload.array('files', 5), (req, res) => {
   const { meterNum, licschet, violations } = req.body;
-  if (!meterNum) {
-    return res.status(400).json({ error: 'meternum required' });
-  }
+  if (!meterNum) return res.status(400).json({ error: 'meternum required' });
   let parsedviolations = [];
-  try {
-    parsedviolations = violations ? JSON.parse(violations) : [];
-  } catch (e) {
-    return res.status(400).json({ error: 'wrong format' });
-  }
-  if (parsedviolations.length === 0) {
-    return res.status(400).json({ error: 'no violation' });
-  }
+  try { parsedviolations = violations ? JSON.parse(violations) : []; } 
+  catch (e) { return res.status(400).json({ error: 'wrong format' }); }
+  if (parsedviolations.length === 0) return res.status(400).json({ error: 'no violation' });
   firebird.attach(config, (err, db) => {
-    if (err) {
-      console.error('DB connect error:', err);
-      return res.status(500).json({ error: 'Database connection failed' });
-    }
+    if (err) return res.status(500).json({ error: 'Database connection failed' });
     const meterQuery = `SELECT ID, LS FROM METERS WHERE METER_NUM = ?`;
     db.query(meterQuery, [meterNum], (err, meterResult) => {
       if (err || !meterResult || meterResult.length === 0) {
@@ -953,29 +920,19 @@ app.post('/save-violation', upload.single('file'), (req, res) => {
       const meterId = meterResult[0].ID;
       const dbLicschet = licschet || meterResult[0].LS;
       const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
-      const abonentQuery = `
-        SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME 
-        FROM ABONENTS A 
-        LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID 
-        WHERE A.G_LICSCHET = ?
-      `;
+      const abonentQuery = `SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME FROM ABONENTS A LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID WHERE A.G_LICSCHET = ?`;
       db.query(abonentQuery, [dbLicschet], (err, abonentResult) => {
         if (err) {
           db.detach();
           return res.status(500).json({ error: 'error finding abonent' });
         }
         let abonentId = null;
-        let clientName = ''; 
+        let clientName = '';
         if (abonentResult && abonentResult.length > 0) {
           abonentId = abonentResult[0].ABONENT_ID;
-          if (abonentResult[0].CLIENT_NAME) {
-            clientName = abonentResult[0].CLIENT_NAME;
-          }
+          if (abonentResult[0].CLIENT_NAME) clientName = abonentResult[0].CLIENT_NAME;
         }
-        const insertQuery = `
-          INSERT INTO VIOLATIONS (ID, NAME, DESCRIPTION, ABONENT_ID, METERS_ID, CREATEDATE)
-          VALUES (GEN_ID(VIOLATIONS_GEN, 1), ?, ?, ?, ?, ?)
-        `;
+        const insertQuery = `INSERT INTO VIOLATIONS (ID, NAME, DESCRIPTION, ABONENT_ID, METERS_ID, CREATEDATE) VALUES (GEN_ID(VIOLATIONS_GEN, 1), ?, ?, ?, ?, ?)`;
         let completed = 0;
         let hasError = false;
         parsedviolations.forEach((v) => {
@@ -983,36 +940,38 @@ app.post('/save-violation', upload.single('file'), (req, res) => {
             if (err && !hasError) {
               hasError = true;
               db.detach();
-              console.error('Insert violation error:', err);
               return res.status(500).json({ error: 'error', details: err.message });
             }
             completed++;
             if (completed === parsedviolations.length && !hasError) {
-              if (req.file) {
-                const fileName = req.file.originalname; 
-                const fileSize = req.file.size.toString();
-                const desc = 'violationfile';
-                const insertFileQuery = `
-                  INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE)
-                  VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)
-                `;
-                db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
-                  db.detach(); 
-                  if (fileErr) {
-                    console.error('File insert error:', fileErr);
-                    return res.status(500).json({ error: 'error', details: fileErr.message });
-                  }
-                  res.json({ status: 'OK', message: 'Saved' });
-                });              
+              if (req.files && req.files.length > 0) {
+                const insertFileQuery = `INSERT INTO ABONENTS_FILES (ID, ABONENT_ID, NAME, DATE_CRATE, DESCRIPTION, ABONENT_NAME, FILESIZE) VALUES (GEN_ID(ABONENTS_FILES_GEN, 1), ?, ?, ?, ?, ?, ?)`;
+                let fileCompleted = 0;
+                let fileError = null;
+                req.files.forEach((file) => {
+                  if (fileError) return;
+                  const fileName = file.originalname;
+                  const fileSize = file.size.toString();
+                  const desc = 'violationfile';
+                  db.query(insertFileQuery, [abonentId, fileName, createdate, desc, clientName, fileSize], (fileErr) => {
+                    if (fileErr && !fileError) fileError = fileErr;
+                    fileCompleted++;
+                    if (fileCompleted === req.files.length) {
+                      db.detach();
+                      if (fileError) return res.status(500).json({ error: 'error', details: fileError.message });
+                      res.json({ status: 'OK', message: 'Saved' });
+                    }
+                  });
+                });
               } else {
                 db.detach();
                 res.json({ status: 'OK', message: 'Saved' });
               }
             }
-          });  
-        });                
-      });  
-    });    
+          });
+        });
+      });
+    });
   });
 });
 

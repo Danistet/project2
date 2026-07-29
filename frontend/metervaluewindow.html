@@ -13,6 +13,8 @@
       <header class="page-header">
         <h1>Передать показания</h1>
         <div id="error" class="error-message"></div>
+        <p v-if="response" class="response-message">{{ response }}</p>
+        <p v-if="error" class="error-message">{{ error }}</p>
       </header>
       <main class="content-wrapper">
         <section class="info-card">
@@ -39,7 +41,8 @@
           > 
           <div class="button-group">
             <label class="form-label">Прикрепить фото счетчика</label>
-            <input type="file" name="fileInput" id="fileInput" accept="image/png" multiple>
+            <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" multiple class="form-input" style="padding: 10px;">
+            <small style="color: #666; font-size: 14px; display: block; margin-top: 4px;">Максимум 5 файлов</small>
             <div id="previewContainer"></div>            
           </div>          
         <div class="button-group">
@@ -57,7 +60,14 @@
     <script>
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
-      fileInput.addEventListener('change', function() {        
+      fileInput.addEventListener('change', function() {  
+        if (this.files.length > 5) {
+          alert('Можно загрузить не более 5 файлов.');
+          this.value = '';
+          previewContainer.innerHTML = '';
+          this.classList.remove('file-selected');
+          return;
+        }      
         previewContainer.innerHTML = '';         
         Array.from(this.files).forEach(file => {          
           if (!file.type.startsWith('image/')) return; 
@@ -253,7 +263,6 @@
       }
       
       window.addEventListener('online', () => {
-        console.log('Сеть восстановлена. Запуск фоновой синхронизации...');
         syncPendingReadings();
       });
       window.addEventListener('DOMContentLoaded', () => {
@@ -284,7 +293,7 @@
         }
       });
       window.addEventListener('online', () => {
-        console.log('Сеть восстановлена. Запуск фонов');
+
       });
     </script>
     <script>

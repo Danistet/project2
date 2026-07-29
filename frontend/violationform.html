@@ -13,6 +13,8 @@
       <header class="page-header">
         <h1>Фиксация нарушений</h1>
         <div id="error" class="error-message"></div>
+        <p v-if="response" class="response-message">{{ response }}</p>
+        <p v-if="error" class="error-message">{{ error }}</p>
       </header>
       <main class="content-wrapper">
         <section class="info-card">
@@ -80,7 +82,8 @@
           </form>
           <div class="form-group" style="width: 100%; margin-top: 16px;">
             <label class="form-label">Прикрепить фото нарушения</label>
-            <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" class="form-input" style="padding: 10px; text-align: left;">
+            <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" multiple class="form-input" style="padding: 10px; text-align: left;">
+            <small style="color: #666; font-size: 14px; display: block; margin-top: 4px;">Максимум 5 файлов</small>
             <div id="previewContainer"></div>
           </div>
         </section>
@@ -94,9 +97,9 @@
     </div>
     <script src="./app.js"></script>
     <script>
-        function main() {
-            window.location.href = 'violationwindow.html';
-        }
+      function main() {
+        window.location.href = 'violationwindow.html';
+      }
     </script>
     <script>
       window.addEventListener('DOMContentLoaded', async () => {
@@ -117,7 +120,14 @@
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
       if (fileInput) {
-        fileInput.addEventListener('change', function() {        
+        fileInput.addEventListener('change', function() { 
+          if (this.files.length > 5) {
+          alert('Можно загрузить не более 5 файлов.');
+          this.value = '';
+          previewContainer.innerHTML = '';
+          this.classList.remove('file-selected');
+          return;
+        }       
           previewContainer.innerHTML = '';         
           Array.from(this.files).forEach(file => {          
             if (!file.type.startsWith('image/')) return; 
@@ -204,7 +214,6 @@
         }
       });
       window.addEventListener('online', () => {
-        console.log('Сеть восстановлена. Запуск фонов');
       });
     </script>
     <script>
