@@ -505,6 +505,7 @@ app.post('/buildings', (req, res) => {
 
 app.post('/apparts', (req, res) => {
   const buildingId = req.query.buildingId;
+  const controllerId = req.query.controllerId;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB connection failed' });    
@@ -513,7 +514,8 @@ app.post('/apparts', (req, res) => {
         A.ID, 
         CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
         CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
-        A.G_LICSCHET
+        A.G_LICSCHET,
+        (SELECT FIRST 1 M.CONTROLER_ID FROM METERS M WHERE M.LS = A.G_LICSCHET) AS CONTROLER_ID
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
       AND (
@@ -530,10 +532,12 @@ app.post('/apparts', (req, res) => {
           WHERE M.LS = A.G_LICSCHET
             AND RS.ID = 1
             AND S.GROUP_ID IN (537, 555, 597)
+            AND M.CONTROLER_ID = CAST(? AS INTEGER)
         )
       )
-    `;    
-    db.query(query, [buildingId], (err, result) => {
+      ORDER BY CONTROLER_ID DESC NULLS LAST, A.APPARTS, A.LETTER
+    `; 
+    db.query(query, [buildingId, controllerId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });     
       res.json(result.map(r => { 

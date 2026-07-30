@@ -1,4 +1,3 @@
-
 const DB_NAME = 'MeterOfflineStorage';
 const STORE_NAME = 'pendingReadings';
 const DB_VERSION = 2;
@@ -258,6 +257,14 @@ createApp({
     };
 
     const saveAddressAndContinue = async () => {
+      const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+      const now = Date.now();
+      const EXPIRY_MS = 2400000;      
+      if (!authData || !authData.token || (now - authData.authDate > EXPIRY_MS)) {
+        error.value = 'Истёк срок сессии. Пожалуйста, войдите снова.';
+        showContinue.value = true;
+        return;
+      }
       if (!townSearch.value?.trim() || !selectedTownId.value) {
         alert("Выберите город из списка"); document.getElementById('townInput')?.focus(); return;
       }
@@ -296,7 +303,6 @@ createApp({
         appartsIdValue = null;
       }            
       isLoading.value = true;
-
       try {
         const actResult = await apiRequest('/generate-act', {});
         actNo.value = actResult.actNo;
@@ -313,7 +319,6 @@ createApp({
           actEdate: actResult.actEdate,
           buildingId: selectedBuildingId.value
         }));
-
         let allMeters = [];
         if (showApparts.value && selectedAppartId.value) {
           const selectedAppart = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
@@ -393,7 +398,9 @@ createApp({
       }
       isLoading.value = true;
       try {
-        const result = await apiRequest(`/apparts?buildingId=${buildingId}`);
+        const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+        const controllerId = sessionStorage.getItem('controllerId' || authData.controllerId);
+        const result = await apiRequest(`/apparts?buildingId=${buildingId}&controllerId=${controllerId}`);
         const emptyAppart = result.find(appr => (!appr.house || appr.house.trim() === '') && appr.g_licschet);
         currentBuildingLicschet.value = emptyAppart?.g_licschet || null;
         apparts.value = result

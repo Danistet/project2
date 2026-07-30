@@ -19,7 +19,7 @@
               <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
               <button type="button" v-if="!showContinue" onclick="wihtowner()">да</button>
               <button type="button" v-if="!showContinue" onclick="noowner()">нет</button>
-              <button type="button" v-if="!showContinue" onclick="tologin()" class="btn-secondary">Назад</button>
+              <button type="button" v-if="!showContinue" onclick="toaddress()" class="btn-secondary">Назад</button>
             </div>
           </div>
           <div class="status" id="statusDiv"></div> 
@@ -29,9 +29,8 @@
 
     <script src="./app.js"></script>
     <script>
-      function tologin() {
-        sessionStorage.clear();
-        window.location.href = 'ActWindow.html';
+      function toaddress() {
+        window.location.href = 'address.html';
       }
       function wihtowner() {
         window.location.href = 'OwnerWindow.html';

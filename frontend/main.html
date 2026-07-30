@@ -323,34 +323,7 @@
             }            
             showContinue.value = false;
             return true;
-          };
-          
-          const bindBuildingToAct = async () => {
-            try {
-              const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
-              const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');              
-              if (!currentAct.actId) {
-                console.warn('Акт не найден в sessionStorage');
-                window.location.href = 'index.html';
-                return;
-              }              
-              if (!addressData.buildingId) {
-                console.warn('buildingId не найден в sessionStorage');
-                return;
-              }              
-              if (currentAct.buildingId === addressData.buildingId) {
-                return;
-              }              
-              await apiRequest('/update-act-building', {
-                actId: currentAct.actId,
-                buildingId: addressData.buildingId
-              });              
-              currentAct.buildingId = addressData.buildingId;
-              sessionStorage.setItem('currentAct', JSON.stringify(currentAct));
-            } catch (err) {
-              console.error('Failed to bind building to act:', err);
-            }
-          };
+          };                    
           
           const logout = () => {
             sessionStorage.removeItem('allMeters');
@@ -379,7 +352,6 @@
             loadAddressDisplay();
             await loadMeters();
             checkSession();
-           // bindBuildingToAct();
           });          
           return {
             meters,
