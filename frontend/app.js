@@ -656,7 +656,14 @@ createApp({
       if (passwordValue.length < 8) { error.value = 'Пароль минимум 8 символов'; return; }   
       try {
         const result = await apiRequest('/auth', { userpswd: password.value, meternum: meternum.value });
-        sessionStorage.setItem('authData', JSON.stringify({ token: result.token, authDate: result.authDate, controllerId: result.controllerId }));
+        const authPayLoad = {
+          token: result.token,
+          authDate: result.authDate,
+          controllerId: result.controllerId
+        };
+        //sessionStorage.setItem('authData', JSON.stringify({ token: result.token, authDate: result.authDate, controllerId: result.controllerId }));
+        sessionStorage.setItem('authData', JSON.stringify(authPayLoad));
+        localStorage.setItem('authData', JSON.stringify(authPayLoad));
         sessionStorage.setItem('controllerId', result.controllerId);
         sessionStorage.setItem('meternum', JSON.stringify({ meterNum: result.meterNum }));
         sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: result.mountDate }));
@@ -709,6 +716,12 @@ createApp({
         loadTowns();
       }
       checkSession();
+      window.addEventListener('online', () => {
+        console.log('online');
+        if (typeof syncPendingReadings === 'function') {
+          syncPendingReadings();
+        }
+      });
     });
 
     return { 

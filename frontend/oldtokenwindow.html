@@ -44,7 +44,7 @@
       createApp({
         setup() {    
           const logout = () => {
-            sessionStorage.clear();
+            clearSessionAndLogout()
             window.location.href = 'index.html';
           };    
           return { logout };
