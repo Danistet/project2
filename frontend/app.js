@@ -653,7 +653,7 @@ createApp({
       error.value = ''; response.value = '';
       const passwordValue = password.value.trim();
       if (!passwordValue) { error.value = 'Пароль обязателен'; return; }
-      if (passwordValue.length < 8) { error.value = 'Пароль минимум 8 символов'; return; }   
+      if (passwordValue.length < 4) { error.value = 'Пароль минимум 4 символов'; return; }   
       try {
         const result = await apiRequest('/auth', { userpswd: password.value, meternum: meternum.value });
         const authPayLoad = {

@@ -31,96 +31,96 @@
   <script>
     const {createApp, ref, onMounted} = Vue;
     createApp({
-        setup() {
-            const showContinue = ref(false);
-            const ownerName = ref('');
-            const phone = ref('');
-            const mail = ref('');
-            const error = ref('');
-            const g_licschet = ref(null);
-            const clientId = ref(null);
-            onMounted(async () => {                
-                checkSession();
-                if (showContinue.value) return;
-                const userAddress = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
-                const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
-                g_licschet.value = userAddress.g_licschet || licschetData.g_licschet;             
-                if (!g_licschet.value) {
-                    error.value = 'no licschet';
-                    return;
-                }             
-                try {
-                    const result = await apiRequest('/get-owner-data', { g_licschet: g_licschet.value });
-                    if (result.found) {
-                        ownerName.value = result.ownerName || '';
-                        phone.value = result.phone || '';
-                        mail.value = result.mail || '';
-                        clientId.value = result.clientId;
-                    } else {
-                        error.value = 'Данные владельца не найдены в БД';
-                    }
-                } catch (err) {
-                    error.value = 'Ошибка загрузки: ' + (err.message || 'Неизвестная ошибка');
-                    console.error(err);
-                }
-            });
-            const saveOwnerData = async () => {
-                error.value = '';
-                if (!ownerName.value.trim()) {
-                    error.value = 'Введите ФИО владельца';
-                    return;
-                }                
-                try {
-                    const result = await apiRequest('/update-owner-data', {
-                        g_licschet: g_licschet.value,
-                        clientId: clientId.value,
-                        ownerName: ownerName.value.trim(),
-                        phone: phone.value.trim() || null,
-                        mail: mail.value.trim() || null
-                    });                 
-                    if (result.status === 'OK') {
-                        window.location.href = 'BoilerWindow.html';
-                    } else {
-                        error.value = result.error || 'Ошибка сохранения';
-                    }
-                } catch (err) {
-                    error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
-                    console.error(err);
-                }  
-            };
-            const checkSession = () => {
-              const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
-              if (!authData) {
-                error.value = 'Сессия не найдена';
-                showContinue.value = true;
-                setTimeout(() => window.location.href = 'index.html', 2000);
-                return false;
-              }
-              const now = Date.now();
-              const EXPIRY_MS = 2400000;
-              if (now - authData.authDate > EXPIRY_MS) {
-                error.value = 'Истёк срок сессии';
-                showContinue.value = true;
-                sessionStorage.setItem('lastAuthDate', authData.authDate);
-                return false;
-              }
-              showContinue.value = false;
-              return true;
-            };
-            const handleExpiredSession = () => {
-              sessionStorage.removeItem('authData');
-              window.location.href = 'oldtokenwindow.html';
-            };
-            return {
-              ownerName, 
-              phone, 
-              mail, 
-              error, 
-              showContinue,
-              saveOwnerData,
-              handleExpiredSession
-            };
-        }
+      setup() {
+        const showContinue = ref(false);
+        const ownerName = ref('');
+        const phone = ref('');
+        const mail = ref('');
+        const error = ref('');
+        const g_licschet = ref(null);
+        const clientId = ref(null);
+        onMounted(async () => {                
+          checkSession();
+          if (showContinue.value) return;
+          const userAddress = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+          const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
+          g_licschet.value = userAddress.g_licschet || licschetData.g_licschet;             
+          if (!g_licschet.value) {
+            error.value = 'no licschet';
+            return;
+          }             
+          try {
+            const result = await apiRequest('/get-owner-data', { g_licschet: g_licschet.value });
+            if (result.found) {
+              ownerName.value = result.ownerName || '';
+              phone.value = result.phone || '';
+              mail.value = result.mail || '';
+              clientId.value = result.clientId;
+            } else {
+              error.value = 'Данные владельца не найдены в БД';
+            }
+          } catch (err) {
+            error.value = 'Ошибка загрузки: ' + (err.message || 'Неизвестная ошибка');
+            console.error(err);
+          }
+        });
+        const saveOwnerData = async () => {
+          error.value = '';
+          if (!ownerName.value.trim()) {
+            error.value = 'Введите ФИО владельца';
+            return;
+          }                
+          try {
+            const result = await apiRequest('/update-owner-data', {
+              g_licschet: g_licschet.value,
+              clientId: clientId.value,
+              ownerName: ownerName.value.trim(),
+              phone: phone.value.trim() || null,
+              mail: mail.value.trim() || null
+            });                 
+            if (result.status === 'OK') {
+              window.location.href = 'BoilerWindow.html';
+            } else {
+              error.value = result.error || 'Ошибка сохранения';
+            }
+          } catch (err) {
+            error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+            console.error(err);
+          }  
+        };
+        const checkSession = () => {
+          const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));
+          if (!authData) {
+            error.value = 'Сессия не найдена';
+            showContinue.value = true;
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return false;
+          }
+          const now = Date.now();
+          const EXPIRY_MS = 2400000;
+          if (now - authData.authDate > EXPIRY_MS) {
+            error.value = 'Истёк срок сессии';
+            showContinue.value = true;
+            sessionStorage.setItem('lastAuthDate', authData.authDate);
+            return false;
+          }
+          showContinue.value = false;
+          return true;
+        };
+        const handleExpiredSession = () => {
+          sessionStorage.removeItem('authData');
+          window.location.href = 'oldtokenwindow.html';
+        };
+        return {
+          ownerName, 
+          phone, 
+          mail, 
+          error, 
+          showContinue,
+          saveOwnerData,
+          handleExpiredSession
+        };
+      }
     }).mount('#app');
   </script>
   <script>
