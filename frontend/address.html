@@ -32,20 +32,7 @@
           novalidate
           :disabled="showContinue"
           :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto', transition: 'opacity 0.2s ease' }"
-        >
-          <div class="form-group">
-            <label for="townInput" class="form-label">Город</label>
-            <input 
-              type="search" id="townInput" list="resultsTown"               
-              placeholder="Введите город" 
-              autocomplete="off"              
-              @input="onTownInput" @change="onTownChange" 
-              v-model="townSearch" class="form-input" required
-            >
-            <datalist id="resultsTown">
-              <option v-for="town in towns" :key="town.id" :value="town.name" :data-id="town.id"></option>
-            </datalist>
-          </div>          
+        >                   
           <div class="form-group">
             <label for="streetInput" class="form-label">Улица</label>
             <input 
@@ -391,31 +378,33 @@
     }
 
     .loading-overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(255, 255, 255, 0.85);
-        z-index: 10;
-        border-radius: 8px;
-        color: #45B0E1;
-        font-weight: 600;
-        font-size: 18px;
-      }
-      .spinner {
-        width: 48px; height: 48px;
-        border: 5px solid #E0F4FA;
-        border-top: 5px solid #45B0E1;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(255, 255, 255, 0.85);
+      z-index: 10;
+      border-radius: 8px;
+      color: #45B0E1;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .spinner {
+      width: 48px; height: 48px;
+      border: 5px solid #E0F4FA;
+      border-top: 5px solid #45B0E1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
     @media (max-width: 480px) {
       body {

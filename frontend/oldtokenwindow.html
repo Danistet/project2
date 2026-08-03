@@ -34,7 +34,7 @@
         if (lastAuthDate) {
           display.textContent = new Date(Number(lastAuthDate)).toLocaleString('ru-RU');
         } else {
-           display.textContent = '---';
+          display.textContent = '---';
         }
       });
     </script>
@@ -235,27 +235,27 @@
       }
 
       .status {    
-      position: fixed;
-      bottom: 0;      
-      left: 0;        
-      right: 0;       
-      width: 100%;    
-      text-align: center;
-      color: #000000;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 12px 0;
-      z-index: 1000;
-      transition: transform 0.5s ease, opacity 0.5s ease;
-      transform: translateY(0);
-      opacity: 1;
-    }
+        position: fixed;
+        bottom: 0;      
+        left: 0;        
+        right: 0;       
+        width: 100%;    
+        text-align: center;
+        color: #000000;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 12px 0;
+        z-index: 1000;
+        transition: transform 0.5s ease, opacity 0.5s ease;
+        transform: translateY(0);
+        opacity: 1;
+      }
       
-    .status.status-hidden {
-      transform: translateY(100%);
-      opacity: 0;
-      pointer-events: none; 
-    }
+      .status.status-hidden {
+        transform: translateY(100%);
+        opacity: 0;
+        pointer-events: none; 
+      }
 
     }
   </style>
