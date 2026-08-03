@@ -10,6 +10,7 @@ const { error } = require('console');
 const app = express();
 const PORT = 3000;
 const uploadDir = path.join(__dirname, 'images');
+const frontendDir = path.join(__dirname, '..', 'frontend');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {recursive: true});
 }
@@ -27,6 +28,16 @@ const upload = multer({
 });
 app.use(cors());
 app.use(express.json()); 
+app.use('/frontend', express.static(frontendDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+  }
+}));
+app.get('/', (req, res) => {
+  res.redirect('/frontend/index.html');
+});
 
 
 app.post('/auth', (req, res) => {
@@ -1075,5 +1086,5 @@ app.post('/update-meter', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://10.151.16.1:${PORT}`);
 });

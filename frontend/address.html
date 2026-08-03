@@ -6,7 +6,7 @@
     <title>Введите адрес</title>
     <link rel="icon" href="data:,">
     <script src="./api.js"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="./vendor/vue.global.js"></script>
   </head>
   <body>
     <div id="app" class="page-wrapper">
@@ -100,8 +100,12 @@
     <script src="./app.js"></script>
     <script>
       function tologin() {
-        clearSessionAndLogout()
-        window.location.href = 'index.html';
+        if (typeof clearSessionAndLogout === 'function') {
+          clearSessionAndLogout();
+        } else {
+          sessionStorage.clear();
+          window.location.href = 'index.html';
+        }
       }      
     </script>
     <script>

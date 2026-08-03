@@ -83,17 +83,15 @@ createApp({
     const meternum = ref('');
     const mountdate = ref('');
     const verifydate = ref('');
-    const towns = ref([]);
     const streets = ref([]);
     const buildings = ref([]);
     const currentBuildingLicschet = ref(null);
     const apparts = ref([]);
-    const selectedTownId = ref(null);
+    const selectedTownId = ref(2);
     const selectedStreetId = ref(null);
     const selectedBuildingId = ref(null);
     const selectedAppartId = ref(null);
     const houseInput = ref('');
-    const townSearch = ref('');
     const streetSearch = ref('');
     const houseSearch = ref('');
     const appartsSearch = ref('');
@@ -109,17 +107,6 @@ createApp({
     const actNo = ref('');
     const actDate = ref('');   
     const { onMounted } = Vue;
-
-    watch(townSearch, (newVal) => {
-      if (!newVal || newVal.trim() === '') {
-        streetSearch.value = '';
-        houseSearch.value = '';
-        selectedStreetId.value = null;
-        selectedBuildingId.value = null;
-        streets.value = [];
-        buildings.value = [];
-      }
-    });
 
     watch(streetSearch, (newVal) => {
       if (!newVal || newVal.trim() === '') {
@@ -223,7 +210,7 @@ createApp({
               formData.append('files', blob, f.fileName);
             });
           }
-          const response = await fetch('http://localhost:3000/PH', { method: 'POST', body: formData });                  
+          const response = await fetch('http://10.151.16.1:3000/PH', { method: 'POST', body: formData });                  
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
           if (recordId) {
@@ -264,9 +251,6 @@ createApp({
         error.value = 'Истёк срок сессии. Пожалуйста, войдите снова.';
         showContinue.value = true;
         return;
-      }
-      if (!townSearch.value?.trim() || !selectedTownId.value) {
-        alert("Выберите город из списка"); document.getElementById('townInput')?.focus(); return;
       }
       if (!streetSearch.value?.trim() || !selectedStreetId.value) {
         alert("Выберите улицу из списка"); document.getElementById('streetInput')?.focus(); return;
@@ -344,10 +328,15 @@ createApp({
         clearMeterDataToSession();
       }
       const addressData = {
-        town: townSearch.value || '', townId: selectedTownId.value,
-        street: streetSearch.value || '', streetId: selectedStreetId.value,
-        house: houseInput.value || '', apparts: appartsValue, appartsId: appartsIdValue, 
-        g_licschet, buildingId: selectedBuildingId.value
+        town: 'Лянтор', 
+        townId: 2,
+        street: streetSearch.value || '', 
+        streetId: selectedStreetId.value,
+        house: houseInput.value || '', 
+        apparts: appartsValue, 
+        appartsId: appartsIdValue, 
+        g_licschet, 
+        buildingId: selectedBuildingId.value
       };
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));      
       showOverlay.value = true;
@@ -364,17 +353,10 @@ createApp({
       window.location.href = 'checkownerwindow.html';
     };
 
-    const loadTowns = async () => {
-      try {
-        const result = await apiRequest('/cities');
-        towns.value = result;
-      } catch (err) { console.error('Failed to load towns:', err); }
-    };
-
     const loadStreets = async (townId) => {
       isLoading.value = true;
       try {
-        const response = await fetch(`http://localhost:3000/streets?townId=${townId}`, {
+        const response = await fetch(`http://10.151.16.1:3000/streets?townId=${townId}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }
         });
         streets.value = await response.json();
@@ -414,20 +396,6 @@ createApp({
         console.error('Failed to load apartments:', err);
         currentBuildingLicschet.value = null; apparts.value = [];
       } finally { isLoading.value = false; }
-    };
-
-    const onTownInput = async (e) => {
-      const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
-      if (option) selectedTownId.value = option.dataset.id;
-    };
-
-    const onTownChange = (e) => {
-      const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsTown option')].find(o => o.value === val);
-      selectedTownId.value = option?.dataset.id || null;
-      if (selectedTownId.value) loadStreets(selectedTownId.value);
-      else { streets.value = []; buildings.value = []; }
     };
 
     const onStreetInput = (e) => {
@@ -623,7 +591,7 @@ createApp({
               formData.append('files', blob, f.fileName);
             });
           }        
-          const response = await fetch('http://localhost:3000/save-violation', {
+          const response = await fetch('http://10.151.16.1:3000/save-violation', {
             method: 'POST',
             body: formData
           });
@@ -712,12 +680,10 @@ createApp({
     };
 
     onMounted(() => {
-      if (document.getElementById('townInput')) {
-        loadTowns();
-      }
+      selectedTownId.value = 2;
+      loadStreets(2);
       checkSession();
       window.addEventListener('online', () => {
-        console.log('online');
         if (typeof syncPendingReadings === 'function') {
           syncPendingReadings();
         }
@@ -726,12 +692,12 @@ createApp({
 
     return { 
       password, response, error, meternum, mountdate, verifydate,
-      towns, streets, buildings, apparts, PHData, PH,
+      streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
-      houseInput, townSearch, streetSearch, houseSearch, appartsSearch, showApparts,
+      houseInput, streetSearch, houseSearch, appartsSearch, showApparts,
       currentBuildingLicschet, meters, showMeterSelect, selectedMeter,
       selectMeter, loadMetersByBuilding, loadMetersByLicschet,
-      NewPH, onTownInput, onTownChange, onStreetInput, onStreetChange,
+      NewPH, onStreetInput, onStreetChange,
       onHouseInput, onHouseChange, onAppartsInput, onAppartsChange,
       login, saveAddressAndContinue,
       submitViolationReport,
