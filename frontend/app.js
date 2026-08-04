@@ -5,7 +5,7 @@ const DB_VERSION = 2;
 function openLocalDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = (event) => { 
       const db = event.target.result;
       if (db.objectStoreNames.contains('pendiReadings')) {
         db.deleteObjectStore('pendiReadings');
