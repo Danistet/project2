@@ -210,7 +210,10 @@ createApp({
               formData.append('files', blob, f.fileName);
             });
           }
-          const response = await fetch('http://10.151.16.1:3000/PH', { method: 'POST', body: formData });                  
+          const response = await fetch(`${API_BASE}/PH`, {
+            method: 'POST',
+            body: formData
+          });                 
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
           if (recordId) {
@@ -356,8 +359,9 @@ createApp({
     const loadStreets = async (townId) => {
       isLoading.value = true;
       try {
-        const response = await fetch(`http://10.151.16.1:3000/streets?townId=${townId}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }
+        const response = await fetch(`${API_BASE}/streets?townId=${townId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
         });
         streets.value = await response.json();
       } catch (err) { console.error('Failed to load streets:', err); }
@@ -591,7 +595,7 @@ createApp({
               formData.append('files', blob, f.fileName);
             });
           }        
-          const response = await fetch('http://10.151.16.1:3000/save-violation', {
+          const response = await fetch(`${API_BASE}/save-violation`, {
             method: 'POST',
             body: formData
           });

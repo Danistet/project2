@@ -191,7 +191,7 @@
           return;
         }       
         try {
-          const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+          const response = await fetch(`${API_BASE}/PH/last?meter_id=${meter_id}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
           });       
@@ -224,7 +224,7 @@
                 const blob = base64ToBlob(record.fileBase64, record.fileType);
                 formData.append('file', blob, record.fileName);
               }
-              const response = await fetch('http://localhost:3000/save-violation', {
+              const response = await fetch('${API_BASE}/save-violation', {
                 method: 'POST',
                 body: formData
               });
@@ -245,7 +245,7 @@
                 const blob = base64ToBlob(record.fileBase64, record.fileType);
                 formData.append('file', blob, record.fileName);
               }
-              const response = await fetch('http://localhost:3000/PH', {
+              const response = await fetch('${API_BASE}/PH', {
                 method: 'POST',
                 body: formData
               });              

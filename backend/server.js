@@ -1086,5 +1086,5 @@ app.post('/update-meter', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://10.151.16.1:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

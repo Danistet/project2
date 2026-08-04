@@ -175,7 +175,7 @@
           return;
         }
         try {
-          const response = await fetch(`http://localhost:3000/PH/last?meter_id=${meter_id}`, {
+          const response = await fetch(`${API_BASE}/PH/last?meter_id=${meter_id}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
           });

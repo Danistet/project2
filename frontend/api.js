@@ -1,16 +1,32 @@
+const API_BASE = (() => {
+  if (window.API_BASE) {
+    return window.API_BASE;
+  }
+  const isHttp = window.location.protocol.startsWith('http');
+  if (isHttp) {
+    return window.location.origin;
+  }
+  return 'http://10.151.16.1:3000';
+});
+
 async function apiRequest(endpoint, data = {}, method = 'POST') { 
   try {
     //const response = await fetch(`http://localhost:3000${endpoint}`, {
-    const response = await fetch(`http://10.151.16.1:3000${endpoint}`, {
-      method,
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: method !== 'GET' ? JSON.stringify(data) : undefined
     });   
     const result = await response.json();
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      try {
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.error || `Ошибка сервера: ${response.status}`);
+      } catch (e) {
+        throw new Error(`Сервер вернул HTML вместо JSON (Статус: ${response.status}). URL: ${endpoint}`);
+      }
     }
-    return result;
+    return await result.json();
   } catch (error) {
     console.error(`API request failed (${endpoint}):`, error);
     throw error;
@@ -83,7 +99,7 @@ async function syncPendingReadings() {
         } else if (record.fileBase64) {
           formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
         }
-        const response = await fetch('http://localhost:3000/save-violation',{ method: 'POST', body: formData});
+        const response = await fetch('${API_BASE}/save-violation',{ method: 'POST', body: formData});
         if (response.ok)
         {
           await deletePendingReading(record.id);
@@ -100,7 +116,7 @@ async function syncPendingReadings() {
         } else if (record.fileBase64) { 
           formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
         }
-        const response = await fetch('http://localhost:3000/PH', { method: 'POST', body: formData});
+        const response = await fetch('${API_BASE}/PH', { method: 'POST', body: formData});
         if (response.ok) 
         {
           await deletePendingReading(record.id);
