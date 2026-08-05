@@ -969,7 +969,7 @@ createApp({
         sessionStorage.setItem('controllerId', result.controllerId);
         localStorage.setItem('offlineAuthData', JSON.stringify({
           password: passwordValue,
-          token: result.token,
+          token: result.token, 
           controllerId: result.controllerId
         }));
         localStorage.setItem('lastPassword', passwordValue);          
