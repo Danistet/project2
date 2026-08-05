@@ -115,13 +115,13 @@
         const errorContainer = document.getElementById('error');
         if (!authData) {
           showError('Сессия не найдена');
-          setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+          setTimeout(() => { window.location.href = 'ActWindow.html'; }, 2000);
           return;
         }
         if (!authData.token) {
           showError('Некорректные данные сессии');
           clearSession();
-          window.location.href = 'index.html';
+          window.location.href = 'ActWindow.html';
           return;
         }  
         loadMeterData();                            
@@ -142,7 +142,7 @@
             } catch (e) {
               console.error("Ошибка данных счетчика:", e);
               errorElement.textContent = 'Ошибка формата данных счетчика';
-              window.location.href = 'index.html';
+              window.location.href = 'ActWindow.html';
             }
           }
         }      
@@ -154,7 +154,7 @@
         } else {
           meterNumElement.textContent = 'Не указан';
           console.log("Данные счетчика не найдены");
-          window.location.href = 'index.html';
+          window.location.href = 'ActWindow.html';
         }
       }    
       function main() {                
@@ -181,7 +181,7 @@
               meterData = JSON.parse(storedMeterData);
             } catch (e) {
               console.error("Ошибка данных счетчика:", e);
-              window.location.href = 'index.html';
+              window.location.href = 'ActWindow.html';
             }
           }
         }      
@@ -205,7 +205,7 @@
         } catch (err) {
           console.error('Failed to load previous PH:', err);
           phElement.textContent = 'нет данных';
-          window.location.href = 'index.html';
+          window.location.href = 'ActWindow.html';
         }
       }         
       async function syncPendingReadings() {

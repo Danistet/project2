@@ -74,10 +74,29 @@ function clearSession() {
   sessionStorage.clear();
 }
 
-function clearSessionAndLogout() {
+async function clearSessionAndLogout() {
   sessionStorage.clear();
   localStorage.removeItem('authData');
-  localStorage.clear(); 
+  localStorage.removeItem('offlineAuthData');
+  localStorage.removeItem('lastPassword');
+  localStorage.clear();    
+  try {
+    if (typeof clearControllerPackage === 'function') {
+      await clearControllerPackage();
+    } else {
+      const request = indexedDB.open('MeterOfflineStorage', 3);
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+        if (db.objectStoreNames.contains('controllerPackages')) {
+          const transaction = db.transaction(['controllerPackages'], 'readwrite');
+          const store = transaction.objectStore('controllerPackages');
+          store.clear();
+        }
+      };
+    }
+  } catch (e) {
+    console.error('Ошибка очистки IndexedDB при выходе:', e);
+  }  
   window.location.href = 'index.html';
 }
 

@@ -174,19 +174,29 @@
           const loadMeters = async () => {
             isLoading.value = true;
             try {
-              let loadedMeters = typeof getAllMeters === 'function' ? getAllMeters() : [];            
+              let loadedMeters = typeof getAllMeters === 'function' ? getAllMeters() : [];
               if (!loadedMeters || loadedMeters.length === 0) {
-                const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
-                if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
-                  loadedMeters = await getMetersByLicschet(addressData.g_licschet);
-                } else if (addressData?.buildingId && typeof getMetersByBuilding === 'function') {
-                  loadedMeters = await getMetersByBuilding(addressData.buildingId);
-                }                
+                const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');                  
+                try {
+                  if (!navigator.onLine) throw new Error('Offline');
+                  if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
+                    loadedMeters = await getMetersByLicschet(addressData.g_licschet);
+                  } else if (addressData?.buildingId && typeof getMetersByBuilding === 'function') {
+                    loadedMeters = await getMetersByBuilding(addressData.buildingId);
+                  }
+                } catch (apiErr) {
+                  console.warn('API failed, trying offline cache:', apiErr);
+                  if (addressData?.g_licschet && typeof getOfflineMetersByLicschet === 'function') {
+                    loadedMeters = await getOfflineMetersByLicschet(addressData.g_licschet);
+                  } else if (addressData?.buildingId && typeof getOfflineMetersByBuilding === 'function') {
+                    loadedMeters = await getOfflineMetersByBuilding(addressData.buildingId);
+                  }
+                }
                 if (loadedMeters?.length && typeof saveAllMeters === 'function') {
                   saveAllMeters(loadedMeters);
                 }
-              }              
-              meters.value = loadedMeters || [];                        
+              }
+              meters.value = loadedMeters || [];                
               const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
               if (activeMeter) {
                 let targetMeterId = activeMeter.id;
@@ -209,13 +219,20 @@
             } finally {
               isLoading.value = false;
             }
-          };
+          };  
           
           const selectMeter = async (meter) => {
             isLoading.value = true;
             try {
               selectedMeterId.value = meter.id;                      
               saveActiveMeter(meter);
+              editData.value = {
+                name: meter.name || '',
+                meterNum: meter.meterNum || '',
+                seal: meter.seal || '',
+                manfDate: formatDateForInput(meter.manfDate),
+                verifyDate: formatDateForInput(meter.verifyDate)
+              };
               sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meter.meterNum }));
               sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: meter.mountDate }));
               sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: meter.verifyDate }));
@@ -228,52 +245,92 @@
             } finally {
               isLoading.value = false;
             }
-          };
+          }
 
           const loadMeterDetails = async (meterId) => {
             if (!meterId) {
               console.warn('no meterId');
               return;
-            }
+            }            
+            const fillEditData = (result) => {
+              editData.value = {
+                name: result.name || editData.value.name || '',
+                meterNum: result.meterNum || editData.value.meterNum || '',
+                seal: result.seal || editData.value.seal || '',
+                manfDate: formatDateForInput(result.manfDate) || editData.value.manfDate || '',
+                verifyDate: formatDateForInput(result.verifyDate) || editData.value.verifyDate || ''
+              };
+            };
             try {
+              if (!navigator.onLine) throw new Error('Offline mode');
               const result = await apiRequest('/get-meter-details', { meterId: meterId });
-              if (result.found) {                    
-                const formatDateForInput = (dateStr) => {
-                  if (!dateStr) return '';
-                  const str = String(dateStr).trim();                  
-                  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;                  
-                  const date = new Date(str);
-                  if (isNaN(date.getTime())) {
-                    const parts = str.match(/\d+/g);
-                    if (parts && parts.length >= 3) {
-                      if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-                      if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                    }
-                    return '';
-                  }
-                  const day = String(date.getDate()).padStart(2, '0');
-                  const month = String(date.getMonth() + 1).padStart(2, '0');
-                  const year = date.getFullYear();
-                  return `${year}-${month}-${day}`;
-                };             
-                editData.value = {
-                  name: result.name || '',
-                  meterNum: result.meterNum || '',
-                  seal: result.seal || '',
-                  manfDate: formatDateForInput(result.manfDate),
-                  verifyDate: formatDateForInput(result.verifyDate)
-                };
+              if (result.found) {
+                fillEditData(result);
               }
             } catch (err) {
-              console.error('Failed to load meter details:', err);
-              error.value = 'Ошибка загрузки деталей счётчика';
+              console.warn('Failed to load meter details from server, trying offline cache:', err);
+              try {
+                const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+                const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;                  
+                if (controllerId && typeof getControllerPackage === 'function') {
+                  const pkg = await getControllerPackage(controllerId);
+                  if (pkg && pkg.meters) {
+                    const meterRow = pkg.meters.find(m => String(m.ID) === String(meterId));
+                    if (meterRow) {
+                      fillEditData({
+                        found: true,
+                        name: meterRow.NAME,
+                        meterNum: meterRow.METER_NUM,
+                        seal: meterRow.SEAL,
+                        manfDate: meterRow.MANFDATE,
+                        verifyDate: meterRow.VERIFY_DATE
+                      });
+                    return;
+                  }
+                }
+              }
+              console.warn('Нет сети и данных в кэше. Используем базовые данные из списка.');
+              } catch (offlineErr) {
+                console.error('Offline fallback failed:', offlineErr);
+              }
             }
+          };
+          
+          const formatDateForInput = (dateStr) => {
+            if (!dateStr) return '';
+            const str = String(dateStr).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            const date = new Date(str);
+            if (isNaN(date.getTime())) {
+              const parts = str.match(/\d+/g);
+              if (parts && parts.length >= 3) {
+                if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              }
+              return '';
+            }
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${year}-${month}-${day}`;
           };
           
           const saveMeterData = async () => {
             saving.value = true;
-            error.value = '';            
+            error.value = '';
             try {
+              if (!navigator.onLine) {
+                const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+                if (activeMeter) {
+                  activeMeter.meterNum = editData.value.meterNum;
+                  activeMeter.verifyDate = editData.value.verifyDate;
+                  if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
+                  sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
+                  sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
+                }
+                alert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.');
+                return;
+              }
               const result = await apiRequest('/update-meter', {
                 meterId: selectedMeterId.value,
                 meterNum: editData.value.meterNum || null,
@@ -282,14 +339,14 @@
                 manfDate: editData.value.manfDate || null,
                 mountDate: meters.value.find(m => m.id === selectedMeterId.value)?.mountDate || null,
                 verifyDate: editData.value.verifyDate || null
-              });              
+              });
               if (result.status === 'OK') {
-                alert('Данные успешно сохранены');                                
-                const activeMeter = getActiveMeter();
+                alert('Данные успешно сохранены');
+                const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
                 if (activeMeter) {
                   activeMeter.meterNum = editData.value.meterNum;
                   activeMeter.verifyDate = editData.value.verifyDate;
-                  saveActiveMeter(activeMeter);
+                  if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
                   sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
                   sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
                 }
@@ -309,7 +366,7 @@
             if (!authData) {
               error.value = 'Сессия не найдена';
               showContinue.value = true;
-              setTimeout(() => window.location.href = 'index.html', 2000);
+              setTimeout(() => window.location.href = 'ActWindow.html', 2000);
               return false;
             }            
             const now = Date.now();

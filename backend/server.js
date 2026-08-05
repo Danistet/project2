@@ -805,7 +805,6 @@ app.post('/meters-by-building', (req, res) => {
 
 app.post('/PH', upload.array('files', 5), (req, res) => {
   const { ph, meter_id, licschet, abonent_name, description } = req.body;
-  const { ph, meter_id, licschet, abonent_name, description } = req.body;
   const actIdRaw = req.body.act_id ?? req.body.actId ?? null;
   let actId = null;
   if (
