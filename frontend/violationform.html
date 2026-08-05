@@ -88,10 +88,14 @@
         </section>
         <div class="button-group"> 
           <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>         
-          <button @click="submitViolationReport" class="btn-primary">Отправить отчет о нарушении</button>
-          <button onclick="main()" class="btn-secondary">Назад к списку</button>
+          <button @click="submitViolationReport" :disabled="isLoading" class="btn-primary">Отправить отчет о нарушении</button>
+          <button onclick="main()" :disabled="isLoading" class="btn-secondary">Назад к списку</button>
         </div>      
       </main>
+      <div v-if="isLoading" class="blocking-overlay">
+        <div class="spinner"></div>
+        <p>Отправка данных...</p>
+      </div>
       <div class="status" id="statusDiv"></div> 
     </div>
     <script src="./app.js"></script>
@@ -563,6 +567,47 @@
         font-size: 15px;
         margin-right: 12px;
       }
+    }
+
+    .blocking-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.85);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: #2E8BC0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid #E0F4FA;
+      border-top: 5px solid #45B0E1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     @media (max-width: 480px) {

@@ -53,7 +53,7 @@ function checkSession() {
   }
   const data = JSON.parse(authData);
   const now = Date.now();
-  const EXPIRY_MS = 2400000;
+  const EXPIRY_MS = 24000000;
   if (!isOffline && (now - authData.authDate > EXPIRY_MS)) {
     console.warn("Сессия истекла");
     return false; 
@@ -111,6 +111,9 @@ async function syncPendingReadings() {
         formData.append('licschet', record.licschet);
         formData.append('abonent_name', record.abonent_name);
         formData.append('description', record.description);
+        if (record.actId) {
+          formData.append('act_id', record.actId);
+        }
         if (record.filesData && record.filesData.length > 0) {
           record.filesData.forEach(f => formData.append('file', base64ToBlob(f.fileBase64, f.fileType), f.fileName));          
         } else if (record.fileBase64) { 

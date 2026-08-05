@@ -86,7 +86,7 @@
         return;
       }
       const now = Date.now();
-      if (now - authData.authDate > 2400000) {
+      if (now - authData.authDate > 24000000) {
         if (errorEl) errorEl.textContent = 'Истёк срок сессии';
         sessionStorage.setItem('lastAuthDate', authData.authDate);          
         let btn = document.getElementById('ContinueButton');

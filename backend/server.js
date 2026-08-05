@@ -64,7 +64,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, (err, meterResult) => {                          
         const now = Date.now();
-        const minute = 2400000;        
+        const minute = 24000000;        
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate, controllerId) => {
           db.detach();
           res.json({ 
@@ -805,6 +805,19 @@ app.post('/meters-by-building', (req, res) => {
 
 app.post('/PH', upload.array('files', 5), (req, res) => {
   const { ph, meter_id, licschet, abonent_name, description } = req.body;
+  const { ph, meter_id, licschet, abonent_name, description } = req.body;
+  const actIdRaw = req.body.act_id ?? req.body.actId ?? null;
+  let actId = null;
+  if (
+    actIdRaw !== null &&
+    actIdRaw !== undefined &&
+    String(actIdRaw).trim() !== ''
+  ) {
+    actId = parseInt(actIdRaw, 10);
+    if (isNaN(actId)) {
+      return res.status(400).json({ error: 'Invalid act_id' });
+    }
+  }
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id required' });
   }
@@ -827,8 +840,8 @@ app.post('/PH', upload.array('files', 5), (req, res) => {
       const meterNum = checkResult[0].METER_NUM;
       const dbLicschet = checkResult[0].LS;
       const targetLicschet = licschet || dbLicschet;
-      const insertQuery = `INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE) VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?)`;
-      db.query(insertQuery, [ph, meterNum, createdate], (err) => {
+      const insertQuery = `INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE, ACT_ID) VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?, ?)`;
+      db.query(insertQuery, [ph, meterNum, createdate, actId], (err) => {
         if (err) {
           db.detach();
           return res.status(500).json({ error: 'error', details: err.message });
@@ -1082,6 +1095,185 @@ app.post('/update-meter', (req, res) => {
         message: 'Data updated'
       });
     });
+  });
+});
+
+app.post('/controller-offline-package', (req, res) => {
+  const { controllerId } = req.body;
+  const ctrlIdNum = parseInt(controllerId, 10);
+  if (isNaN(ctrlIdNum)) {
+    return res.status(400).json({ error: 'Invalid controllerId' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = (sql, params = []) => {
+      return new Promise((resolve, reject) => {
+        db.query(sql, params, (queryErr, result) => {
+          if (queryErr) reject(queryErr);
+          else resolve(result || []);
+        });
+      });
+    };
+    const run = async () => {
+      const meterByControllerFilter = `
+        SELECT M.LS
+        FROM METERS M
+        WHERE M.CONTROLER_ID = ?
+      `;
+      const meters = await query(`
+        SELECT
+          M.ID,
+          M.METER_NUM,
+          M.NAME,
+          M.SEAL,
+          M.MANFDATE,
+          M.MOUNT_DATE,
+          M.VERIFY_DATE,
+          M.LS,
+          M.CONTROLER_ID,
+          M.METER_TYPE,
+          M.STATUS
+        FROM METERS M
+        WHERE M.CONTROLER_ID = ?
+      `, [ctrlIdNum]);
+      const abonents = await query(`
+        SELECT
+          A.ID,
+          A.G_LICSCHET,
+          A.CLIENT_ID,
+          A.BUILDINGS_ID,
+          CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+          CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER
+        FROM ABONENTS A
+        WHERE A.G_LICSCHET IN (${meterByControllerFilter})
+      `, [ctrlIdNum]);
+      const clients = await query(`
+        SELECT
+          C.ID,
+          CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME,
+          CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS PHONE,
+          CAST(C.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS MAIL
+        FROM CLIENTS C
+        WHERE C.ID IN (
+          SELECT A.CLIENT_ID
+          FROM ABONENTS A
+          WHERE A.G_LICSCHET IN (${meterByControllerFilter})
+        )
+      `, [ctrlIdNum]);
+      const buildings = await query(`
+        SELECT
+          B.ID,
+          B.STREET_ID,
+          CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+          CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
+        FROM BUILDINGS B
+        WHERE B.ID IN (
+          SELECT A.BUILDINGS_ID
+          FROM ABONENTS A
+          WHERE A.G_LICSCHET IN (${meterByControllerFilter})
+        )
+      `, [ctrlIdNum]);
+      const streets = await query(`
+        SELECT
+          RS.ID,
+          RS.TOWN_ID,
+          CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET,
+          CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE
+        FROM RSTREETS RS
+        WHERE RS.ID IN (
+          SELECT B.STREET_ID
+          FROM BUILDINGS B
+          WHERE B.ID IN (
+            SELECT A.BUILDINGS_ID
+            FROM ABONENTS A
+            WHERE A.G_LICSCHET IN (${meterByControllerFilter})
+          )
+        )
+      `, [ctrlIdNum]);
+      const meterTypes = await query(`
+        SELECT
+          MT.ID,
+          MT.LOW_QUALITY_GRP_TARIFF
+        FROM METER_TYPES MT
+        WHERE MT.ID IN (
+          SELECT M.METER_TYPE
+          FROM METERS M
+          WHERE M.CONTROLER_ID = ?
+        )
+      `, [ctrlIdNum]);
+      const services = await query(`
+        SELECT
+          S.ID,
+          S.GROUP_ID,
+          CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
+        FROM SERVICES S
+        WHERE S.ID IN (
+          SELECT MT.LOW_QUALITY_GRP_TARIFF
+          FROM METER_TYPES MT
+          WHERE MT.ID IN (
+            SELECT M.METER_TYPE
+            FROM METERS M
+            WHERE M.CONTROLER_ID = ?
+          )
+        )
+      `, [ctrlIdNum]);
+      const meterStatuses = await query(`
+        SELECT
+          RS.ID
+        FROM RMETER_STATUS RS
+        WHERE RS.ID IN (
+          SELECT M.STATUS
+          FROM METERS M
+          WHERE M.CONTROLER_ID = ?
+        )
+      `, [ctrlIdNum]);
+      const meterIndLast = await query(`
+        SELECT
+          MI.ID,
+          MI.METER_ID,
+          MI.PH,
+          MI.CREATEDATE,
+          MI.ACT_ID
+        FROM METERS_IND MI
+        WHERE MI.METER_ID IN (
+          SELECT M.METER_NUM
+          FROM METERS M
+          WHERE M.CONTROLER_ID = ?
+        )
+        AND MI.ID IN (
+          SELECT MAX(MI2.ID)
+          FROM METERS_IND MI2
+          WHERE MI2.METER_ID = MI.METER_ID
+        )
+      `, [ctrlIdNum]);
+      res.json({
+        controllerId: ctrlIdNum,
+        generatedAt: new Date().toISOString(),
+        meters,
+        abonents,
+        clients,
+        buildings,
+        streets,
+        meterTypes,
+        services,
+        meterStatuses,
+        meterIndLast
+      });
+    };
+    run()
+      .catch(e => {
+        console.error('Offline package error:', e);
+        res.status(500).json({
+          error: 'Failed to build controller offline package',
+          details: e.message
+        });
+      })
+      .finally(() => {
+        db.detach();
+      });
   });
 });
 

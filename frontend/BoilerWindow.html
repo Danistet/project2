@@ -58,7 +58,7 @@
             return false;
           }
           const now = Date.now();
-          const EXPIRY_MS = 2400000;
+          const EXPIRY_MS = 24000000;
           if (now - authData.authDate > EXPIRY_MS) {
             error.value = 'Истёк срок сессии';
             showContinue.value = true;

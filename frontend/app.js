@@ -1,6 +1,7 @@
 const DB_NAME = 'MeterOfflineStorage';
 const STORE_NAME = 'pendingReadings';
-const DB_VERSION = 2;
+const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
+const DB_VERSION = 3;
 
 function openLocalDB() {
   return new Promise((resolve, reject) => {
@@ -13,10 +14,66 @@ function openLocalDB() {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
       }
+      if (!db.objectStoreNames.contains(CONTROLLER_PACKAGE_STORE)) {
+        db.createObjectStore(CONTROLLER_PACKAGE_STORE, { keyPath: 'controllerId' });
+      }
     };
     request.onsuccess = (event) => resolve(event.target.result);
     request.onerror = (event) => reject(event.target.error);
   });
+}
+
+async function saveControllerPackage(controllerId, packageData) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readwrite');
+    const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
+    const request = store.put({
+      controllerId,
+      savedAt: Date.now(),
+      ...packageData
+    });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getControllerPackage(controllerId) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readonly');
+    const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
+    const request = store.get(Number(controllerId));
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function downloadAndCacheControllerData(controllerId) {
+  const data = await apiRequest('/controller-offline-package', { controllerId });
+  await saveControllerPackage(controllerId, data);
+  return data;
+}
+
+async function ensureControllerPackage(controllerId, maxAgeMs = 2400000) {
+  if (!controllerId) return null;
+  const existing = await getControllerPackage(controllerId);
+  if (
+    existing &&
+    existing.savedAt &&
+    Date.now() - existing.savedAt < maxAgeMs
+  ) {
+    return existing;
+  }
+  if (!navigator.onLine) {
+    return existing;
+  }
+  try {
+    return await downloadAndCacheControllerData(controllerId);
+  } catch (err) {
+    console.warn('Не удалось обновить офлайн-пакет контролёра:', err);
+    return existing;
+  }
 }
 
 async function saveReadingLocally(readingData) {
@@ -168,7 +225,9 @@ createApp({
           return;
         }
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
-        const licschet = addressData.g_licschet || meterData.licschet || '';                        
+        const licschet = addressData.g_licschet || meterData.licschet || '';    
+        const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
+        const actId = currentAct?.actId || null;                    
         let filesDataForStorage = [];
         let fileNamesForServer = [];
         if (files && files.length > 0) {
@@ -189,13 +248,17 @@ createApp({
           }
         }
         const payload = {
-          ph: numericValue, meter_id, licschet,
-          abonent_name: addressData.town || '', description: 'file',
-          fileNames: fileNamesForServer, 
+          ph: numericValue,
+          meter_id,
+          licschet,
+          abonent_name: addressData.town || '',
+          description: 'file',
+          fileNames: fileNamesForServer,
           filesData: filesDataForStorage,
           createdate: new Date().toISOString().replace('T', ' ').slice(0, 19),
-          isViolation: false
-        };          
+          isViolation: false,
+          actId
+        };         
         const recordId = await saveReadingLocally(payload);         
         if (navigator.onLine) {          
           const formData = new FormData();
@@ -203,7 +266,10 @@ createApp({
           formData.append('meter_id', payload.meter_id);
           formData.append('licschet', payload.licschet); 
           formData.append('abonent_name', payload.abonent_name);
-          formData.append('description', payload.description);          
+          formData.append('description', payload.description);   
+          if (payload.actId) {
+            formData.append('act_id', payload.actId);
+          }       
           if (filesDataForStorage.length > 0) {
             filesDataForStorage.forEach(f => {
               const blob = base64ToBlob(f.fileBase64, f.fileType);
@@ -249,7 +315,7 @@ createApp({
     const saveAddressAndContinue = async () => {
       const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
       const now = Date.now();
-      const EXPIRY_MS = 2400000;      
+      const EXPIRY_MS = 24000000;      
       if (!authData || !authData.token || (now - authData.authDate > EXPIRY_MS)) {
         error.value = 'Истёк срок сессии. Пожалуйста, войдите снова.';
         showContinue.value = true;
@@ -486,14 +552,55 @@ createApp({
     };
 
     const loadMetersByLicschet = async (g_licschet) => {
-      if (!g_licschet?.trim()) { meters.value = []; clearMeterDataToSession(); return; }
+      if (!g_licschet?.trim()) {
+        meters.value = [];
+        clearMeterDataToSession();
+        return;
+      }
       try {
+        if (!navigator.onLine) {
+          const offlineMeters = await getOfflineMetersByLicschet(g_licschet.trim());
+          meters.value = offlineMeters;
+          if (offlineMeters.length === 1) {
+            selectMeter(offlineMeters[0]);
+          } else if (offlineMeters.length > 1) {
+            showMeterSelect.value = true;
+          } else {
+            clearMeterDataToSession();
+            showMeterSelect.value = false;
+          }
+          return;
+        }
         const meterList = await apiRequest('/meters-by-licschet', { g_licschet });
-        meters.value = meterList;      
-        if (meterList.length === 1) selectMeter(meterList[0]);
-        else if (meterList.length > 1) showMeterSelect.value = true;
-        else { clearMeterDataToSession(); showMeterSelect.value = false; }
-      } catch (err) { console.error("error:", err); meters.value = []; clearMeterDataToSession(); showMeterSelect.value = false; }
+        meters.value = meterList;
+        if (meterList.length === 1) {
+          selectMeter(meterList[0]);
+        } else if (meterList.length > 1) {
+          showMeterSelect.value = true;
+        } else {
+          clearMeterDataToSession();
+          showMeterSelect.value = false;
+        }
+      } catch (err) {
+        console.error('error:', err);
+        try {
+          const offlineMeters = await getOfflineMetersByLicschet(g_licschet.trim());
+          meters.value = offlineMeters;
+          if (offlineMeters.length === 1) {
+            selectMeter(offlineMeters[0]);
+          } else if (offlineMeters.length > 1) {
+            showMeterSelect.value = true;
+          } else {
+            clearMeterDataToSession();
+            showMeterSelect.value = false;
+          }
+        } catch (offlineErr) {
+          console.error('offline fallback error:', offlineErr);
+          meters.value = [];
+          clearMeterDataToSession();
+          showMeterSelect.value = false;
+        }
+      }
     };
 
     const selectMeter = (meter) => {
@@ -521,7 +628,9 @@ createApp({
     };
 
     const submitViolationReport = async () => {
-      try {
+      if (isLoading.value) return;
+      isLoading.value = true;
+      try {  
         const meterData = JSON.parse(sessionStorage.getItem('meternum') || '{}');
         const meterNum = meterData.meterNum; 
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
@@ -619,8 +728,11 @@ createApp({
       } catch (err) {
         console.error('Error submitting:', err);
         alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
+      } finally {
+        isLoading.value = false;
       }
     };
+
     const login = async (e) => {
       error.value = ''; response.value = '';
       const passwordValue = password.value.trim();
@@ -633,13 +745,21 @@ createApp({
           authDate: result.authDate,
           controllerId: result.controllerId
         };
-        //sessionStorage.setItem('authData', JSON.stringify({ token: result.token, authDate: result.authDate, controllerId: result.controllerId }));
         sessionStorage.setItem('authData', JSON.stringify(authPayLoad));
         localStorage.setItem('authData', JSON.stringify(authPayLoad));
         sessionStorage.setItem('controllerId', result.controllerId);
         sessionStorage.setItem('meternum', JSON.stringify({ meterNum: result.meterNum }));
         sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: result.mountDate }));
         sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: result.verifyDate }));
+        if (navigator.onLine && result.controllerId) {
+          ensureControllerPackage(result.controllerId)
+          .then(() => {
+            console.log('сохранён');
+          })
+          .catch(err => {
+            console.warn('Ошибка сохранения:', err);
+          });
+        }
         window.location.href = 'ActWindow.html'; 
       } catch (err) { error.value = `Ошибка: ${err.message}`; console.error(err); }
     };
@@ -666,7 +786,7 @@ createApp({
         return false;
       }
       const now = Date.now();
-      const EXPIRY_MS = 2400000;
+      const EXPIRY_MS = 24000000;
       if (now - authData.authDate > EXPIRY_MS)
       {
         error.value = 'Истёк срок сессии';
@@ -683,13 +803,62 @@ createApp({
       window.location.href = 'oldtokenwindow.html';
     };
 
+    function mapOfflineMeter(pkg, meterRow) {
+      const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meterRow.LS)) || null;
+      const client = abonent
+        ? pkg.clients?.find(c => c.ID === abonent.CLIENT_ID)
+        : null;
+      const meterType = meterRow.METER_TYPE
+        ? pkg.meterTypes?.find(t => t.ID === meterRow.METER_TYPE)
+        : null;
+      const service = meterType
+        ? pkg.services?.find(s => s.ID === meterType.LOW_QUALITY_GRP_TARIFF)
+        : null;
+      return {
+        found: true,
+        id: meterRow.ID,
+        meterNum: meterRow.METER_NUM,
+        mountDate: meterRow.MOUNT_DATE,
+        verifyDate: meterRow.VERIFY_DATE,
+        licschet: meterRow.LS,
+        groupName: service?.GROUP_NAME || null,
+        clientName: client?.NAME || null
+      };
+    }
+
+    async function getOfflineMetersByLicschet(g_licschet) {
+      const auth = typeof getAuthData === 'function'
+        ? getAuthData()
+        : JSON.parse(sessionStorage.getItem('authData') || 'null');
+      if (!auth?.controllerId) return [];
+      const pkg = await getControllerPackage(auth.controllerId);
+      if (!pkg || !Array.isArray(pkg.meters)) return [];
+      return pkg.meters
+        .filter(m => String(m.LS) === String(g_licschet))
+        .map(m => mapOfflineMeter(pkg, m));
+    }
+
     onMounted(() => {
       selectedTownId.value = 2;
       loadStreets(2);
-      checkSession();
+      const sessionValid = checkSession();
+      if (sessionValid) {
+        const auth = typeof getAuthData === 'function'
+          ? getAuthData()
+          : JSON.parse(sessionStorage.getItem('authData') || 'null');
+        if (auth?.controllerId) {
+          ensureControllerPackage(auth.controllerId).catch(() => {});
+        }
+      }
       window.addEventListener('online', () => {
         if (typeof syncPendingReadings === 'function') {
           syncPendingReadings();
+        }
+        const auth = typeof getAuthData === 'function'
+          ? getAuthData()
+          : JSON.parse(sessionStorage.getItem('authData') || 'null');
+        if (auth?.controllerId) {
+          ensureControllerPackage(auth.controllerId).catch(() => {});
         }
       });
     });

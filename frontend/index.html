@@ -69,7 +69,7 @@
         try {
           const data = JSON.parse(authData);
           const now = Date.now();
-          if (now - data.authDate > 2400000) {
+          if (now - data.authDate > 24000000) {
             sessionStorage.removeItem('authData');
           }
         } catch (e) {
