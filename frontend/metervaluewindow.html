@@ -120,7 +120,7 @@
         }
         if (!authData.token) {
           showError('Некорректные данные сессии');
-          clearSession();
+          //clearSession();
           window.location.href = 'ActWindow.html';
           return;
         }  
@@ -224,7 +224,7 @@
                 const blob = base64ToBlob(record.fileBase64, record.fileType);
                 formData.append('file', blob, record.fileName);
               }
-              const response = await fetch('${API_BASE}/save-violation', {
+              const response = await fetch(`${API_BASE}/save-violation`, {
                 method: 'POST',
                 body: formData
               });
@@ -245,7 +245,7 @@
                 const blob = base64ToBlob(record.fileBase64, record.fileType);
                 formData.append('file', blob, record.fileName);
               }
-              const response = await fetch('${API_BASE}/PH', {
+              const response = await fetch(`${API_BASE}/PH`, {
                 method: 'POST',
                 body: formData
               });              

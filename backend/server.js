@@ -121,11 +121,12 @@ app.post('/controller-addresses', (req, res) => {
     }
     const query = `
       SELECT
-        M.ID AS METER_ID,
-        M.VERIFY_DATE,
-        A.APPARTS,
-        A.LETTER,
-        A.BUILDINGS_ID,
+      M.ID AS METER_ID,
+      M.CONTROLER_ID,
+      M.VERIFY_DATE,
+      A.APPARTS,
+      A.LETTER,
+      A.BUILDINGS_ID,
       CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
       CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
       CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
@@ -139,8 +140,14 @@ app.post('/controller-addresses', (req, res) => {
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
       WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
-      ORDER BY RS.STREET_TYPE, RS.STREET, B.HOUSE, A.APPARTS, A.LETTER
-    `;        
+      ORDER BY
+        M.CONTROLER_ID DESC NULLS LAST,
+        RS.STREET_TYPE,
+        RS.STREET,
+        B.HOUSE,
+        A.APPARTS,
+        A.LETTER
+    `;     
     const ctrlIdNum = parseInt(controllerId, 10);
     if (isNaN(ctrlIdNum)) {
       db.detach();
@@ -162,6 +169,7 @@ app.post('/controller-addresses', (req, res) => {
         const houseName = `${r.HOUSE} ${corpsPart}`.trim();
         return {
           meterId: r.METER_ID,
+          controllerId: r.CONTROLER_ID,
           verifyDate: r.VERIFY_DATE,
           buildingsId: r.BUILDINGS_ID,
           streetId: r.STREET_ID,
@@ -551,24 +559,23 @@ app.post('/apparts', (req, res) => {
     db.query(query, [buildingId, controllerId], (err, result) => {
       db.detach();
       if (err) return res.status(500).json({ error: 'Query failed' });     
-      res.json(result.map(r => { 
+      res.json(result.map(r => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
-        if (r.APPARTS == null)
-        {
+        if (r.APPARTS == null) {
           return {
             id: r.ID,
             house: `${letterPart}`.trim(),
-            g_licschet: r.G_LICSCHET
+            g_licschet: r.G_LICSCHET,
+            controllerId: r.CONTROLER_ID
           };
-        }
-        else
-        {
+        } else {
           return {
             id: r.ID,
             house: `кв. ${r.APPARTS}${letterPart}`.trim(),
-            g_licschet: r.G_LICSCHET
+            g_licschet: r.G_LICSCHET,
+            controllerId: r.CONTROLER_ID
           };
-        }       
+        }
       }));
     });
   });
