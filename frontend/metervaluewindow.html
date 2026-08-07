@@ -62,7 +62,11 @@
       const previewContainer = document.getElementById('previewContainer');
       fileInput.addEventListener('change', function() {  
         if (this.files.length > 5) {
-          alert('Можно загрузить не более 5 файлов.');
+          if (typeof showAlert === 'function') {
+            showAlert('Можно загрузить не более 5 файлов.', 'error');
+          } else {
+            alert('Можно загрузить не более 5 файлов.');
+          }
           this.value = '';
           previewContainer.innerHTML = '';
           this.classList.remove('file-selected');

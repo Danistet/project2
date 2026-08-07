@@ -205,7 +205,11 @@
           error.value = '';
           try {
             await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
-            alert('Дата проверки успешно обновлена');
+            if (typeof showAlert === 'function') {
+              showAlert('Дата проверки успешно обновлена', 'success');
+            } else {
+              alert('Дата проверки успешно обновлена');
+            }
             const idx = allAddresses.value.findIndex(a => a.meterId === editData.value.meterId);
             if (idx !== -1) {
               allAddresses.value[idx].verifyDate = editData.value.verifyDate;

@@ -225,17 +225,17 @@ createApp({
       try {
         const inputEl = document.getElementById('newPH');
         const rawValue = inputEl?.value?.trim() || '';            
-        if (!rawValue) { alert("Введите показания"); return; }              
+        if (!rawValue) { showAlert("Введите показания", 'error'); return; }              
         const formatted = formatWithThousands(rawValue);
         const numericValue = parseFloat(rawValue.replace(',', '.'));
-        if (isNaN(numericValue)) { alert('Некорректное число'); return; }                 
+        if (isNaN(numericValue)) { showAlert("Некорректное число", 'error'); return; }                 
         const meterData = JSON.parse(sessionStorage.getItem('activeMeter') || sessionStorage.getItem('meternum') || '{}');
         const meter_id = meterData.meterNum;            
-        if (!meter_id) { alert('Не найден серийный номер счётчика'); return; }                
+        if (!meter_id) { showAlert("Не найден серийный номер счётчика", 'error'); return; }                
         const fileInput = document.getElementById('fileInput');
         const files = fileInput?.files;
-        if (files && files.length > 5) {
-          alert('Можно выбрать не более 5 файлов.');
+        if (files && files.length > 5) {    
+          showAlert('Можно выбрать не более 5 файлов.', 'error');
           fileInput.value = '';
           return;
         }
@@ -300,9 +300,9 @@ createApp({
           if (recordId) {
             await deletePendingReading(recordId);
           }
-          alert(result.message || 'Показания и фото успешно переданы на сервер!');
+          showAlert(result.message || 'Показания и фото успешно переданы на сервер!', 'success');
         } else {          
-          alert('Интернет отсутствует. Показания и фото сохранены локально.');
+          showAlert('Интернет отсутствует. Показания сохранены локально.', 'info');          
         }       
         const phElement = document.getElementById('PH');
         if (phElement) phElement.textContent = formatted;
@@ -323,7 +323,7 @@ createApp({
         inputEl.value = '';
       } catch (err) {
         console.error('Error:', err);
-        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка') + '. Данные сохранены локально.');
+        showAlert('Ошибка: ' + (err.message || 'Неизвестная ошибка'), 'error' + '. Данные сохранены локально.');
       }
     };
 
@@ -337,16 +337,17 @@ createApp({
         return;
       }
       if (!streetSearch.value?.trim() || !selectedStreetId.value) {
-        alert("Выберите улицу из списка"); document.getElementById('streetInput')?.focus(); return;
+        showAlert('Выберите улицу из списка.', 'info'); 
+        document.getElementById('streetInput')?.focus(); return;        
       }
       let houseValue = houseInput.value?.trim();
       if (!houseValue) {
-        alert("Введите номер дома");
+        showAlert('Введите номер дома.', 'info');
         const input = document.getElementById('houseInput');
         if (input) { input.focus(); input.select(); } return;
       }
       if (!selectedBuildingId.value) {
-        alert("Несуществующий номер дома");
+        showAlert('Несуществующий номер дома', 'error');
         const input = document.getElementById('houseInput');
         if (input) { input.focus(); input.select(); } return;
       }
@@ -354,12 +355,12 @@ createApp({
       let appartsIdValue = null;
       if (showApparts.value) {
         if (!appartsSearch.value?.trim()) {
-          alert("Введите номер квартиры");
+          showAlert('Введите номер квартиры', 'info');
           const input = document.getElementById('appartsInput');
           if (input) { input.focus(); input.select(); } return;
         }
         if (!selectedAppartId.value) {
-          alert("Несуществующий номер квартиры");
+          showAlert('Несуществующий номер квартиры', 'error');
           const input = document.getElementById('appartsInput');
           if (input) { input.focus(); input.select(); } return;
         }
@@ -440,7 +441,7 @@ createApp({
           }
           if (!allMeters || allMeters.length === 0) {
             clearMeterDataToSession();
-            alert(!showApparts.value ? "Для выбранного дома не найдено счётчиков." : "Для выбранной квартиры не найдено счётчиков.");
+            showAlert(!showApparts.value ? "Для выбранного дома не найдено счётчиков." : "Для выбранной квартиры не найдено счётчиков.", 'error');
             return;
           }          
           saveAllMeters(allMeters);
@@ -465,7 +466,7 @@ createApp({
           showOverlay.value = true;
       } catch (err) {
         console.error('Error during address save:', err);
-        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
+        showAlert('Ошибка: ' + (err.message || 'Неизвестная ошибка'), 'error');
       } finally {
         isLoading.value = false;
       }
@@ -830,7 +831,7 @@ createApp({
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
         const licschet = addressData.g_licschet || '';
         if (!meterNum) {
-          alert('Не найден серийный номер счётчика');
+          showAlert('Не найден серийный номер счётчика', 'error');
           return;
         }
         const violations = [];
@@ -848,13 +849,13 @@ createApp({
           if (t2 && t2 !== "") violations.push({ name: 'Серийный номер счетчика', description: t2 });
         }
         if (violations.length === 0) {
-          alert('Пожалуйста, выберите хотя бы одно нарушение');
+          showAlert('Пожалуйста, выберите хотя бы одно нарушение', 'info');
           return;
         }       
         const fileInput = document.getElementById('fileInput');
         const files = fileInput?.files;
         if (files && files.length > 5) {
-          alert('Можно выбрать не более 5 файлов.');
+          showAlert('Можно выбрать не более 5 файлов.', 'info');
           fileInput.value = '';
           document.getElementById('previewContainer').innerHTML = '';
           return;
@@ -907,9 +908,9 @@ createApp({
           if (recordId) {
             await deletePendingReading(recordId);
           }
-          alert(result.message || 'Отчет о нарушении успешно отправлен!');
+          showAlert(result.message || 'Отчет о нарушении успешно отправлен!', 'success');
         } else {
-          alert('Интернет отсутствует, сохранено локально, ожидание сети');
+          showAlert('Интернет отсутствует, сохранено локально, ожидание сети', 'info');
         }     
         document.getElementById('violationsForm')?.reset();
         document.getElementById('techcheckForm')?.reset();
@@ -921,7 +922,7 @@ createApp({
         document.getElementById('previewContainer').innerHTML = '';
       } catch (err) {
         console.error('Error submitting:', err);
-        alert('Ошибка: ' + (err.message || 'Неизвестная ошибка'));
+        showAlert('Ошибка: ' + (err.message || 'Неизвестная ошибка'), 'error');
       } finally {
         isLoading.value = false;
       }

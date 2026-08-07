@@ -328,7 +328,11 @@
                   sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
                   sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
                 }
-                alert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.');
+                if (typeof showAlert === 'function') {
+                  showAlert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.', 'success');
+                } else {
+                  alert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.');
+                }
                 return;
               }
               const result = await apiRequest('/update-meter', {
@@ -341,7 +345,11 @@
                 verifyDate: editData.value.verifyDate || null
               });
               if (result.status === 'OK') {
-                alert('Данные успешно сохранены');
+                if (typeof showAlert === 'function') {
+                  showAlert('Данные успешно сохранены', 'success');
+                } else {
+                  alert('Данные успешно сохранены');
+                }
                 const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
                 if (activeMeter) {
                   activeMeter.meterNum = editData.value.meterNum;
