@@ -146,7 +146,8 @@ function base64ToBlob(base64, mimeType) {
   return new Blob(byteArrays, { type: mimeType });
 }
 
-const { createApp, ref, watch } = Vue;
+const { createApp, ref, watch, computed } = Vue;
+
 createApp({
   setup() {
     const password = ref(localStorage.getItem('lastPassword') || '');
@@ -163,7 +164,6 @@ createApp({
     const selectedStreetId = ref(null);
     const selectedBuildingId = ref(null);
     const selectedAppartId = ref(null);
-    const houseInput = ref('');
     const streetSearch = ref('');
     const houseSearch = ref('');
     const appartsSearch = ref('');
@@ -200,7 +200,8 @@ createApp({
       if (!newVal) {
         appartsSearch.value = '';
         selectedAppartId.value = null;
-        sessionStorage.removeItem('licschet');
+        sessionStorage.removeItem('licschet');        
+        isAppartsOpen.value = false;        
         if (selectedBuildingId.value) {
           loadMeterByBuilding(selectedBuildingId.value);
         }
@@ -340,7 +341,7 @@ createApp({
         showAlert('Выберите улицу из списка.', 'info'); 
         document.getElementById('streetInput')?.focus(); return;        
       }
-      let houseValue = houseInput.value?.trim();
+      let houseValue = houseSearch.value?.trim();
       if (!houseValue) {
         showAlert('Введите номер дома.', 'info');
         const input = document.getElementById('houseInput');
@@ -456,7 +457,7 @@ createApp({
             townId: 2,
             street: streetSearch.value || '',
             streetId: selectedStreetId.value,
-            house: houseInput.value || '',
+            house: houseSearch.value || '',
             apparts: appartsValue,
             appartsId: appartsIdValue,
             g_licschet,
@@ -632,52 +633,126 @@ createApp({
       }
     };
 
-    const onStreetInput = (e) => {
-      const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
-      if (option) selectedStreetId.value = option.dataset.id;
-    };
+      const isStreetOpen = ref(false);
+      const isHouseOpen = ref(false);
+      const isAppartsOpen = ref(false);
 
-    const onStreetChange = (e) => {
-      const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === val);
-      selectedStreetId.value = option?.dataset.id || null;
-      if (selectedStreetId.value) loadBuildings(selectedStreetId.value);
-      else buildings.value = [];
-    };
+      const filteredStreets = computed(() => {
+        if (!streetSearch.value) return streets.value;
+        const term = streetSearch.value.toLowerCase();
+        return streets.value.filter(s => s.name.toLowerCase().includes(term));
+      });
 
-    const onHouseInput = (e) => {
-      houseInput.value = e.target.value;
-      const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === e.target.value);
-      if (option) selectedBuildingId.value = option.dataset.id;
-    };
+      const filteredBuildings = computed(() => {
+        if (!houseSearch.value) return buildings.value;
+        const term = houseSearch.value.toLowerCase();
+        return buildings.value.filter(b => b.house.toLowerCase().includes(term));
+      });
 
-    const onHouseChange = (e) => {
-      const val = e.target.value;
-      const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === val);
-      selectedBuildingId.value = option?.dataset.id || null;
-      houseInput.value = val;
-      if (selectedBuildingId.value) loadApparts(selectedBuildingId.value);
-      else apparts.value = [];
-    };
+      const filteredApparts = computed(() => {
+        if (!appartsSearch.value) return apparts.value;
+        const term = appartsSearch.value.toLowerCase();
+        return apparts.value.filter(a => (a.displayHouse || '').toLowerCase().includes(term));
+      });
 
-    const getSelectedOptionData = (e, dataListId) => {
-      const val = e.target.value;
-      if (!val) return null;
-      const options = document.querySelectorAll(`#${dataListId} option`);
-      for (let i = 0; i < options.length; i++) {
-        const opt = options[i];
-        if(opt.value === val || opt.dataset.id === String(val)) {
-          return { id: opt.dataset.id, licschet: opt.dataset.licschet, text: opt.text || opt.value };
+      const refreshMeters = async () => {
+        showMeterSelect.value = false;
+        selectedMeter.value = null;
+        
+        if (selectedAppartId.value && showApparts.value) {
+          const appr = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
+          if (appr?.g_licschet) {
+            await loadMetersByLicschet(appr.g_licschet);
+          }
+        } else if (selectedBuildingId.value) {
+          if (currentBuildingLicschet.value && !showApparts.value) {
+            await loadMetersByLicschet(currentBuildingLicschet.value);
+          } else {
+            await loadMetersByBuilding(selectedBuildingId.value);
+          }
+        } else {
+          meters.value = [];
+          clearMeterDataToSession();
         }
-      }
-      return null;
-    };
+      };
 
-    const onAppartsInput = (e) => {
-      const data = getSelectedOptionData(e, 'resultsApparts');
-      selectedAppartId.value = data ? data.id : null;
-    };
+      const selectStreet = (street) => {
+        streetSearch.value = street.name;
+        selectedStreetId.value = street.id;
+        isStreetOpen.value = false;
+        loadBuildings(street.id);
+      };
+
+      const selectHouse = (bld) => {
+        houseSearch.value = bld.house;
+        selectedBuildingId.value = bld.id;
+        isHouseOpen.value = false;
+        loadApparts(bld.id);
+      };
+
+      const selectAppart = async (appr) => {
+        appartsSearch.value = appr.displayHouse;
+        selectedAppartId.value = appr.id;
+        isAppartsOpen.value = false;
+        await refreshMeters();
+      };
+
+      const closeStreet = () => {
+        isStreetOpen.value = false;
+        if (streetSearch.value) {
+          const match = streets.value.find(s => s.name === streetSearch.value);
+          if (!match) {
+            selectedStreetId.value = null;
+            houseSearch.value = '';
+            selectedBuildingId.value = null;
+            buildings.value = [];
+            appartsSearch.value = '';
+            selectedAppartId.value = null;
+            apparts.value = [];
+          }
+        }
+        refreshMeters();
+      };
+
+      const closeHouse = () => {
+        isHouseOpen.value = false;
+        if (houseSearch.value) {
+          const match = buildings.value.find(b => b.house === houseSearch.value);
+          if (!match) {
+            selectedBuildingId.value = null;
+            appartsSearch.value = '';
+            selectedAppartId.value = null;
+            apparts.value = [];
+          }
+        }
+        refreshMeters();
+      };
+
+      const closeAppart = () => {
+        isAppartsOpen.value = false;
+        if (appartsSearch.value && showApparts.value) {
+          const match = apparts.value.find(a => a.displayHouse === appartsSearch.value);
+          if (!match) {
+            selectedAppartId.value = null;
+          }
+        }
+        refreshMeters();
+      };
+
+      const clearStreet = () => {
+        streetSearch.value = '';
+        closeStreet();
+      };
+
+      const clearHouse = () => {
+        houseSearch.value = '';
+        closeHouse();
+      };
+
+      const clearAppart = () => {
+        appartsSearch.value = '';
+        closeAppart();
+      };
 
     const clearMeterDataToSession = () => {
       sessionStorage.setItem('meternum', JSON.stringify({meterNum: null }));
@@ -809,18 +884,7 @@ createApp({
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
     };
 
-    const onAppartsChange = async (e) => {
-      const data = getSelectedOptionData(e, 'resultsApparts');      
-      selectedAppartId.value = data?.id || null;
-      appartsSearch.value = data?.text || e.target.value; 
-      showMeterSelect.value = false;
-      selectedMeter.value = null;
-      const g_licschet = data?.licschet?.trim();
-      if (selectedAppartId.value && g_licschet) await loadMetersByLicschet(g_licschet);
-      else if (!selectedAppartId.value && selectedBuildingId.value && currentBuildingLicschet.value) await loadMetersByLicschet(currentBuildingLicschet.value);
-      else if (!selectedAppartId.value && selectedBuildingId.value) await loadMetersByBuilding(selectedBuildingId.value);
-      else { meters.value = []; clearMeterDataToSession(); showMeterSelect.value = false; }
-    };
+    
 
     const submitViolationReport = async () => {
       if (isLoading.value) return;
@@ -1108,11 +1172,15 @@ createApp({
       password, response, error, meternum, mountdate, verifydate,
       streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
-      houseInput, streetSearch, houseSearch, appartsSearch, showApparts,
+       streetSearch, houseSearch, appartsSearch, showApparts,
       currentBuildingLicschet, meters, showMeterSelect, selectedMeter,
       selectMeter, loadMetersByBuilding, loadMetersByLicschet,
-      NewPH, onStreetInput, onStreetChange,
-      onHouseInput, onHouseChange, onAppartsInput, onAppartsChange,
+      NewPH, 
+      isStreetOpen, isHouseOpen, isAppartsOpen,
+      filteredStreets, filteredBuildings, filteredApparts,
+      selectStreet, selectHouse, selectAppart,
+      closeStreet, closeHouse, closeAppart,
+      clearStreet, clearHouse, clearAppart,
       login, saveAddressAndContinue,
       submitViolationReport,
       showOverlay, actNo, actDate,

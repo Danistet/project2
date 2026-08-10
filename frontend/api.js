@@ -965,8 +965,6 @@
   }
 
   const LOCAL_DB = loadDb();
-
-  // удобно для отладки в devtools
   window.LOCAL_DB = LOCAL_DB;
 
   function persistDb() {
@@ -1044,7 +1042,6 @@
       return false;
     }
     const service = getServiceByMeter(meter);
-    // если справочники не заполнены, не блокируем работу
     if (!service) {
       return true;
     }
@@ -1227,6 +1224,24 @@
       });
 
       return rows.map(({ _apparts, _letter, ...rest }) => rest);
+    },
+
+    '/controller-offline-package': ({ body }) => {
+      const controllerId = toNumber(body.controllerId);
+      if (!controllerId) {
+        return httpResponse(400, { error: 'controllerId required' });
+      }
+      return {
+        controllerId: controllerId,
+        savedAt: Date.now(),
+        streets: LOCAL_DB.RSTREETS,
+        buildings: LOCAL_DB.BUILDINGS,
+        abonents: LOCAL_DB.ABONENTS,
+        meters: LOCAL_DB.METERS.filter(m => toNumber(m.CONTROLER_ID) === controllerId),
+        clients: LOCAL_DB.CLIENTS,
+        meterTypes: LOCAL_DB.METER_TYPES,
+        services: LOCAL_DB.SERVICES
+      };
     },
 
     '/update-verify-date': ({ body }) => {
@@ -1870,17 +1885,13 @@
 /* LOCAL MOCK DB END                                          */
 /* ========================================================== */
 
-////TEMP DB
-const API_BASE = (() => {
-  if (window.API_BASE) {
-    return window.API_BASE;
-  }
-  const isHttp = window.location.protocol.startsWith('http');
-  if (isHttp) {
-    return window.location.origin;
-  }
-  return 'http://10.151.16.1:3000';
-})();
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////TEMP DB
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
 
 async function apiRequest(endpoint, data = {}, method = 'POST') { 
   try {
@@ -1909,14 +1920,12 @@ async function apiRequest(endpoint, data = {}, method = 'POST') {
 function checkSession() {
   const path = window.location.pathname.toLowerCase();
   const href = window.location.href.toLowerCase();
-  if (path.includes('index.html') || path.includes('oldtokenwindow.html') || path === '/' || path === '/frontend')
-  {
+  if (path.includes('index.html') || path.includes('oldtokenwindow.html') || path === '/' || path === '/frontend') {
     return true;
   }
   const authData = getAuthData();
-  const isOffline = !navigator.onLine
-  if (!authData)
-  {
+  const isOffline = !navigator.onLine;
+  if (!authData) {
     if (isOffline) {
       console.warn("Офлайн-режим, отсутствует подключение к сети.");
       return true;
@@ -1927,7 +1936,7 @@ function checkSession() {
   const data = JSON.parse(authData);
   const now = Date.now();
   const EXPIRY_MS = 24000000;
-  if (!isOffline && (now - authData.authDate > EXPIRY_MS)) {
+  if (!isOffline && (now - data.authDate > EXPIRY_MS)) {
     console.warn("Сессия истекла");
     return false; 
   }
@@ -1936,8 +1945,7 @@ function checkSession() {
 
 function getAuthData() {
   let data = sessionStorage.getItem('authData');
-  if (!data)
-  {
+  if (!data) {
     data = localStorage.getItem('authData');
   }
   return data ? JSON.parse(data) : null;
@@ -1952,7 +1960,7 @@ async function clearSessionAndLogout() {
   //localStorage.removeItem('authData');
   //localStorage.removeItem('offlineAuthData');
   //localStorage.removeItem('lastPassword');
-  //localStorage.clear();    
+  //localStorage.clear(); 
   try {
     if (typeof clearControllerPackage === 'function') {
       await clearControllerPackage();
@@ -1992,8 +2000,7 @@ async function syncPendingReadings() {
           formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
         }
         const response = await fetch(`${API_BASE}/save-violation`, { method: 'POST', body: formData });
-        if (response.ok)
-        {
+        if (response.ok) {
           await deletePendingReading(record.id);
           console.log(`Нарушение ID ${record.id}`);
         }
@@ -2012,8 +2019,7 @@ async function syncPendingReadings() {
           formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
         }
         const response = await fetch(`${API_BASE}/PH`, { method: 'POST', body: formData });
-        if (response.ok) 
-        {
+        if (response.ok) {
           await deletePendingReading(record.id);
           console.log(`Показания ID ${record.id}`);
         }
@@ -2077,7 +2083,6 @@ function saveActiveMeter(meter) {
 function clearActiveMeter() {
   sessionStorage.removeItem('activeMeter');
 }
-
 
 function saveAllMeters(meters) {
   sessionStorage.setItem('allMeters', JSON.stringify(meters));
@@ -2149,6 +2154,7 @@ if (!document.getElementById('custom-alert-styles')) {
   `;
   document.head.appendChild(style);
 }
+
 window.alert = function(message) {
   showAlert(message, 'info');
 };

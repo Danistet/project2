@@ -35,59 +35,111 @@
         >                   
           <div class="form-group">
             <label for="streetInput" class="form-label">Улица</label>
-            <input 
-              type="search" id="streetInput" list="resultsStreet" 
-              placeholder="Введите улицу" 
-              autocomplete="off"
-              @input="onStreetInput" @change="onStreetChange" 
-              :disabled="!selectedTownId" v-model="streetSearch" class="form-input" :required="!!selectedTownId"
-            >
-            <datalist id="resultsStreet">
-              <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
-            </datalist>
-          </div>          
+            <div class="custom-datalist" :class="{ disabled: !selectedTownId }">
+              <div class="custom-datalist-input-wrapper">
+                <input 
+                  type="text" id="streetInput" 
+                  placeholder="Введите улицу" 
+                  autocomplete="off"
+                  v-model="streetSearch" 
+                  class="form-input custom-datalist-input" 
+                  :required="!!selectedTownId"
+                  :disabled="!selectedTownId"
+                  @focus="isStreetOpen = true"
+                  @blur="closeStreet"
+                  @input="isStreetOpen = true"
+                >
+                <span 
+                  v-if="streetSearch" 
+                  class="clear-input-btn" 
+                  @mousedown.prevent="clearStreet"
+                >✕</span>
+                <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+              </div>
+              <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+                <div 
+                  v-for="street in filteredStreets" 
+                  :key="street.id" 
+                  class="custom-datalist-option"
+                  @mousedown.prevent="selectStreet(street)"
+                >
+                  {{ street.name }}
+                </div>
+              </div>
+            </div>
+          </div>         
           <div class="form-group">
             <label for="houseInput" class="form-label">Дом</label>
-            <input 
-              type="search" id="houseInput" list="resultsHome" 
-              placeholder="Введите номер дома" 
-              autocomplete="off"
-              @input="onHouseInput" @change="onHouseChange" 
-              :disabled="!selectedStreetId" v-model="houseSearch" class="form-input" :required="!!selectedStreetId"
-            >
-            <datalist id="resultsHome">
-              <option v-for="bld in buildings" :key="bld.id" :value="bld.house" :data-id="bld.id"></option>
-            </datalist>
-          </div>          
+            <div class="custom-datalist" :class="{ disabled: !selectedStreetId }">
+              <div class="custom-datalist-input-wrapper">
+                <input 
+                  type="text" id="houseInput" 
+                  placeholder="Введите номер дома" 
+                  autocomplete="off"
+                  v-model="houseSearch" 
+                  class="form-input custom-datalist-input" 
+                  :required="!!selectedStreetId"
+                  :disabled="!selectedStreetId"
+                  @focus="isHouseOpen = true"
+                  @blur="closeHouse"
+                  @input="isHouseOpen = true"
+                >
+                <span 
+                  v-if="houseSearch" 
+                  class="clear-input-btn" 
+                  @mousedown.prevent="clearHouse"
+                >✕</span>
+                <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
+              </div>
+              <div v-if="isHouseOpen && filteredBuildings.length" class="custom-datalist-dropdown">
+                <div 
+                  v-for="bld in filteredBuildings" 
+                  :key="bld.id" 
+                  class="custom-datalist-option"
+                  @mousedown.prevent="selectHouse(bld)"
+                >
+                  {{ bld.house }}
+                </div>
+              </div>
+            </div>
+          </div>         
           <div class="form-group">
             <label class="form-label checkbox-label">
               <input type="checkbox" id="appartscheck" v-model="showApparts" class="form-checkbox">
               <span class="checkbox-text">Квартира</span>
             </label>
-            <input 
-              :style="{ 
-                visibility: showApparts ? 'visible' : 'hidden', 
-                position: showApparts ? 'static' : 'absolute',
-                opacity: showApparts ? '1' : '0',
-                pointerEvents: showApparts ? 'auto' : 'none',
-                height: showApparts ? 'auto' : '0',
-                overflow: 'hidden'
-              }" 
-              type="search" id="appartsInput" list="resultsApparts" 
-              placeholder="Введите номер квартиры" :required="showApparts" 
-              autocomplete="off"
-              @input="onAppartsInput" @change="onAppartsChange" 
-              v-model="appartsSearch" class="form-input" tabindex="-1"
-            >
-            <datalist id="resultsApparts">
-              <option v-for="appr in apparts" 
-                :key="appr.id" 
-                :value="appr.displayHouse"
-                :data-id="appr.id" 
-                :data-licschet="appr.g_licschet">
-              </option>
-            </datalist>
-          </div>          
+            <div class="custom-datalist" :class="{ disabled: !showApparts }" v-if="showApparts">
+              <div class="custom-datalist-input-wrapper">
+                <input 
+                  type="text" id="appartsInput" 
+                  placeholder="Введите номер квартиры" 
+                  autocomplete="off"
+                  v-model="appartsSearch" 
+                  class="form-input custom-datalist-input" 
+                  :required="showApparts"
+                  @focus="isAppartsOpen = true"
+                  @blur="closeAppart"
+                  @input="isAppartsOpen = true"
+                >
+                <span 
+                  v-if="appartsSearch" 
+                  class="clear-input-btn" 
+                  @mousedown.prevent="clearAppart"
+                >✕</span>
+                <span class="custom-datalist-arrow" :class="{ open: isAppartsOpen }">▼</span>
+              </div>
+              <div v-if="isAppartsOpen && filteredApparts.length" class="custom-datalist-dropdown">
+                <div 
+                  v-for="appr in filteredApparts" 
+                  :key="appr.id" 
+                  class="custom-datalist-option"
+                  @mousedown.prevent="selectAppart(appr)"
+                >
+                  {{ appr.displayHouse }}
+                </div>
+              </div>
+            </div>
+          </div>         
           <div class="button-group">
             <button @click="cont" id="ContinueButton" class="btn-primary ContinueButton" v-if="showContinue">Продолжить</button>
             <button type="submit" class="btn-primary" v-if="!showContinue">Подтвердить</button>
@@ -106,7 +158,7 @@
           //sessionStorage.clear();
           window.location.href = 'ActWindow.html';
         }
-      }      
+      }     
     </script>
     <script>
       let statusTimeout;    
@@ -450,6 +502,134 @@
 
     .server-response {
       white-space: pre-line;
+    }
+  </style>
+  <style>
+    .custom-datalist {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-arrow.open {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-datalist.disabled .custom-datalist-input {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .custom-datalist-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-top: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-datalist-option {
+      padding: 14px 20px;
+      font-size: 16px;
+      color: #000000;
+      cursor: pointer;
+      border-bottom: 1px solid #F0F0F0;
+      transition: background-color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .custom-datalist-option:last-child {
+      border-bottom: none;
+    }
+
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active {
+      background-color: #F0F9FC;
+      color: #2E8BC0;
+    }
+
+    .custom-datalist-option.empty {
+      color: #999999;
+      font-style: italic;
+      cursor: default;
+      text-align: center;
+    }
+
+    .custom-datalist-option.empty:hover {
+      background-color: transparent;
+      color: #999999;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-track {
+      background: #F8FDFF;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-thumb {
+      background: #45B0E1;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 480px) {
+      .custom-datalist-dropdown {
+        max-height: 200px;
+      }
+      .custom-datalist-option {
+        padding: 12px 16px;
+        font-size: 15px;
+      }
+    }
+
+    .custom-datalist-input {
+      width: 100%;
+      padding-right: 75px !important; 
+    }
+
+    .custom-datalist-arrow {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #45B0E1;
+      font-size: 20px;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+      user-select: none;
+    }
+
+    .clear-input-btn {
+      position: absolute;
+      right: 45px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999999;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 8px;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      z-index: 2;
     }
   </style>
 </html>

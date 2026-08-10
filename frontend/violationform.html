@@ -651,9 +651,119 @@
       }
     }
 
-
     .server-response {
       white-space: pre-line;
+    }
+  </style>
+  <style>
+    .custom-datalist {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input {
+      width: 100%;
+      padding-right: 40px !important;
+    }
+
+    .custom-datalist-arrow {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #45B0E1;
+      font-size: 20px;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+      user-select: none;
+    }
+
+    .custom-datalist-arrow.open {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-datalist.disabled .custom-datalist-input {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .custom-datalist-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-top: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-datalist-option {
+      padding: 14px 20px;
+      font-size: 16px;
+      color: #000000;
+      cursor: pointer;
+      border-bottom: 1px solid #F0F0F0;
+      transition: background-color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .custom-datalist-option:last-child {
+      border-bottom: none;
+    }
+
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active {
+      background-color: #F0F9FC;
+      color: #2E8BC0;
+    }
+
+    .custom-datalist-option.empty {
+      color: #999999;
+      font-style: italic;
+      cursor: default;
+      text-align: center;
+    }
+
+    .custom-datalist-option.empty:hover {
+      background-color: transparent;
+      color: #999999;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-track {
+      background: #F8FDFF;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-thumb {
+      background: #45B0E1;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 480px) {
+      .custom-datalist-dropdown {
+        max-height: 200px;
+      }
+      .custom-datalist-option {
+        padding: 12px 16px;
+        font-size: 15px;
+      }
     }
   </style>
 </html>

@@ -11,53 +11,108 @@
   <body>
     <div id="app">
       <h1>Формирование списка</h1>
-      <div v-if="showContinue" class="session-expired-block">
-        <p class="error-message">{{ error }}</p>
-        <button @click="cont" class="btn-primary">Продолжить</button>
-      </div>
-      <form v-else @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
+      <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="form-group">
           <label for="streetInput" class="form-label">Улица</label>
-          <input
-            type="search" id="streetInput" list="resultsStreet"
-            placeholder="Введите улицу"
-            autocomplete="off"
-            v-model="streetSearch" 
-            class="form-input" 
-            :disabled="isLoading || streets.length === 0"
-          >
-          <datalist id="resultsStreet">
-            <option v-for="street in streets" :key="street.id" :value="street.name" :data-id="street.id"></option>
-          </datalist>
+          <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
+            <div class="custom-datalist-input-wrapper">
+              <input
+                type="text" id="streetInput"
+                placeholder="Введите улицу"
+                autocomplete="off"
+                v-model="streetSearch" 
+                class="form-input custom-datalist-input" 
+                :disabled="isLoading || streets.length === 0"
+                @focus="isStreetOpen = true"
+                @blur="closeStreet"
+                @input="isStreetOpen = true"
+              >
+              <span 
+                v-if="streetSearch" 
+                class="clear-input-btn" 
+                @mousedown.prevent="clearStreet"
+              >✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+            </div>
+            <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+              <div 
+                v-for="street in filteredStreets" 
+                :key="street.id" 
+                class="custom-datalist-option"
+                @mousedown.prevent="selectStreet(street)"
+              >
+                {{ street.name }}
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label for="houseInput" class="form-label">Дом</label>
-          <input
-            type="search" id="houseInput" list="resultsHome"
-            placeholder="Введите номер дома"
-            autocomplete="off"
-            v-model="houseSearch" 
-            class="form-input" 
-            :disabled="isLoading || !selectedStreetId"
-          >
-          <datalist id="resultsHome">
-            <option v-for="bld in buildings" :key="bld.id" :value="bld.name" :data-id="bld.id"></option>
-          </datalist>
+          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedStreetId }">
+            <div class="custom-datalist-input-wrapper">
+              <input
+                type="text" id="houseInput"
+                placeholder="Введите номер дома"
+                autocomplete="off"
+                v-model="houseSearch" 
+                class="form-input custom-datalist-input" 
+                :disabled="isLoading || !selectedStreetId"
+                @focus="isHouseOpen = true"
+                @blur="closeHouse"
+                @input="isHouseOpen = true"
+              >
+              <span 
+                v-if="houseSearch" 
+                class="clear-input-btn" 
+                @mousedown.prevent="clearHouse"
+              >✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
+            </div>
+            <div v-if="isHouseOpen && filteredBuildings.length" class="custom-datalist-dropdown">
+              <div 
+                v-for="bld in filteredBuildings" 
+                :key="bld.id" 
+                class="custom-datalist-option"
+                @mousedown.prevent="selectHouse(bld)"
+              >
+                {{ bld.name }}
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label for="listInput" class="form-label">Список адресов</label>
-          <input
-            type="search" id="listInput" list="resultsList"
-            placeholder="Выберите адрес из списка"
-            autocomplete="off"
-            @change="onListChange"
-            v-model="selectedAddressText" 
-            class="form-input" 
-            :disabled="isLoading || !selectedBuildingId"
-          >
-          <datalist id="resultsList">
-            <option v-for="addr in filteredAddressList" :key="addr.meterId" :value="addr.displayText"></option>
-          </datalist>
+          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
+            <div class="custom-datalist-input-wrapper">
+              <input
+                type="text" id="listInput"
+                placeholder="Выберите адрес из списка"
+                autocomplete="off"
+                v-model="selectedAddressText" 
+                class="form-input custom-datalist-input" 
+                :disabled="isLoading || !selectedBuildingId"
+                @focus="isListOpen = true"
+                @blur="closeList"
+                @input="isListOpen = true"
+              >
+              <span 
+                v-if="selectedAddressText" 
+                class="clear-input-btn" 
+                @mousedown.prevent="clearList"
+              >✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isListOpen }">▼</span>
+            </div>
+            <div v-if="isListOpen && filteredAddresses.length" class="custom-datalist-dropdown">
+              <div 
+                v-for="addr in filteredAddresses" 
+                :key="addr.meterId" 
+                class="custom-datalist-option"
+                @mousedown.prevent="selectAddress(addr)"
+              >
+                {{ addr.displayText }}
+              </div>
+            </div>
+          </div>
         </div>
         <div v-if="selectedAddress" class="meter-block selected">
           <h4>Выбранный объект</h4>
@@ -85,13 +140,17 @@
             </label>
           </div>
         </div>  
+        <div v-if="showContinue" class="session-expired-block">
+          <p class="error-message">{{ error }}</p>
+          <button @click="cont" class="btn-primary">Продолжить</button>
+        </div>
         <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
-      <button type="button" @click="logout" class="btn-secondary">Выход</button>
+        <button type="button" @click="logout" class="btn-secondary">Выход</button>
       </form>
     <div class="status" id="statusDiv"></div>
   </div>
   <script>
-    const { createApp, ref, onMounted, watch } = Vue;
+    const { createApp, ref, onMounted, watch, computed } = Vue;
     createApp({
       setup() {
         const showContinue = ref(false);
@@ -113,6 +172,9 @@
         const selectedAddressText = ref('');
         const selectedAddress = ref(null);
         const editData = ref({ meterId: null, verifyDate: '' });
+        const isStreetOpen = ref(false);
+        const isHouseOpen = ref(false);
+        const isListOpen = ref(false);
         const loadData = async () => {
           isLoading.value = true;
           try {
@@ -138,67 +200,158 @@
             isLoading.value = false;
           }
         };
-        watch(streetSearch, () => {
-          const option = [...document.querySelectorAll('#resultsStreet option')].find(o => o.value === streetSearch.value);
-          selectedStreetId.value = option?.dataset.id || null;
+
+        const filteredStreets = computed(() => {
+          if (!streetSearch.value) return streets.value;
+          const term = streetSearch.value.toLowerCase();
+          return streets.value.filter(s => s.name.toLowerCase().includes(term));
+        });
+
+        const filteredBuildings = computed(() => {
+          if (!houseSearch.value) return buildings.value;
+          const term = houseSearch.value.toLowerCase();
+          return buildings.value.filter(b => b.name.toLowerCase().includes(term));
+        });
+
+        const filteredAddresses = computed(() => {
+          if (!selectedAddressText.value) return filteredAddressList.value;
+          const term = selectedAddressText.value.toLowerCase();
+          return filteredAddressList.value.filter(a => a.displayText.toLowerCase().includes(term));
+        });
+
+        const clearStreet = () => {
+          streetSearch.value = '';
+          closeStreet();
+        };
+
+        const clearHouse = () => {
+          houseSearch.value = '';
+          closeHouse();
+        };
+
+        const clearList = () => {
+          selectedAddressText.value = '';
+          closeList();
+        };
+
+        const selectStreet = (street) => {
+          streetSearch.value = street.name;
+          selectedStreetId.value = street.id;
+          isStreetOpen.value = false;
+          
           buildings.value = [];
           selectedBuildingId.value = null;
           houseSearch.value = '';
           filteredAddressList.value = [];
           selectedAddress.value = null;
           selectedAddressText.value = '';
-          if (selectedStreetId.value) {
-            const bldMap = new Map();
-            allAddresses.value
+          
+          const bldMap = new Map();
+          allAddresses.value
             .filter(a => String(a.streetId) === String(selectedStreetId.value))
             .forEach(addr => {
               if (!bldMap.has(addr.buildingsId)) {
                 bldMap.set(addr.buildingsId, addr.houseName);
               }
             });
-            buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
+          buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
+        };
+
+        const closeStreet = () => {
+          isStreetOpen.value = false;
+          if (streetSearch.value) {
+            const match = streets.value.find(s => s.name === streetSearch.value);
+            if (!match) {
+              selectedStreetId.value = null;
+              buildings.value = [];
+              selectedBuildingId.value = null;
+              houseSearch.value = '';
+              filteredAddressList.value = [];
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+            }
+          } else {
+            selectedStreetId.value = null;
+            buildings.value = [];
+            selectedBuildingId.value = null;
+            houseSearch.value = '';
+            filteredAddressList.value = [];
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
           }
-        });
-        watch(houseSearch, () => {
-          const option = [...document.querySelectorAll('#resultsHome option')].find(o => o.value === houseSearch.value);
-          selectedBuildingId.value = option?.dataset.id || null;
+        };
+
+        const selectHouse = (bld) => {
+          houseSearch.value = bld.name;
+          selectedBuildingId.value = bld.id;
+          isHouseOpen.value = false;
+          
           filteredAddressList.value = [];
           selectedAddress.value = null;
           selectedAddressText.value = '';
-          if (selectedBuildingId.value) {
-            filteredAddressList.value = allAddresses.value.filter(
-              a => String(a.buildingsId) === String(selectedBuildingId.value)
-            );
+          
+          filteredAddressList.value = allAddresses.value.filter(
+            a => String(a.buildingsId) === String(selectedBuildingId.value)
+          );
+        };
+
+        const closeHouse = () => {
+          isHouseOpen.value = false;
+          if (houseSearch.value) {
+            const match = buildings.value.find(b => b.name === houseSearch.value);
+            if (!match) {
+              selectedBuildingId.value = null;
+              filteredAddressList.value = [];
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+            }
+          } else {
+            selectedBuildingId.value = null;
+            filteredAddressList.value = [];
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
           }
-        });
-        const onListChange = () => {
-          const found = filteredAddressList.value.find(a => a.displayText === selectedAddressText.value);
-          if (found) {
-            selectedAddress.value = found;
-            editData.value.meterId = found.meterId;
-            let vDate = found.verifyDate;
-            if (vDate) {
-              const str = String(vDate).trim();
-              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-                editData.value.verifyDate = str;
-              } else {
-                const date = new Date(str);
-                if (!isNaN(date.getTime())) {
-                  const y = date.getFullYear();
-                  const m = String(date.getMonth() + 1).padStart(2, '0');
-                  const d = String(date.getDate()).padStart(2, '0');
-                  editData.value.verifyDate = `${y}-${m}-${d}`;
-                } else {
-                  editData.value.verifyDate = '';
-                }
-              }
+        };
+
+        const selectAddress = (addr) => {
+          selectedAddressText.value = addr.displayText;
+          selectedAddress.value = addr;
+          editData.value.meterId = addr.meterId;
+          isListOpen.value = false;
+          
+          let vDate = addr.verifyDate;
+          if (vDate) {
+            const str = String(vDate).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+              editData.value.verifyDate = str;
             } else {
-              editData.value.verifyDate = '';
+              const date = new Date(str);
+              if (!isNaN(date.getTime())) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                editData.value.verifyDate = `${y}-${m}-${d}`;
+              } else {
+                editData.value.verifyDate = '';
+              }
+            }
+          } else {
+            editData.value.verifyDate = '';
+          }
+        };
+
+        const closeList = () => {
+          isListOpen.value = false;
+          if (selectedAddressText.value) {
+            const match = filteredAddressList.value.find(a => a.displayText === selectedAddressText.value);
+            if (!match) {
+              selectedAddress.value = null;
             }
           } else {
             selectedAddress.value = null;
           }
         };
+
         const saveVerifyDate = async () => {
           if (!editData.value.meterId) return;
           saving.value = true;
@@ -266,7 +419,12 @@
           streetSearch, houseSearch, selectedAddressText,
           selectedStreetId, selectedBuildingId,
           selectedAddress, editData,
-          onListChange, saveVerifyDate,
+          clearStreet, clearHouse, clearList,
+          isStreetOpen, isHouseOpen, isListOpen,
+          filteredStreets, filteredBuildings, filteredAddresses,
+          selectStreet, selectHouse, selectAddress,
+          closeStreet, closeHouse, closeList,
+          saveVerifyDate,
           cont, continueAction, logout
         };
       }
@@ -586,6 +744,134 @@
       body { padding: 16px 12px; } 
       h1 { font-size: 22px; margin-bottom: 20px; } 
       button { padding: 12px 14px; } 
+    }
+  </style>
+  <style>
+    .custom-datalist {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input {
+      width: 100%;
+      padding-right: 75px !important; 
+    }
+
+    .custom-datalist-arrow {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #45B0E1;
+      font-size: 20px;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+      user-select: none;
+    }
+
+    .clear-input-btn {
+      position: absolute;
+      right: 45px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999999;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 8px;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      z-index: 2;
+    }
+
+    .custom-datalist-arrow.open {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-datalist.disabled .custom-datalist-input {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .custom-datalist-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-top: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-datalist-option {
+      padding: 14px 20px;
+      font-size: 16px;
+      color: #000000;
+      cursor: pointer;
+      border-bottom: 1px solid #F0F0F0;
+      transition: background-color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .custom-datalist-option:last-child {
+      border-bottom: none;
+    }
+
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active {
+      background-color: #F0F9FC;
+      color: #2E8BC0;
+    }
+
+    .custom-datalist-option.empty {
+      color: #999999;
+      font-style: italic;
+      cursor: default;
+      text-align: center;
+    }
+
+    .custom-datalist-option.empty:hover {
+      background-color: transparent;
+      color: #999999;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-track {
+      background: #F8FDFF;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-thumb {
+      background: #45B0E1;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 480px) {
+      .custom-datalist-dropdown {
+        max-height: 200px;
+      }
+      .custom-datalist-option {
+        padding: 12px 16px;
+        font-size: 15px;
+      }
     }
   </style>
 </html>
