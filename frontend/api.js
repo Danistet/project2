@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = true;
+  const USE_LOCAL_DB = false;
 
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
@@ -1242,6 +1242,45 @@
         meterTypes: LOCAL_DB.METER_TYPES,
         services: LOCAL_DB.SERVICES
       };
+    },
+
+    '/controller-history': ({ body }) => {
+      const controllerId = toNumber(body.controllerId);
+      if (!controllerId)
+      {
+        return httpResponse(400, {error: 'controllerId required'});        
+      }
+      const history = [];
+      LOCAL_DB.METERS_IND.forEach(ind => {
+        if (ind.IS_DELETED) return;
+        const meter = LOCAL_DB.METERS.find(m => String(m.METER_NUM) === String(ind.METER_ID));
+        if (!meter || toNumber(meter.CONTROLER_ID) !== controllerId) return;
+        const act = LOCAL_DB.BUILD_MAINT_ACTS.find(a => a.ID === ind.ACT_ID);
+        if (!act) return;
+        const abonent = LOCAL_DB.ABONENTS.find(a => String(a.G_LICSCHET) === String(meter.LS));
+        const building = abonent ? LOCAL_DB.BUILDINGS.find(b => b.ID === abonent.BUILDINGS_ID) : null;
+        const street = building ? LOCAL_DB.RSTREETS.find(s => s.ID === building.STREET_ID) : null;
+        const meterType = LOCAL_DB.METER_TYPES.find(t => t.ID === meter.METER_TYPE)
+        const service =   meterType ? LOCAL_DB.SERVICES.find(s => s.ID == meterType.LOW_QUALITY_GRP_TARIFF) : null;
+        let addressStr = 'адрес не найден';
+        if (street && building) {
+          const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
+          const houseName = `${building.HOUSE || ''}${building.CORPS ? ` ${building.CORPS}` : ''}`.trim();
+          const appartsName = abonent?.APPARTS ? `кв. ${abonent.APPARTS}${abonent.LETTER ? ` ${abonent.LETTER}` : ''}` : '';
+          addressStr = `${streetName}, д. ${houseName}${appartsName ? ', ' + appartsName : ''}`;
+        }
+        history.push({
+          actId: act.ID,
+          actNo: act.ACT_NO,
+          actDate: act.ACT_DATE,
+          meterNum: meter.METER_NUM,
+          verifyDate: meter.VERIFY_DATE,
+          serviceName: service ? service.NAME : 'Не указана',
+          address: addressStr
+        });        
+      });
+      history.sort((a,b) => String(b.actDate).localeCompare(String(a.actDate)));
+      return history;
     },
 
     '/update-verify-date': ({ body }) => {

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="WIN1251">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>история работ</title>
+        <link rel="icon" href="data:,">
+        <script src="./vendor/vue.global.js"></script>
+        <script src="./api.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <h1>история работ</h1>
+            <div v-if="isLoading" class="loading">Загрузка данных...</div>
+            <div v-if="error" class="error-message">{{ error }}</div>            
+            <div v-if="!isLoading && history.length === 0" class="empty-state">
+                История пуста
+            </div>
+           <ul class="history-list" v-if="!isLoading && history.length > 0">
+                <li 
+                    v-for="act in history" 
+                    :key="act.actId + '-' + act.meterNum" 
+                    class="history-item"
+                    @click="selectAct(act)"
+                >
+                    <div class="act-info">
+                        <span class="act-no">Акт № {{ act.actNo }}</span>
+                        <span class="act-date">{{ act.actDate }}</span>
+                    </div>
+                    <span class="arrow">›</span>
+                </li>
+            </ul>            
+            <div>
+                <button @click="toactwindow" class="btn-secondary">Назад</button>
+            </div>
+            <div v-if="selectedAct" class="overlay" @click.self="closeOverlay">
+                <div class="overlay-content">
+                    <button class="close-btn" @click="closeOverlay">✕</button>
+                    <h2 class="overlay-title">Акт № {{ selectedAct.actNo }}</h2>
+                    <p class="overlay-date">Дата акта: {{ selectedAct.actDate }}</p>                    
+                    <div class="details">
+                        <div class="detail-row">
+                            <span class="label">Адрес:</span>
+                            <span class="value">{{ selectedAct.address }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Услуга:</span>
+                            <span class="value">{{ selectedAct.serviceName }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">№ счётчика:</span>
+                            <span class="value">{{ selectedAct.meterNum }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Показания:</span>
+                            <span class="value">{{ selectedAct.ph}}</span>
+                        </div>    
+                        <div class="detail-row">
+                            <span class="label">Дата проверки:</span>
+                            <span class="value">{{ selectedAct.verifyDate || 'нет данных' }}</span>
+                        </div>
+                    </div>                    
+                    <button class="btn-primary" @click="closeOverlay">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const history = ref([]);
+                const selectedAct = ref(null);
+                const isLoading = ref(false);
+                const error = ref('');
+                const checkSession = () => {
+                    const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+                    if (!authData || !authData.token) {
+                        window.location.href = 'index.html';
+                        return false;
+                    }
+                    return true;
+                };
+                const loadHistory = async () => {
+                    isLoading.value = true;
+                    try {
+                        const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+                        const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+                        if (!controllerId) {
+                            error.value = 'Не найден ID контроллера.';
+                            return;
+                        }
+                        const data = await apiRequest('/controller-history', { controllerId });
+                        history.value = data;
+                    } catch (err) {
+                        console.error(err);
+                        error.value = 'Ошибка загрузки истории';
+                    } finally {
+                        isLoading.value = false;
+                    }
+                };
+                const selectAct = (act) => {
+                    selectedAct.value = act;
+                };
+                const closeOverlay = () => {
+                    selectedAct.value = null;
+                };
+                const toactwindow = () => {
+                    window.location.href = 'ActWindow.html';
+                };
+                onMounted(() => {
+                    if (checkSession()) {
+                        loadHistory();
+                    }
+                });
+                return {
+                    history,
+                    selectedAct,
+                    isLoading,
+                    error,
+                    selectAct,
+                    closeOverlay,
+                    toactwindow
+                };
+            }
+        }).mount('#app');
+    </script>
+    <style>
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            font-size: 16px; 
+            line-height: 1.5; 
+            color: #000000; 
+            background-color: #F0F9FC; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh; 
+            padding: 24px 16px; 
+        }
+
+        h1 { 
+            font-size: 24px; 
+            font-weight: 600; 
+            margin-bottom: 24px; 
+            text-align: center; 
+        }
+
+        .loading, .empty-state {
+            font-size: 18px;
+            color: #666;
+            margin: 40px 0;
+        }
+
+        .error-message {
+            color: #C62828;
+            font-size: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .history-list {
+            list-style: none;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .history-item {
+            background: #FFFFFF;
+            border: 2px solid #45B0E1;
+            padding: 6px 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .history-item:active {
+            background-color: #E0F4FA;
+            transform: scale(0.98);
+        }
+
+        .act-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .act-no {
+            font-size: 18px;
+            font-weight: 600;
+            color: #000000;
+        }
+
+        .act-date {
+            font-size: 14px;
+            color: #666666;
+        }
+
+        .arrow {
+            font-size: 24px;
+            color: #45B0E1;
+            font-weight: bold;
+        }
+
+        .button-container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        button { 
+            width: 100%; 
+            padding: 14px 16px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #FFFFFF; 
+            background-color: #45B0E1; 
+            border: 2px solid #45B0E1; 
+            cursor: pointer; 
+            transition: background-color 0.2s ease; 
+            text-align: center; 
+            touch-action: manipulation;
+        }
+
+        button:active {
+            background-color: #1A6B96;
+            border-color: #1A6B96;
+        }
+
+        .btn-secondary {
+            background-color: #FFFFFF;
+            color: #45B0E1;
+        }
+
+        .btn-secondary:active {
+            background-color: #E0F4FA;
+        }
+
+        .overlay { 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0, 0, 0, 0.6); 
+            z-index: 9999; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .overlay-content { 
+            background: #FFFFFF; 
+            padding: 30px 24px; 
+            border-radius: 8px; 
+            text-align: left; 
+            max-width: 400px; 
+            width: 100%;
+            border: 2px solid #45B0E1; 
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideUp 0.25s ease;
+        }
+
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            min-height: 32px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            color: #999;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .close-btn:active {
+            color: #C62828;
+            background: transparent;
+        }
+
+        .overlay-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #000;
+            padding-right: 30px;
+        }
+
+        .overlay-date {
+            font-size: 15px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .details {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 24px;
+            border-top: 1px solid #eee;
+            padding-top: 16px;
+        }
+
+        .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #45B0E1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .value {
+            font-size: 16px;
+            color: #000;
+            word-break: break-word;
+        }
+
+        .btn-primary {
+            margin-top: 8px;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 16px 12px; }
+            h1 { font-size: 22px; margin-bottom: 20px; }
+            .overlay-content { padding: 24px 18px; }
+        }
+    </style>
+</html>  

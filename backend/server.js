@@ -1283,6 +1283,86 @@ app.post('/controller-offline-package', (req, res) => {
   });
 });
 
+app.post('/controller-history', (req, res) => {
+  const { controllerId } = req.body;
+  const ctrlIdNum = parseInt(controllerId, 10);  
+  if (isNaN(ctrlIdNum)) {
+    return res.status(400).json({ error: 'Invalid controllerId' });
+  } 
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }  
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); 
+    const query = `
+      SELECT 
+        a.ACT_NO, 
+        a.ACT_DATE, 
+        m.METER_NUM, 
+        m.VERIFY_DATE, 
+        ind.PH,
+        CAST(s.SHORT_NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS SERVICE_NAME, 
+        CAST(st.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(st.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(b.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, 
+        CAST(b.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS, 
+        CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS, 
+        CAST(ab.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER
+      FROM METERS_IND ind
+      JOIN METERS m ON m.METER_NUM = ind.METER_ID
+      JOIN BUILD_MAINT_ACTS a ON a.ID = ind.ACT_ID
+      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
+      LEFT JOIN BUILDINGS b ON b.ID = ab.BUILDINGS_ID
+      LEFT JOIN RSTREETS st ON st.ID = b.STREET_ID
+      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
+      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      WHERE m.CONTROLER_ID = ? 
+        AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
+        AND a.ACT_DATE >= ?
+      ORDER BY a.ACT_DATE DESC, ind.ID DESC
+    `;      
+    db.query(query, [ctrlIdNum, thirtyDaysAgo], (err, result) => {
+      db.detach();         
+      if (err) {
+        console.error('History query error:', err);
+        return res.status(500).json({ error: 'Query failed', details: err.message });
+      }        
+      const history = result.map(r => {
+        const streetName = `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim();
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        const houseName = `${r.HOUSE || ''}${corpsPart}`.trim();
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        const appartsName = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();            
+        let addressStr = 'адрес не найден';
+        if (streetName && houseName) {
+          addressStr = `${streetName}, д. ${houseName}${appartsName ? ', ' + appartsName : ''}`;
+        }   
+        const formatDate = (dateVal) => {
+          if (!dateVal) return null;
+          const d = new Date(dateVal);
+          if (isNaN(d.getTime())) return dateVal;
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+        };    
+        return {
+          actNo: r.ACT_NO,
+          actDate: formatDate(r.ACT_DATE),
+          meterNum: r.METER_NUM,
+          ph: r.PH !== null && r.PH !== undefined 
+            ? Number(r.PH).toLocaleString('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) 
+            : null,
+          verifyDate: formatDate(r.VERIFY_DATE),
+          serviceName: r.SERVICE_NAME || 'Не указана',
+          address: addressStr
+        };
+      });   
+      res.json(history);
+    });
+  });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

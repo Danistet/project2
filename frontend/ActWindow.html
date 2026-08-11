@@ -145,6 +145,7 @@
           <button @click="cont" class="btn-primary">Продолжить</button>
         </div>
         <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
+        <button type="button" @click="viewhistory" class="btn-secondary">история работ</button>
         <button type="button" @click="logout" class="btn-secondary">Выход</button>
       </form>
     <div class="status" id="statusDiv"></div>
@@ -407,6 +408,9 @@
           clearSessionAndLogout();
           window.location.href = 'index.html';
         };
+        const viewhistory = () => {
+          window.location.href='historywindow.html';
+        };
         onMounted(() => {
           if (checkSession()) {
             loadData();
@@ -425,7 +429,7 @@
           selectStreet, selectHouse, selectAddress,
           closeStreet, closeHouse, closeList,
           saveVerifyDate,
-          cont, continueAction, logout
+          cont, continueAction, logout, viewhistory
         };
       }
     }).mount('#app');
@@ -478,6 +482,7 @@
       background-color: #FFFFFF; 
       display: flex; 
       flex-direction: column; 
+      justify-content: center;
       align-items: center; 
       min-height: 100vh; 
       padding: 24px 16px; 
