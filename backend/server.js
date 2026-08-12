@@ -182,6 +182,46 @@ app.post('/controller-addresses', (req, res) => {
   });
 });
 
+app.post('/controllers', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'DB connection failed' });
+    }
+    const query = `SELECT ID, CAST(FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS FIO FROM CONTROLLERS ORDER BY FIO`;
+    db.query(query, (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }
+      res.json(result);
+    });
+  });
+});
+
+app.post('/update-meter-controller', (req, res) => {
+  const { meterId, controllerId } = req.body;
+  if (!meterId || !controllerId) {
+    return res.status(400).json({ error: 'meterId and controllerId required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'DB connection failed' });
+    }
+    const updateQuery = `UPDATE METERS SET CONTROLER_ID = ? WHERE ID = ?`;
+    db.query(updateQuery, [controllerId, meterId], (err) => {
+      db.detach();
+      if (err) {
+        console.error('Update error:', err);
+        return res.status(500).json({ error: 'Update failed', details: err.message });
+      }
+      res.json({ status: 'OK', message: 'Контролёр обновлён' });
+    });
+  });
+});
+
 app.post('/update-verify-date', (req, res) => {
   const { meterId, verifyDate } = req.body;
   if (!meterId) {
@@ -1295,9 +1335,10 @@ app.post('/controller-history', (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }  
     const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); 
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const isoDate = thirtyDaysAgo.toISOString().split('T')[0]; 
     const query = `
-      SELECT 
+      SELECT FIRST 30
         a.ACT_NO, 
         a.ACT_DATE, 
         m.METER_NUM, 
@@ -1320,10 +1361,10 @@ app.post('/controller-history', (req, res) => {
       LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
       WHERE m.CONTROLER_ID = ? 
         AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
-        AND a.ACT_DATE >= ?
+        AND CAST(a.ACT_DATE AS DATE) >= CAST(? AS DATE)
       ORDER BY a.ACT_DATE DESC, ind.ID DESC
-    `;      
-    db.query(query, [ctrlIdNum, thirtyDaysAgo], (err, result) => {
+    `;     
+    db.query(query, [ctrlIdNum, isoDate], (err, result) => {
       db.detach();         
       if (err) {
         console.error('History query error:', err);

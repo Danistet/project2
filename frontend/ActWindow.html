@@ -13,6 +13,10 @@
       <h1>Формирование списка</h1>
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="form-group">
+          <label class="form-label checkbox-label">
+            <input type="checkbox" id="allmeters" v-model="" class="form-checkbox">
+            <span class="checkbox-text">Все адреса</span>
+          </label>
           <label for="streetInput" class="form-label">Улица</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
             <div class="custom-datalist-input-wrapper">
@@ -125,8 +129,16 @@
               <span class="detail-label">Дата проверки:</span>
               <input v-model="editData.verifyDate" type="date" class="edit-input" :disabled="saving">
             </div>
+            <div class="detail-row">
+              <span class="detail-label">Ответственный контролёр</span>
+              <select v-model="editData.controllerId" class="edit-input" :disabled="saving || controllers.length === 0">
+                <option v-for="ctrl in controllers" :key="ctrl.ID" :value="ctrl.ID">
+                  {{ ctrl.FIO }}
+                </option>
+              </select>
+            </div>
             <button type="submit" class="save-btn" :disabled="saving">
-              {{ saving ? 'Сохранение...' : 'Сохранить дату проверки' }}
+              {{ saving ? 'Сохранение...' : 'Сохранить' }}
             </button>
           </div>
           <div class="radio-group">
@@ -172,7 +184,8 @@
         const houseSearch = ref('');
         const selectedAddressText = ref('');
         const selectedAddress = ref(null);
-        const editData = ref({ meterId: null, verifyDate: '' });
+        const controllers = ref([]);
+        const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
         const isStreetOpen = ref(false);
         const isHouseOpen = ref(false);
         const isListOpen = ref(false);
@@ -220,6 +233,15 @@
           return filteredAddressList.value.filter(a => a.displayText.toLowerCase().includes(term));
         });
 
+        const loadControllers = async () => {
+          try {
+            const data = await apiRequest('/controllers', {});
+            controllers.value = data;
+          } catch (err) {
+            console.error('Failed to load controllers:', err);
+          }
+        };
+
         const clearStreet = () => {
           streetSearch.value = '';
           closeStreet();
@@ -238,15 +260,13 @@
         const selectStreet = (street) => {
           streetSearch.value = street.name;
           selectedStreetId.value = street.id;
-          isStreetOpen.value = false;
-          
+          isStreetOpen.value = false;          
           buildings.value = [];
           selectedBuildingId.value = null;
           houseSearch.value = '';
           filteredAddressList.value = [];
           selectedAddress.value = null;
-          selectedAddressText.value = '';
-          
+          selectedAddressText.value = '';          
           const bldMap = new Map();
           allAddresses.value
             .filter(a => String(a.streetId) === String(selectedStreetId.value))
@@ -285,12 +305,10 @@
         const selectHouse = (bld) => {
           houseSearch.value = bld.name;
           selectedBuildingId.value = bld.id;
-          isHouseOpen.value = false;
-          
+          isHouseOpen.value = false;          
           filteredAddressList.value = [];
           selectedAddress.value = null;
-          selectedAddressText.value = '';
-          
+          selectedAddressText.value = '';          
           filteredAddressList.value = allAddresses.value.filter(
             a => String(a.buildingsId) === String(selectedBuildingId.value)
           );
@@ -318,8 +336,8 @@
           selectedAddressText.value = addr.displayText;
           selectedAddress.value = addr;
           editData.value.meterId = addr.meterId;
-          isListOpen.value = false;
-          
+          editData.value.controllerId = addr.controllerId;
+          isListOpen.value = false;          
           let vDate = addr.verifyDate;
           if (vDate) {
             const str = String(vDate).trim();
@@ -359,21 +377,25 @@
           error.value = '';
           try {
             await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
+            await apiRequest('/update-meter-controller', { 
+              meterId: editData.value.meterId, 
+              controllerId: editData.value.controllerId 
+            });
             if (typeof showAlert === 'function') {
               showAlert('Дата проверки успешно обновлена', 'success');
             } else {
               alert('Дата проверки успешно обновлена');
             }
-            const idx = allAddresses.value.findIndex(a => a.meterId === editData.value.meterId);
-            if (idx !== -1) {
-              allAddresses.value[idx].verifyDate = editData.value.verifyDate;
-            }
+            await loadData();
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
           } catch (err) {
             error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
           } finally {
             saving.value = false;
           }
         };
+
         const checkSession = () => {
           const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
           if (!authData || !authData.token) {
@@ -392,10 +414,12 @@
           showContinue.value = false;
           return true;
         };
+
         const cont = () => {
           sessionStorage.removeItem('authData');
           window.location.href = 'oldtokenwindow.html';
         };      
+
         const continueAction = () => {
           if (!checkType.value) {
             error.value = 'Выберите тип проверки';
@@ -404,18 +428,23 @@
           sessionStorage.setItem('checkType', checkType.value);
           window.location.href = 'address.html';
         };
+
         const logout = () => {
           clearSessionAndLogout();
           window.location.href = 'index.html';
         };
+
         const viewhistory = () => {
           window.location.href='historywindow.html';
         };
+
         onMounted(() => {
           if (checkSession()) {
             loadData();
+            loadControllers();
           }
         });
+
         return {
           showContinue, showOverlay, actNo, actDate, checkType,
           error, isLoading, saving,
@@ -428,7 +457,7 @@
           filteredStreets, filteredBuildings, filteredAddresses,
           selectStreet, selectHouse, selectAddress,
           closeStreet, closeHouse, closeList,
-          saveVerifyDate,
+          saveVerifyDate, controllers,
           cont, continueAction, logout, viewhistory
         };
       }
@@ -667,6 +696,32 @@
     .overlay-content button { 
       max-width: 200px; 
       margin: 0 auto; 
+    }
+
+    .checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+    }
+
+    .form-checkbox {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      accent-color: #45B0E1;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+      
+    .checkbox-text {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
     }
 
     .btn-secondary {

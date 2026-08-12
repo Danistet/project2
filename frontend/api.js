@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = false;
+  const USE_LOCAL_DB = true;
 
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
@@ -1275,7 +1275,7 @@
           actDate: act.ACT_DATE,
           meterNum: meter.METER_NUM,
           verifyDate: meter.VERIFY_DATE,
-          serviceName: service ? service.NAME : 'Не указана',
+          serviceName: service ? service.SHORT_NAME : 'Не указана',
           address: addressStr
         });        
       });
