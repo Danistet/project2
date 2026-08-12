@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = true;
+  const USE_LOCAL_DB = false;
 
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
@@ -1281,6 +1281,52 @@
       });
       history.sort((a,b) => String(b.actDate).localeCompare(String(a.actDate)));
       return history;
+    },
+
+        '/controllers': () => {
+      return LOCAL_DB.CONTROLLERS.map(c => ({
+        ID: c.ID,
+        FIO: c.FIO || 'Контролер'
+      }));
+    },
+
+    '/all-addresses': () => {
+      const rows = [];
+      LOCAL_DB.METERS.forEach(meter => {
+        const abonent = LOCAL_DB.ABONENTS.find(a => String(a.G_LICSCHET) === String(meter.LS));
+        if (!abonent) return;
+        const client = LOCAL_DB.CLIENTS.find(c => c.ID === abonent.CLIENT_ID) || null;
+        const building = LOCAL_DB.BUILDINGS.find(b => b.ID === abonent.BUILDINGS_ID);
+        if (!building) return;
+        const street = LOCAL_DB.RSTREETS.find(s => s.ID === building.STREET_ID);
+        if (!street) return;
+        const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
+        const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
+        const namePart = client && client.NAME ? client.NAME : 'ФИО не указано';
+        const phonePart = client && client.PHONE ? `, тел: ${client.PHONE}` : '';
+        const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
+        const houseName = String(building.HOUSE || '').trim();
+        rows.push({
+          meterId: meter.ID,
+          controllerId: toNumber(meter.CONTROLER_ID),
+          verifyDate: meter.VERIFY_DATE,
+          buildingsId: building.ID,
+          streetId: street.ID,
+          streetName,
+          houseName,
+          displayText: `${appartsPart}, ${namePart}${phonePart}`
+        });
+      });
+      rows.sort((a, b) => {
+        const byController = (b.controllerId || 0) - (a.controllerId || 0);
+        if (byController !== 0) return byController;
+        const byStreet = String(a.streetName || '').localeCompare(String(b.streetName || ''), 'ru', { numeric: true });
+        if (byStreet !== 0) return byStreet;
+        const byHouse = String(a.houseName || '').localeCompare(String(b.houseName || ''), 'ru', { numeric: true });
+        if (byHouse !== 0) return byHouse;
+        return 0;
+      });
+      return rows;
     },
 
     '/update-verify-date': ({ body }) => {

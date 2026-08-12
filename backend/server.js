@@ -200,6 +200,69 @@ app.post('/controllers', (req, res) => {
   });
 });
 
+app.post('/all-addresses', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT
+      M.ID AS METER_ID,
+      M.CONTROLER_ID,
+      M.VERIFY_DATE,
+      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+      CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
+      A.BUILDINGS_ID,
+      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+      CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+      CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+      CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+      RS.ID AS STREET_ID,
+      CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+      CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
+      INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      ORDER BY
+        M.CONTROLER_ID DESC NULLS LAST,
+        RS.STREET_TYPE,
+        RS.STREET,
+        B.HOUSE,
+        A.APPARTS,
+        A.LETTER
+    `;     
+    db.query(query, [], (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed' });
+      }            
+      res.json(result.map(r => {
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
+        const namePart = r.CLIENT_NAME || `ФИО не указано`;
+        const phonePart = r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : '';
+        const streetName = `${r.STREET_TYPE} ${r.STREET_NAME}`.trim();
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        const houseName = `${r.HOUSE} ${corpsPart}`.trim();
+        return {
+          meterId: r.METER_ID,
+          controllerId: r.CONTROLER_ID,
+          verifyDate: r.VERIFY_DATE,
+          buildingsId: r.BUILDINGS_ID,
+          streetId: r.STREET_ID,
+          streetName: streetName,
+          houseName: houseName,
+          displayText: `${appartsPart}, ${namePart}${phonePart}`
+        };
+      }));
+    });
+  });
+});
+
 app.post('/update-meter-controller', (req, res) => {
   const { meterId, controllerId } = req.body;
   if (!meterId || !controllerId) {

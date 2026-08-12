@@ -14,7 +14,7 @@
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="form-group">
           <label class="form-label checkbox-label">
-            <input type="checkbox" id="allmeters" v-model="" class="form-checkbox">
+            <input type="checkbox" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
             <span class="checkbox-text">Все адреса</span>
           </label>
           <label for="streetInput" class="form-label">Улица</label>
@@ -185,20 +185,39 @@
         const selectedAddressText = ref('');
         const selectedAddress = ref(null);
         const controllers = ref([]);
+        const showAllAddresses = ref(false);
         const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
         const isStreetOpen = ref(false);
         const isHouseOpen = ref(false);
         const isListOpen = ref(false);
+        watch(showAllAddresses, () => {
+          streets.value = [];
+          buildings.value = [];
+          filteredAddressList.value = [];
+          selectedStreetId.value = null;
+          streetSearch.value = '';
+          selectedBuildingId.value = null;
+          houseSearch.value = '';
+          selectedAddressText.value = '';
+          selectedAddress.value = null;
+          loadData();
+        });
+
         const loadData = async () => {
           isLoading.value = true;
           try {
-            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-            const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-            if (!controllerId) {
-              error.value = 'Не найден ID контроллера. Выполните вход заново.';
-              return;
-            }
-            const data = await getControllerAddresses(controllerId);
+            let data;
+            if (showAllAddresses.value) {
+              data = await apiRequest('/all-addresses', {});
+            } else {
+              const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+              const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+              if (!controllerId) {
+                error.value = 'Не найден ID контроллера. Выполните вход заново.';
+                return;
+              }
+              data = await getControllerAddresses(controllerId);
+            }            
             allAddresses.value = data;
             const streetMap = new Map();
             data.forEach(addr => {
@@ -457,7 +476,7 @@
           filteredStreets, filteredBuildings, filteredAddresses,
           selectStreet, selectHouse, selectAddress,
           closeStreet, closeHouse, closeList,
-          saveVerifyDate, controllers,
+          saveVerifyDate, controllers, showAllAddresses,
           cont, continueAction, logout, viewhistory
         };
       }
