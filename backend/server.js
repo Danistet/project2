@@ -697,6 +697,9 @@ app.post('/meter-by-licschet', (req, res) => {
         M.MOUNT_DATE,
         M.VERIFY_DATE,
         M.LS,
+        M.NAME,
+        M.SEAL,
+        M.MANFDATE,
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
@@ -721,6 +724,9 @@ app.post('/meter-by-licschet', (req, res) => {
         return res.json ({
           found: false,
           meterNum: null,
+          name: r.NAME,
+          seal: r.SEAL,
+          manfDate: r.MANFDATE,
           mountDate: null,
           verifyDate: null,
           groupName: null,
@@ -730,6 +736,9 @@ app.post('/meter-by-licschet', (req, res) => {
       res.json({
         found: true,
         meterNum: result[0].METER_NUM,
+        name: result[0].NAME,
+        seal: result[0].SEAL,
+        manfDate: result[0].MANFDATE,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
         licschet: result[0].LS,
@@ -758,6 +767,9 @@ app.post('/meters-by-licschet', (req, res) => {
         M.VERIFY_DATE, 
         M.LS, 
         M.ID,
+        M.NAME,
+        M.SEAL,
+        M.MANFDATE,
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
@@ -780,6 +792,9 @@ app.post('/meters-by-licschet', (req, res) => {
       res.json(result.map(r => ({
         found: true,
         meterNum: r.METER_NUM,
+        name: r.NAME,
+        seal: r.SEAL,
+        manfDate: r.MANFDATE,
         mountDate: r.MOUNT_DATE,
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,
@@ -807,6 +822,9 @@ app.post('/meter-by-building', (req, res) => {
         M.MOUNT_DATE, 
         M.VERIFY_DATE, 
         M.LS,
+        M.NAME,
+        M.SEAL,
+        M.MANFDATE,
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
@@ -837,6 +855,9 @@ app.post('/meter-by-building', (req, res) => {
         return res.json({
           found: false,
           meterNum: null,
+          name: r.NAME,
+          seal: r.SEAL,
+          manfDate: r.MANFDATE,
           mountDate: null,
           verifyDate: null,
           groupName: null,
@@ -846,6 +867,9 @@ app.post('/meter-by-building', (req, res) => {
       res.json({
         found: true,
         meterNum: result[0].METER_NUM,
+        name: result[0].NAME,
+        seal: result[0].SEAL,
+        manfDate: result[0].MANFDATE,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
         licschet: result[0].LS,
@@ -873,6 +897,9 @@ app.post('/meters-by-building', (req, res) => {
         M.VERIFY_DATE, 
         M.LS, 
         M.ID,
+        M.NAME,
+        M.SEAL,
+        M.MANFDATE,
         CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
@@ -901,6 +928,9 @@ app.post('/meters-by-building', (req, res) => {
       res.json(result.map(r => ({
         found: true,
         meterNum: r.METER_NUM,
+        name: r.NAME,
+        seal: r.SEAL,
+        manfDate: r.MANFDATE,
         mountDate: r.MOUNT_DATE,
         verifyDate: r.VERIFY_DATE,
         licschet: r.LS,

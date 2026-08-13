@@ -8,21 +8,16 @@
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
   const USE_LOCAL_DB = false;
-
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
   const LOCAL_MOCK_PERSIST = true;
-
   const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V3';
-
   if (!USE_LOCAL_DB) {
     return;
   }
-
   /* ========================================================== */
   /*                                */
   /* ========================================================== */
-
   const LOCAL_DB_SEED = {
     CONTROLLERS: [
       {
@@ -963,7 +958,6 @@
 
     return clone(LOCAL_DB_SEED);
   }
-
   const LOCAL_DB = loadDb();
   window.LOCAL_DB = LOCAL_DB;
 
@@ -998,7 +992,6 @@
     if (value === null || value === undefined || value === '') {
       return null;
     }
-
     const n = Number(value);
     return isNaN(n) ? null : n;
   }
@@ -1026,14 +1019,12 @@
   function getClientByLs(ls) {
     const abonent = getAbonentByLs(ls);
     if (!abonent) return null;
-
     return LOCAL_DB.CLIENTS.find(c => c.ID === abonent.CLIENT_ID) || null;
   }
 
   function getServiceByMeter(meter) {
     const meterType = LOCAL_DB.METER_TYPES.find(t => t.ID === meter.METER_TYPE);
     if (!meterType) return null;
-
     return LOCAL_DB.SERVICES.find(s => s.ID === meterType.LOW_QUALITY_GRP_TARIFF) || null;
   }
 
@@ -1060,18 +1051,14 @@
     const sorted = [...meters].sort((a, b) => {
       const aCtrl = toNumber(a.CONTROLER_ID);
       const bCtrl = toNumber(b.CONTROLER_ID);
-
       const aPreferred = preferredControllerId !== null && aCtrl === preferredControllerId ? 1 : 0;
       const bPreferred = preferredControllerId !== null && bCtrl === preferredControllerId ? 1 : 0;
-
       if (aPreferred !== bPreferred) {
         return bPreferred - aPreferred;
       }
-
       if (aCtrl === null && bCtrl === null) return 0;
       if (aCtrl === null) return 1;
       if (bCtrl === null) return -1;
-
       return bCtrl - aCtrl;
     });
 
@@ -1081,11 +1068,9 @@
   function compareByControllerIdDesc(a, b) {
     const aCtrl = toNumber(a.controllerId);
     const bCtrl = toNumber(b.controllerId);
-
     if (aCtrl === null && bCtrl === null) return 0;
     if (aCtrl === null) return 1;
     if (bCtrl === null) return -1;
-
     return bCtrl - aCtrl;
   }
 
@@ -1094,13 +1079,14 @@
     const client = abonent
       ? LOCAL_DB.CLIENTS.find(c => c.ID === abonent.CLIENT_ID)
       : null;
-
     const service = getServiceByMeter(meter);
-
     return {
       found: true,
       id: meter.ID,
       meterNum: meter.METER_NUM,
+      name: meter.NAME || '',
+      seal: meter.SEAL || '',
+      manfDate: meter.MANFDATE || null,
       mountDate: meter.MOUNT_DATE,
       verifyDate: meter.VERIFY_DATE,
       licschet: meter.LS,
@@ -1123,25 +1109,18 @@
   const routes = {
     '/auth': ({ body }) => {
       const password = String(body.userpswd || '').trim();
-
       const controller = LOCAL_DB.CONTROLLERS.find(
         c => String(c.CONTROLLER_PSWD) === password
       );
-
       if (!controller) {
         return httpResponse(401, { error: 'wrong password' });
       }
-
       controller.AUTHDATE = Date.now();
-
       if (!controller.TOKEN) {
         controller.TOKEN = `LOCAL_TOKEN_${controller.ID}`;
       }
-
       persistDb();
-
       const firstMeter = LOCAL_DB.METERS[0] || null;
-
       return {
         status: 'OK',
         token: controller.TOKEN,
@@ -1195,34 +1174,29 @@
       rows.sort((a, b) => {
         const byController = compareByControllerIdDesc(a, b);
         if (byController !== 0) return byController;
-
         const byStreet = String(a.streetName || '').localeCompare(
           String(b.streetName || ''),
           'ru',
           { numeric: true }
         );
         if (byStreet !== 0) return byStreet;
-
         const byHouse = String(a.houseName || '').localeCompare(
           String(b.houseName || ''),
           'ru',
           { numeric: true }
         );
         if (byHouse !== 0) return byHouse;
-
         const byApparts = String(a._apparts ?? '').localeCompare(
           String(b._apparts ?? ''),
           'ru',
           { numeric: true }
         );
         if (byApparts !== 0) return byApparts;
-
         return String(a._letter ?? '').localeCompare(
           String(b._letter ?? ''),
           'ru'
         );
       });
-
       return rows.map(({ _apparts, _letter, ...rest }) => rest);
     },
 
@@ -1275,6 +1249,12 @@
           actDate: act.ACT_DATE,
           meterNum: meter.METER_NUM,
           verifyDate: meter.VERIFY_DATE,
+          ph: ind.PH !== null && ind.PH !== undefined
+            ? Number(ind.PH).toLocaleString('ru-RU', {
+                minimumFractionDigits: 3,
+                maximumFractionDigits: 3
+              })
+            : null,
           serviceName: service ? service.SHORT_NAME : 'Не указана',
           address: addressStr
         });        
@@ -1283,7 +1263,7 @@
       return history;
     },
 
-        '/controllers': () => {
+    '/controllers': () => {
       return LOCAL_DB.CONTROLLERS.map(c => ({
         ID: c.ID,
         FIO: c.FIO || 'Контролер'
@@ -1331,29 +1311,41 @@
 
     '/update-verify-date': ({ body }) => {
       const meterId = toNumber(body.meterId);
-
       const meter = LOCAL_DB.METERS.find(m => m.ID === meterId);
-
       if (!meter) {
         return httpResponse(400, { error: 'meter not found' });
       }
-
       meter.VERIFY_DATE = body.verifyDate || null;
       persistDb();
-
       return {
         status: 'OK',
         message: 'Дата проверки обновлена'
       };
     },
 
+    '/update-meter-controller': ({ body }) => {
+      const meterId = toNumber(body.meterId);
+      const controllerId = toNumber(body.controllerId);    
+      if (!meterId || !controllerId) {
+        return httpResponse(400, { error: 'meterId and controllerId required' });
+      }    
+      const meter = LOCAL_DB.METERS.find(m => m.ID === meterId);
+      if (!meter) {
+        return httpResponse(404, { error: 'meter not found' });
+      }    
+      meter.CONTROLER_ID = controllerId;
+      persistDb(); 
+      return {
+        status: 'OK',
+        message: 'Контролёр обновлён'
+      };
+    },
+
     '/add-representative': ({ body }) => {
       const name = String(body.name || '').trim();
-
       if (!name) {
         return httpResponse(400, { error: 'Missing Name' });
       }
-
       const newClient = {
         ID: nextId('CLIENTS'),
         NAME: name,
@@ -1366,7 +1358,6 @@
 
       LOCAL_DB.CLIENTS.push(newClient);
       persistDb();
-
       return {
         status: 'OK',
         message: 'Data saved',
@@ -1376,19 +1367,14 @@
 
     '/get-owner-data': ({ body }) => {
       const g_licschet = body.g_licschet;
-
       if (!g_licschet) {
         return httpResponse(400, { error: 'g_licschet required' });
       }
-
       const abonent = getAbonentByLs(g_licschet);
-
       if (!abonent) {
         return { found: false };
       }
-
       const client = LOCAL_DB.CLIENTS.find(c => c.ID === abonent.CLIENT_ID) || null;
-
       return {
         found: true,
         ownerName: client ? client.NAME : null,
@@ -1400,7 +1386,6 @@
 
     '/update-owner-data': ({ body }) => {
       const clientId = toNumber(body.clientId);
-
       if (!clientId) {
         return {
           status: 'OK',
@@ -1409,17 +1394,13 @@
       }
 
       const client = LOCAL_DB.CLIENTS.find(c => c.ID === clientId);
-
       if (!client) {
         return httpResponse(400, { error: 'client not found' });
       }
-
       client.NAME = body.ownerName || client.NAME;
       client.PHONE = body.phone || null;
       client.MAIL = body.mail || null;
-
       persistDb();
-
       return {
         status: 'OK',
         message: 'Data updated'
@@ -1428,16 +1409,12 @@
 
     '/update-token': ({ body }) => {
       const token = body.token;
-
       const controller = LOCAL_DB.CONTROLLERS.find(c => c.TOKEN === token);
-
       if (!controller) {
         return httpResponse(401, { error: 'Invalid token' });
       }
-
       controller.AUTHDATE = Date.now();
       persistDb();
-
       return {
         status: 'OK',
         token,
@@ -1449,19 +1426,14 @@
       const now = new Date();
       const actBdate = new Date(now.getFullYear(), now.getMonth(), 1);
       const actEdate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
       const bdateStr = formatDateOnly(actBdate);
       const edateStr = formatDateOnly(actEdate);
       const actDateStr = nowDateTime();
-
       const monthPrefix = bdateStr.slice(0, 7);
-
       const maxNo = LOCAL_DB.BUILD_MAINT_ACTS
         .filter(a => String(a.ACT_BDATE || '').startsWith(monthPrefix))
         .reduce((max, a) => Math.max(max, parseInt(a.ACT_NO, 10) || 0), 0);
-
       const newActNo = String(maxNo + 1).padStart(5, '0');
-
       const act = {
         ID: nextId('BUILD_MAINT_ACTS'),
         BUILDING_ID: null,
@@ -1474,7 +1446,6 @@
 
       LOCAL_DB.BUILD_MAINT_ACTS.push(act);
       persistDb();
-
       return {
         actId: act.ID,
         actNo: act.ACT_NO,
@@ -1487,16 +1458,12 @@
     '/update-act-building': ({ body }) => {
       const actId = toNumber(body.actId);
       const buildingId = toNumber(body.buildingId);
-
       const act = LOCAL_DB.BUILD_MAINT_ACTS.find(a => a.ID === actId);
-
       if (!act) {
         return httpResponse(400, { error: 'act not found' });
       }
-
       act.BUILDING_ID = buildingId;
       persistDb();
-
       return {
         status: 'OK',
         message: 'BUILDING_ID updated',
@@ -1514,7 +1481,6 @@
 
     '/streets': ({ query }) => {
       const townId = toNumber(query.townId);
-
       return LOCAL_DB.RSTREETS
         .filter(s => toNumber(s.TOWN_ID) === townId)
         .map(s => ({
@@ -1525,12 +1491,10 @@
 
     '/buildings': ({ query }) => {
       const streetId = toNumber(query.streetId);
-
       return LOCAL_DB.BUILDINGS
         .filter(b => toNumber(b.STREET_ID) === streetId)
         .map(b => {
           const corpsPart = b.CORPS ? ` ${b.CORPS}` : '';
-
           return {
             id: b.ID,
             house: `${b.HOUSE || ''}${corpsPart}`.trim()
@@ -1600,11 +1564,9 @@
 
     '/meter-by-licschet': ({ body }) => {
       const g_licschet = body.g_licschet;
-
       const meter = LOCAL_DB.METERS.find(
         m => String(m.LS) === String(g_licschet) && isValidMeter(m)
       );
-
       if (!meter) {
         return {
           found: false,
@@ -1615,23 +1577,19 @@
           clientName: null
         };
       }
-
       return meterToListItem(meter);
     },
 
     '/meters-by-licschet': ({ body }) => {
       const g_licschet = body.g_licschet;
-
       const meters = LOCAL_DB.METERS.filter(
         m => String(m.LS) === String(g_licschet) && isValidMeter(m)
       );
-
       return sortMetersByMountDateDesc(meters.map(m => meterToListItem(m)));
     },
 
     '/meter-by-building': ({ body }) => {
       const buildingId = toNumber(body.buildingId);
-
       const abonents = LOCAL_DB.ABONENTS.filter(a => {
         return (
           toNumber(a.BUILDINGS_ID) === buildingId &&
@@ -1643,7 +1601,6 @@
         const meter = LOCAL_DB.METERS.find(
           m => String(m.LS) === String(abonent.G_LICSCHET) && isValidMeter(m)
         );
-
         if (meter) {
           return meterToListItem(meter);
         }
@@ -1661,50 +1618,38 @@
 
     '/meters-by-building': ({ body }) => {
       const buildingId = toNumber(body.buildingId);
-
       const abonents = LOCAL_DB.ABONENTS.filter(
         a => toNumber(a.BUILDINGS_ID) === buildingId
       );
-
       const result = [];
-
       abonents.forEach(abonent => {
         const meters = LOCAL_DB.METERS.filter(
           m => String(m.LS) === String(abonent.G_LICSCHET) && isValidMeter(m)
         );
-
         meters.forEach(meter => {
           result.push(meterToListItem(meter));
         });
       });
-
       return sortMetersByMountDateDesc(result);
     },
 
     '/PH': ({ body }) => {
       const phRaw = body.ph;
       const meterIdRaw = body.meter_id;
-
       if (phRaw === undefined || phRaw === null || !meterIdRaw) {
         return httpResponse(400, { error: 'ph и meter_id required' });
       }
-
       const meter = LOCAL_DB.METERS.find(
         m => String(m.METER_NUM) === String(meterIdRaw)
       );
-
       if (!meter) {
         return httpResponse(500, { error: 'no meter' });
       }
-
       const ph = parseFloat(String(phRaw).replace(',', '.'));
-
       if (isNaN(ph)) {
         return httpResponse(400, { error: 'invalid ph' });
       }
-
       const actId = toNumber(body.act_id || body.actId);
-
       const indication = {
         ID: nextId('METERS_IND'),
         METER_ID: meter.METER_NUM,
@@ -1731,15 +1676,12 @@
 
     '/PH/last': ({ query }) => {
       const meterId = query.meter_id;
-
       if (!meterId) {
         return httpResponse(400, { error: 'meter_id required' });
       }
-
       const rows = LOCAL_DB.METERS_IND
         .filter(i => String(i.METER_ID) === String(meterId) && !i.IS_DELETED)
         .sort((a, b) => toNumber(b.ID) - toNumber(a.ID));
-
       if (!rows.length) {
         return {
           found: false,
@@ -1749,7 +1691,6 @@
       }
 
       const last = rows[0];
-
       const phFormatted =
         last.PH !== null && last.PH !== undefined
           ? Number(last.PH).toLocaleString('ru-RU', {
@@ -1757,7 +1698,6 @@
               maximumFractionDigits: 3
             })
           : null;
-
       return {
         found: true,
         ph: phFormatted,
@@ -1769,39 +1709,30 @@
 
     '/save-violation': ({ body }) => {
       const meterNum = body.meterNum;
-
       if (!meterNum) {
         return httpResponse(400, { error: 'meternum required' });
       }
-
       let violations = [];
-
       try {
         violations = body.violations ? JSON.parse(body.violations) : [];
       } catch (e) {
         return httpResponse(400, { error: 'wrong format' });
       }
-
       if (!Array.isArray(violations) || violations.length === 0) {
         return httpResponse(400, { error: 'no violation' });
       }
-
       const meter = LOCAL_DB.METERS.find(
         m => String(m.METER_NUM) === String(meterNum)
       );
-
       if (!meter) {
         return httpResponse(404, { error: 'no meter' });
       }
-
       const licschet = body.licschet || meter.LS;
       const abonent = getAbonentByLs(licschet);
       const client = abonent
         ? LOCAL_DB.CLIENTS.find(c => c.ID === abonent.CLIENT_ID)
         : null;
-
       const createdate = nowDateTime();
-
       violations.forEach(v => {
         LOCAL_DB.VIOLATIONS.push({
           ID: nextId('VIOLATIONS'),
@@ -1812,9 +1743,7 @@
           CREATEDATE: createdate
         });
       });
-
       persistDb();
-
       return {
         status: 'OK',
         message: 'Saved'
@@ -1823,13 +1752,10 @@
 
     '/get-meter-details': ({ body }) => {
       const meterId = toNumber(body.meterId);
-
       const meter = LOCAL_DB.METERS.find(m => m.ID === meterId);
-
       if (!meter) {
         return { found: false };
       }
-
       return {
         found: true,
         id: meter.ID,
@@ -1845,22 +1771,17 @@
 
     '/update-meter': ({ body }) => {
       const meterId = toNumber(body.meterId);
-
       const meter = LOCAL_DB.METERS.find(m => m.ID === meterId);
-
       if (!meter) {
         return httpResponse(400, { error: 'meter not found' });
       }
-
       meter.METER_NUM = body.meterNum || meter.METER_NUM;
       meter.NAME = body.name || null;
       meter.SEAL = body.seal || null;
       meter.MANFDATE = body.manfDate || null;
       meter.MOUNT_DATE = body.mountDate || meter.MOUNT_DATE;
       meter.VERIFY_DATE = body.verifyDate || null;
-
       persistDb();
-
       return {
         status: 'OK',
         message: 'Data updated'
@@ -1876,19 +1797,15 @@
     if (!init || !init.body) {
       return {};
     }
-
     if (typeof FormData !== 'undefined' && init.body instanceof FormData) {
       const obj = {};
-
       for (const [key, value] of init.body.entries()) {
         const isFile =
           (typeof File !== 'undefined' && value instanceof File) ||
           (typeof Blob !== 'undefined' && value instanceof Blob);
-
         if (isFile) {
           continue;
         }
-
         if (obj[key] === undefined) {
           obj[key] = value;
         } else if (Array.isArray(obj[key])) {
@@ -1897,10 +1814,8 @@
           obj[key] = [obj[key], value];
         }
       }
-
       return obj;
     }
-
     if (typeof init.body === 'string') {
       try {
         return JSON.parse(init.body);
@@ -1908,25 +1823,20 @@
         return {};
       }
     }
-
     return {};
   }
 
   const originalFetch = window.fetch ? window.fetch.bind(window) : null;
-
   window.fetch = async function (input, init) {
     try {
       const url = typeof input === 'string' ? input : input.url;
       const parsedUrl = new URL(url, window.location.href);
       const path = parsedUrl.pathname;
-
       const route = routes[path];
-
       if (!route) {
         if (originalFetch) {
           return originalFetch(input, init);
         }
-
         return new Response(
           JSON.stringify({ error: `No local route: ${path}` }),
           {
@@ -1935,24 +1845,20 @@
           }
         );
       }
-
       const body = await parseBody(init);
       const query = Object.fromEntries(parsedUrl.searchParams.entries());
-
       const result = await route({
         body,
         query,
         init,
         url: parsedUrl
       });
-
       if (result && result.__localResponse) {
         return new Response(JSON.stringify(result.body || {}), {
           status: result.status || 200,
           headers: { 'Content-Type': 'application/json' }
         });
       }
-
       return new Response(JSON.stringify(result ?? {}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }

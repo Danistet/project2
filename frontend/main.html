@@ -289,6 +289,11 @@
                   }
                 }
               }
+              const localMeter = meters.value.find(m => String(m.id) === String(meterId));
+              if (localMeter) {
+                fillEditData(localMeter);
+                return;
+              }
               console.warn('Нет сети и данных в кэше. Используем базовые данные из списка.');
               } catch (offlineErr) {
                 console.error('Offline fallback failed:', offlineErr);
@@ -397,7 +402,10 @@
             sessionStorage.removeItem('mountdate');
             sessionStorage.removeItem('verifydate');
             sessionStorage.removeItem('licschet');
-            clearSessionAndLogout();
+            sessionStorage.removeItem('userAddress');
+            sessionStorage.removeItem('currentAct');
+            sessionStorage.removeItem('ph');
+            //clearSessionAndLogout();
             window.location.href = 'address.html';
           };
           

@@ -331,7 +331,7 @@ createApp({
     const saveAddressAndContinue = async () => {
       const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
       const now = Date.now();
-      const EXPIRY_MS = 2400000;
+      const EXPIRY_MS = 24000000;
       if (!authData || !authData.token || (now - authData.authDate > EXPIRY_MS)) {
         error.value = 'Истёк срок сессии. Пожалуйста, войдите снова.';
         showContinue.value = true;
