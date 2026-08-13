@@ -13,8 +13,8 @@
       <h1>Формирование списка</h1>
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="form-group">
-          <label class="form-label checkbox-label">
-            <input type="checkbox" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
+          <label class="form-label checkbox-label" :class="{ disabled: !isOnline || isLoading }">
+            <input type="checkbox" :disabled="!isOnline || isLoading" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
             <span class="checkbox-text">Все адреса</span>
           </label>
           <label for="streetInput" class="form-label">Улица</label>
@@ -163,7 +163,52 @@
     <div class="status" id="statusDiv"></div>
   </div>
   <script>
-    const { createApp, ref, onMounted, watch, computed } = Vue;
+    (function () {
+      if (typeof window.getControllerPackage === 'function') {
+        return;
+      }
+      const DB_NAME = 'MeterOfflineStorage';
+      const STORE_NAME = 'pendingReadings';
+      const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
+      const DB_VERSION = 3;
+      function openLocalDB() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (db.objectStoreNames.contains('pendiReadings')) {
+              db.deleteObjectStore('pendiReadings');
+            }
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME, {
+                keyPath: 'id',
+                autoIncrement: true
+              });
+            }
+            if (!db.objectStoreNames.contains(CONTROLLER_PACKAGE_STORE)) {
+              db.createObjectStore(CONTROLLER_PACKAGE_STORE, {
+                keyPath: 'controllerId'
+              });
+            }
+          };
+          request.onsuccess = (event) => resolve(event.target.result);
+          request.onerror = (event) => reject(event.target.error);
+        });
+      }
+      window.getControllerPackage = async function (controllerId) {
+        const db = await openLocalDB();
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readonly');
+          const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
+          const request = store.get(Number(controllerId));
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+      };
+    })();
+    </script>
+  <script>
+    const { createApp, ref, onMounted, onUnmounted, watch, computed } = Vue;
     createApp({
       setup() {
         const showContinue = ref(false);
@@ -173,6 +218,7 @@
         const checkType = ref('planned');
         const error = ref('');
         const isLoading = ref(false);
+        const isOnline = ref(navigator.onLine);
         const saving = ref(false);
         const allAddresses = ref([]);
         const streets = ref([]);
@@ -190,37 +236,76 @@
         const isStreetOpen = ref(false);
         const isHouseOpen = ref(false);
         const isListOpen = ref(false);
-        watch(showAllAddresses, () => {
-          streets.value = [];
-          buildings.value = [];
+        watch(showAllAddresses, async (newVal) => {
+          if (!navigator.onLine && newVal === true) {
+            showAllAddresses.value = false;
+            if (typeof showAlert === 'function') {
+              showAlert('Просмотр всех адресов доступен только при подключении к интернету', 'info');
+            } else {
+              alert('Просмотр всех адресов доступен только при подключении к интернету');
+            }
+          }
           filteredAddressList.value = [];
-          selectedStreetId.value = null;
-          streetSearch.value = '';
           selectedBuildingId.value = null;
           houseSearch.value = '';
           selectedAddressText.value = '';
           selectedAddress.value = null;
-          loadData();
+          await loadData();
+          if (
+            selectedStreetId.value &&
+            !streets.value.some(s => String(s.id) === String(selectedStreetId.value))
+          ) {
+            selectedStreetId.value = null;
+            streetSearch.value = '';
+            buildings.value = [];
+            houseSearch.value = '';
+            filteredAddressList.value = [];
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
+          }
         });
 
         const loadData = async () => {
           isLoading.value = true;
+          error.value = '';           
+          if (!navigator.onLine && showAllAddresses.value) {
+            showAllAddresses.value = false;
+          }          
           try {
-            let data;
+            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+            const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;            
+            if (!controllerId) {
+              error.value = 'Не найден ID контроллера. Выполните вход заново.';
+              return;
+            }
+            let data = [];
             if (showAllAddresses.value) {
-              data = await apiRequest('/all-addresses', {});
-            } else {
-              const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-              const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-              if (!controllerId) {
-                error.value = 'Не найден ID контроллера. Выполните вход заново.';
-                return;
+              if (!navigator.onLine) {
+                showAllAddresses.value = false;
+                data = await getOfflineAddresses(controllerId);
+              } else {
+                try {
+                  data = await apiRequest('/all-addresses', {});
+                } catch (e) {
+                  console.warn('Ошибка сети при загрузке всех адресов, переход в офлайн', e);
+                  data = await getOfflineAddresses(controllerId);
+                }
               }
-              data = await getControllerAddresses(controllerId);
-            }            
-            allAddresses.value = data;
+            } else {
+              if (!navigator.onLine) {
+                data = await getOfflineAddresses(controllerId);
+              } else {
+                try {
+                  data = await getControllerAddresses(controllerId);
+                } catch (e) {
+                  console.warn('Ошибка сети, загрузка из офлайн-кэша', e);
+                  data = await getOfflineAddresses(controllerId);
+                }
+              }
+            }                        
+            allAddresses.value = data || [];
             const streetMap = new Map();
-            data.forEach(addr => {
+            allAddresses.value.forEach(addr => {
               if (!streetMap.has(addr.streetId)) {
                 streetMap.set(addr.streetId, addr.streetName);
               }
@@ -233,7 +318,6 @@
             isLoading.value = false;
           }
         };
-
         const filteredStreets = computed(() => {
           if (!streetSearch.value) return streets.value;
           const term = streetSearch.value.toLowerCase();
@@ -258,6 +342,55 @@
             controllers.value = data;
           } catch (err) {
             console.error('Failed to load controllers:', err);
+          }
+        };
+
+        const getOfflineAddresses = async (controllerId) => {
+          if (typeof getControllerPackage !== 'function') return [];
+          const pkg = await getControllerPackage(controllerId);
+          if (!pkg || !Array.isArray(pkg.meters)) return [];
+          const rows = [];
+          pkg.meters.forEach(meter => {
+            if (String(meter.CONTROLER_ID) !== String(controllerId)) return;          
+            const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
+            if (!abonent) return;            
+            const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
+            const building = pkg.buildings?.find(b => b.ID === abonent.BUILDINGS_ID);
+            if (!building) return;            
+            const street = pkg.streets?.find(s => s.ID === building.STREET_ID);
+            if (!street) return;
+            const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
+            const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
+            const namePart = client?.NAME || 'ФИО не указано';
+            const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';
+            const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
+            const corpsPart = building.CORPS ? ` ${building.CORPS}` : '';
+            const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();
+            rows.push({
+              meterId: meter.ID,
+              controllerId: meter.CONTROLER_ID,
+              verifyDate: meter.VERIFY_DATE,
+              buildingsId: building.ID,
+              streetId: street.ID,
+              streetName: streetName,
+              houseName: houseName,
+              displayText: `${appartsPart}, ${namePart}${phonePart}`
+            });
+          });
+          return rows;
+        };
+
+        const updateOnlineStatus = () => {
+          const wasOnline = isOnline.value;
+          isOnline.value = navigator.onLine;
+          if (wasOnline && !isOnline.value && showAllAddresses.value) {
+            showAllAddresses.value = false;
+            if (typeof showAlert === 'function') {
+              showAlert('Потеряно подключение. Отображаются только ваши адреса', 'info');
+            } else {
+              alert('Потеряно подключение. Отображаются только ваши адреса');
+            }
+            loadData();
           }
         };
 
@@ -458,10 +591,17 @@
         };
 
         onMounted(() => {
+          window.addEventListener('online', updateOnlineStatus);
+          window.addEventListener('offline', updateOnlineStatus);
           if (checkSession()) {
             loadData();
             loadControllers();
           }
+        });
+
+        onUnmounted(() => {
+          window.removeEventListener('online', updateOnlineStatus);
+          window.removeEventListener('offline', updateOnlineStatus);
         });
 
         return {
@@ -470,7 +610,7 @@
           streets, buildings, filteredAddressList,
           streetSearch, houseSearch, selectedAddressText,
           selectedStreetId, selectedBuildingId,
-          selectedAddress, editData,
+          selectedAddress, editData, isOnline,
           clearStreet, clearHouse, clearList,
           isStreetOpen, isHouseOpen, isListOpen,
           filteredStreets, filteredBuildings, filteredAddresses,
@@ -627,6 +767,19 @@
       border-color: #CCCCCC; 
       color: #999999; 
       cursor: not-allowed; 
+    }
+
+    .checkbox-label.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .checkbox-label.disabled .checkbox-text {
+      color: #999999;
+    }
+
+    .form-checkbox:disabled {
+      cursor: not-allowed;
     }
       
     .meter-block.selected { 
