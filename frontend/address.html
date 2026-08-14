@@ -35,16 +35,16 @@
         >                   
           <div class="form-group">
             <label for="streetInput" class="form-label">Улица</label>
-            <div class="custom-datalist" :class="{ disabled: !selectedTownId }">
+            <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
               <div class="custom-datalist-input-wrapper">
-                <input 
-                  type="text" id="streetInput" 
-                  placeholder="Введите улицу" 
+                <input
+                  type="text" id="streetInput"
+                  placeholder="Введите улицу"
                   autocomplete="off"
-                  v-model="streetSearch" 
-                  class="form-input custom-datalist-input" 
-                  :required="!!selectedTownId"
-                  :disabled="!selectedTownId"
+                  v-model="streetSearch"
+                  class="form-input custom-datalist-input"
+                  :required="streets.length > 0"
+                  :disabled="isLoading || streets.length === 0"
                   @focus="isStreetOpen = true"
                   @blur="closeStreet"
                   @input="isStreetOpen = true"
@@ -79,7 +79,7 @@
                   v-model="houseSearch" 
                   class="form-input custom-datalist-input" 
                   :required="!!selectedStreetId"
-                  :disabled="!selectedStreetId"
+                  :disabled="isLoading || !selectedStreetId"
                   @focus="isHouseOpen = true"
                   @blur="closeHouse"
                   @input="isHouseOpen = true"

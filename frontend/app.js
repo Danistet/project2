@@ -158,6 +158,7 @@ createApp({
     const verifydate = ref('');
     const streets = ref([]);
     const buildings = ref([]);
+    const addressCatalog = ref([]);
     const currentBuildingLicschet = ref(null);
     const apparts = ref([]);
     const selectedTownId = ref(2);
@@ -478,89 +479,110 @@ createApp({
       window.location.href = 'checkownerwindow.html';
     };
 
-    const loadStreets = async (townId) => {
+    async function getOfflineControllerAddresses(controllerId) {
+      if (typeof getControllerPackage !== 'function') return [];
+      const pkg = await getControllerPackage(controllerId);
+      if (!pkg || !Array.isArray(pkg.meters)) return [];
+      const rows = [];
+      pkg.meters.forEach(meter => {
+        if (String(meter.CONTROLER_ID) !== String(controllerId)) return;
+        const abonents = pkg.abonents?.find(
+          a => String(a.G_LICSCHET) === String(meters.LS)
+        );
+        if (!abonent) return;
+        const client = pkg.clients?.find(c => c.ID === abonents.CLIENT_ID);
+        const building = pkg.buildings?.find(d => d.ID === abonents.BUILDINGS_ID);
+        if (!building) return;
+        const street = pkg.street?.find(s => s.ID === building.STREET_ID);
+        if (!street) return;
+        const letterPart = client?.NAME || 'ФИО не указано';
+        const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';
+        const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
+        const corpsPart = building.CORPS ? ` ${building.CORPS}` : '';
+        const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();
+        rows.push({
+          meterId: meter.ID,
+          controllerId: meter.CONTROLER_ID,
+          verifyDate: meter.VERIFY_DATE,
+          buildingsId: building.ID,
+          streetId: street.ID,
+          streetName,
+          houseName,
+          displayText: `${appartsPart}, ${namePart}${phonePart}`
+        });
+      });
+      return rows;
+    }
+
+    const loadStreets = async (townId = null) => {
       isLoading.value = true;
       try {
-        if (!navigator.onLine) {
-          const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-          const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-          const pkg = controllerId ? await getControllerPackage(controllerId) : null;
-          if (pkg && pkg.streets) {
-            streets.value = pkg.streets
-            .filter(s => s.TOWN_ID == townId)
-            .map(r => ({
-              id: r.ID,
-              name: `${r.STREET_TYPE} ${r.STREET}`.trim()
-            }));
-            return;
-          }
-        }            
-        const response = await fetch(`${API_BASE}/streets?townId=${townId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        streets.value = await response.json();
-      } catch (err) { 
-        console.error('Failed to load streets:', err);
         const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-        const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-        const pkg = controllerId ? await getControllerPackage(controllerId) : null;
-        if (pkg && pkg.streets) {
-          streets.value = pkg.streets
-          .filter(s => s.TOWN_ID == townId)
-          .map(r => ({
-            id: r.ID,
-            name: `${r.STREET_TYPE} ${r.STREET}`.trim()
-          }));
+        const controllerId =
+          sessionStorage.getItem('controllerId') || authData.controllerId;
+        if (!controllerId) {
+          streets.value = [];
+          addressCatalog.value = [];
+          return;
         }
-      } finally { 
-        isLoading.value = false; 
+        let data = [];
+        if (!navigator.onLine) {
+          data = await getOfflineControllerAddresses(controllerId);
+        } else {
+          try {
+            data = await getControllerAddresses(controllerId);
+          } catch (e) {
+            console.warn('Ошибка сети, загрузка адресов из офлайн-кэша', e);
+            data = await getOfflineControllerAddresses(controllerId);
+          }
+        }
+        addressCatalog.value = Array.isArray(data) ? data : [];
+        const streetMap = new Map();
+        addressCatalog.value.forEach(addr => {
+          if (!addr || addr.streetId === null || addr.streetId === undefined) return;
+          if (!streetMap.has(addr.streetId)) {
+            streetMap.set(addr.streetId, addr.streetName);
+          }
+        });
+        streets.value = Array.from(streetMap, ([id, name]) => ({ id, name }))
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+      } catch (err) {
+        console.error('Failed to load streets:', err);
+        streets.value = [];
+        addressCatalog.value = [];
+      } finally {
+        isLoading.value = false;
       }
     };
 
     const loadBuildings = async (streetId) => {
-      if (!streetId) { buildings.value = []; return; }
+      if (!streetId) {
+        buildings.value = [];
+        return;
+      }
       isLoading.value = true;
       try {
-        if (!navigator.onLine) {
-          const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-          const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-          const pkg = controllerId ? await getControllerPackage(controllerId) : null;
-          if (pkg && pkg.buildings) {
-            buildings.value = pkg.buildings
-            .filter(b => b.STREET_ID == streetId)
-            .map(r => {
-              const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
-              return {
-                id: r.ID,
-                house: `${r.HOUSE} ${corpsPart}`.trim()
-              };
-            });
-            return;
-          }
+        if (!addressCatalog.value.length) {
+          await loadStreets(selectedTownId.value);
         }
-        const result = await apiRequest(`/buildings?streetId=${streetId}`);
-        buildings.value = result;
-      } catch (err) { 
-        console.error('Failed to load buildings:', err);
-        const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-        const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-        const pkg = controllerId ? await getControllerPackage(controllerId) : null;
-        if (pkg && pkg.buildings) {
-          buildings.value = pkg.buildings
-          .filter(b => b.STREET_ID == streetId)
-          .map(r => {
-            const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
-            return {
-              id: r.ID,
-              house: `${r.HOUSE} ${corpsPart}`.trim()
-            };
+        const buildingMap = new Map();
+        addressCatalog.value
+          .filter(a => String(a.streetId) === String(streetId))
+          .forEach(a => {
+            if (a.buildingsId === null || a.buildingsId === undefined) return;
+            if (!buildingMap.has(a.buildingsId)) {
+              buildingMap.set(a.buildingsId, a.houseName);
+            }
           });
-        } else {
-          buildings.value = [];
-        }
-      } finally { 
-        isLoading.value = false; 
+        buildings.value = Array.from(buildingMap, ([id, house]) => ({ id, house }))
+          .sort((a, b) =>
+            String(a.house).localeCompare(String(b.house), 'ru', { numeric: true })
+          );
+      } catch (err) {
+        console.error('Failed to load buildings:', err);
+        buildings.value = [];
+      } finally {
+        isLoading.value = false;
       }
     };
 
@@ -1145,8 +1167,12 @@ createApp({
 
     onMounted(() => {
       selectedTownId.value = 2;
-      loadStreets(2);
       const sessionValid = checkSession();
+      const path = window.location.pathname.toLowerCase();
+      const isAddressPage = path.includes('address.html');
+      if (sessionValid && isAddressPage) {
+        loadStreets(selectedTownId.value);
+      }
       if (sessionValid) {
         const auth = typeof getAuthData === 'function'
           ? getAuthData()
@@ -1164,6 +1190,9 @@ createApp({
           : JSON.parse(sessionStorage.getItem('authData') || 'null');
         if (auth?.controllerId) {
           ensureControllerPackage(auth.controllerId).catch(() => {});
+        }
+        if (isAddressPage) {
+          loadStreets(selectedTownId.value);
         }
       });
     });
