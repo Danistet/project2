@@ -882,9 +882,9 @@ app.post('/meter-by-building', (req, res) => {
         return res.json({
           found: false,
           meterNum: null,
-          name: r.NAME,
-          seal: r.SEAL,
-          manfDate: r.MANFDATE,
+          name: null,
+          seal: null,
+          manfDate: null, 
           mountDate: null,
           verifyDate: null,
           groupName: null,
@@ -1266,7 +1266,7 @@ app.post('/update-meter', (req, res) => {
 
 app.post('/save-boiler-status', (req, res) => {
   const body = req.body || {};
-  const {status, meterId} = req.body;
+  const { status, meterId } = body;
   if (!status) {
     return res.status(400).json({ error: 'status required'});
   }

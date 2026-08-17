@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = false;
+  const USE_LOCAL_DB = true;
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
   const LOCAL_MOCK_PERSIST = true;
@@ -931,7 +931,14 @@
     ],
 
     VIOLATIONS: [],
-    BOILER_STATUS: []
+    BOILER_STATUS: [
+      {
+        ID: 1,
+        STATUS: 'В наличии',
+        METER_ID: 14,
+        CREATEDATE: '2026-08-06'
+      }
+    ]
   };
 
   /* ========================================================== */
@@ -1578,6 +1585,24 @@
       return result.map(({ _apparts, _letter, ...rest }) => rest);
     },
 
+    '/save-boiler-status': ({ body }) => {
+      const status = String(body.status || '').trim();
+      if (!status) {
+        return httpResponse(400, { error: 'status required' });
+      }
+      const meterId = toNumber(body.meterId);
+      if (!LOCAL_DB.BOILER_STATUS) LOCAL_DB.BOILER_STATUS = [];
+      const record = {
+        ID: nextId('BOILER_STATUS'),
+        STATUS: status,
+        METER_ID: meterId,
+        CREATEDATE: nowDateTime()
+      };
+      LOCAL_DB.BOILER_STATUS.push(record);
+      persistDb();
+      return { status: 'OK', message: 'Boiler status saved', id: record.ID };
+    },
+
     '/meter-by-licschet': ({ body }) => {
       const g_licschet = body.g_licschet;
       const meter = LOCAL_DB.METERS.find(
@@ -1612,7 +1637,6 @@
           (!a.APPARTS || String(a.APPARTS).trim() === '')
         );
       });
-
       for (const abonent of abonents) {
         const meter = LOCAL_DB.METERS.find(
           m => String(m.LS) === String(abonent.G_LICSCHET) && isValidMeter(m)
@@ -1621,9 +1645,9 @@
           return meterToListItem(meter);
         }
       }
-
       return {
-        found: false,
+        found: true,
+        id: meter.ID,
         meterNum: null,
         mountDate: null,
         verifyDate: null,

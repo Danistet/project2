@@ -14,11 +14,11 @@
       <div class="form-container">
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" v-model="boilerStatus" value="present" />
+            <input type="radio" v-model="boilerStatus" value="В наличии" />
             <span>В наличии</span>
           </label>
           <label class="radio-label">
-            <input type="radio" v-model="boilerStatus" value="absent" />
+            <input type="radio" v-model="boilerStatus" value="Отсутствует" />
             <span>Отсутствует</span>
           </label>
         </div>
@@ -31,13 +31,38 @@
     </div>
   </body>
    <script>
-    const { createApp, ref } = Vue;
+    const { createApp, ref, onMounted } = Vue;
     createApp({
       setup() {
         const showContinue = ref(false);
         const boilerStatus = ref('');
         const error = ref('');
         const saving = ref(false);
+        const getMeterId = () => {
+          let meterData = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+          if (meterData?.id) return meterData.id;
+          if (!meterData && typeof getSelectedMeter === 'function') {
+            meterData = getSelectedMeter();
+          }
+          if (meterData?.id) return meterData.id;
+          let meterNum = meterData?.meterNum || null;
+          if (!meterNum) {
+            try {
+              const stored = sessionStorage.getItem('meternum');
+              if (stored) meterNum = JSON.parse(stored).meterNum;
+            } catch (e) {}
+          }
+          const allMeters = typeof getAllMeters === 'function' ? getAllMeters() : [];
+          if (meterNum) {
+            const found = allMeters.find(m => String(m.meterNum) === String(meterNum));
+            if (found?.id) return found.id;
+          }
+          if (allMeters.length > 0 && allMeters[0]?.id) {
+            return allMeters[0].id;
+          }
+          return null;
+        };
+
         const continueAction = async () => {
           error.value = '';
           if (!boilerStatus.value) {
@@ -46,7 +71,7 @@
           }
           saving.value = true;
           try {
-            let meterId = null;
+            const meterId = getMeterId();
             if (typeof getActiveMeter === 'function') {
               const activeMeter = getActiveMeter();
               if (activeMeter?.id) {
@@ -99,6 +124,9 @@
           sessionStorage.removeItem('authData');
           window.location.href = 'oldtokenwindow.html';
         };
+        onMounted(() => {
+          checkSession();
+        });
         return {
           boilerStatus,
           error,
