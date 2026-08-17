@@ -930,7 +930,8 @@
       }
     ],
 
-    VIOLATIONS: []
+    VIOLATIONS: [],
+    BOILER_STATUS: []
   };
 
   /* ========================================================== */
@@ -960,6 +961,7 @@
   }
   const LOCAL_DB = loadDb();
   window.LOCAL_DB = LOCAL_DB;
+  if (!LOCAL_DB.BOILER_STATUS) LOCAL_DB.BOILER_STATUS = [];
 
   function persistDb() {
     if (!LOCAL_MOCK_PERSIST) return;
@@ -1423,6 +1425,7 @@
     },
 
     '/generate-act': () => {
+      const serviceId = toNumber(body.serviceId || body.service_id);
       const now = new Date();
       const actBdate = new Date(now.getFullYear(), now.getMonth(), 1);
       const actEdate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -1441,6 +1444,7 @@
         ACT_BDATE: bdateStr,
         ACT_EDATE: edateStr,
         ACT_DATE: actDateStr,
+        SERVICE_ID: serviceId || null,
         CREATEDATE: actDateStr
       };
 
@@ -1453,6 +1457,18 @@
         actBdate: act.ACT_BDATE,
         actEdate: act.ACT_EDATE
       };
+    },
+
+    '/update-act-service': ({ body }) => {
+      const actId = toNumber(body.actId);
+      const serviceId = toNumber(body.serviceId);
+      const act = LOCAL_DB.BUILD_MAINT_ACTS.find(a => a.ID === actId);
+      if (!act) {
+        return httpResponse(400, { error: 'act not found' });
+      }
+      act.SERVICE_ID = serviceId || null;
+      persistDb();
+      return { status: 'OK', message: 'SERVICE_ID updated' };
     },
 
     '/update-act-building': ({ body }) => {
@@ -1786,7 +1802,29 @@
         status: 'OK',
         message: 'Data updated'
       };
-    }
+    },
+
+    '/save-boiler-status': ({ body }) => {
+      const status = String(body.status || '').trim();
+      if (!status) {
+        return httpResponse(400, { error: 'status required' });
+      }
+      const meterId = toNumber(body.meterId);
+      if (!LOCAL_DB.BOILER_STATUS) LOCAL_DB.BOILER_STATUS = [];
+      const record = {
+        ID: nextId('BOILER_STATUS'),
+        STATUS: status,
+        METER_ID: meterId,
+        CREATEDATE: nowDateTime()
+      };
+      LOCAL_DB.BOILER_STATUS.push(record);
+      persistDb();
+      return {
+        status: 'OK',
+        message: 'Boiler status saved',
+        id: record.ID
+      };
+    },
   };
 
   /* ========================================================== */

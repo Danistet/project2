@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная страница</title>
+    <link rel="icon" href="data:,">
+    <script src="./api.js"></script>
+    <script src="./vendor/vue.global.js"></script>
+  </head>
+
+  <body>
+    <div id="app" class="page-wrapper">
+      <header class="page-header">
+        <h1>Главная страница</h1>
+        <div id="error" class="error-message" v-if="error">{{ error }}</div>
+      </header>
+      <main class="content-card">
+        <section class="address-section">
+          <div class="address-row">
+            <span class="address-part">{{ streetType }}</span>
+            <span class="address-part">{{ streetName }}</span>
+          </div>
+          <div class="address-row">
+            <span class="address-part">{{ house }}</span>
+            <span class="address-part">{{ apparts }}</span>
+          </div>
+        </section>  
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Загрузка данных счётчика...</p>
+        </div>        
+        <template v-else>
+          <section class="meters-section">
+            <div class="meters-container">
+              <div v-if="!meters || meters.length === 0" class="no-meters">
+                Счётчики не найдены
+              </div>            
+              <div 
+                v-for="meter in meters" 
+                :key="meter.id" 
+                class="meter-block"
+                :class="{ selected: selectedMeterId === meter.id }"
+                :style="{ opacity: selectedMeterId && selectedMeterId !== meter.id ? '0.5' : '1' }"
+              >
+                <h4>{{ meter.clientName || 'Не указано' }}</h4>              
+                <div class="meter-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Лицевой счёт:</span>
+                    <span class="detail-value">{{ meter.licschet || 'Не указан' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Услуга:</span>
+                    <span class="detail-value">{{ meter.groupName ? meter.groupName.trim() : 'Услуга не указана' }}</span>
+                  </div>                                
+                  <template v-if="selectedMeterId === meter.id">
+                    <div class="detail-row">
+                      <span class="detail-label">Место установки:</span>
+                      <input v-model="editData.name" maxlength="60" class="edit-input" placeholder="Место установки">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Номер прибора:</span>
+                      <input v-model="editData.meterNum" maxlength="30" class="edit-input" placeholder="Номер прибора">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Номер пломбы:</span>
+                      <input v-model="editData.seal" maxlength="16" class="edit-input" placeholder="Номер пломбы">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата изготовления:</span>
+                      <input v-model="editData.manfDate" type="date" class="edit-input">
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата установки:</span>
+                      <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата проверки:</span>
+                      <input v-model="editData.verifyDate" type="date" class="edit-input">
+                    </div>                  
+                    <button @click="saveMeterData" class="save-btn" :disabled="saving" v-if="!showContinue">
+                      {{ saving ? 'Сохранение...' : 'Сохранить изменения' }}
+                    </button>
+                  </template>                
+                  <template v-else>
+                    <div class="detail-row">
+                      <span class="detail-label">Серийный номер:</span>
+                      <span class="detail-value">{{ meter.meterNum || 'Не указан' }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата установки:</span>
+                      <span class="detail-value">{{ formatDate(meter.mountDate) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Дата проверки:</span>
+                      <span class="detail-value">{{ formatDate(meter.verifyDate) }}</span>
+                    </div>
+                  </template>
+                </div>              
+                <button 
+                  v-if="selectedMeterId !== meter.id" 
+                  @click="selectMeter(meter)" 
+                  class="select-btn"
+                >
+                  Выбрать
+                </button>
+              </div>
+            </div>
+          </section>                  
+          <section class="actions-section">
+            <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">
+              Продолжить
+            </button>          
+            <div id="actionButtons" class="action-buttons" v-if="selectedMeterId && !showContinue">
+              <button @click="info" id="infbt" class="btn-primary">Передать нарушения</button>
+            </div>          
+            <button @click="logout" id="changebutton" class="btn-secondary" v-if="!showContinue">Сменить адрес</button>
+          </section>
+        </template>
+      </main>
+      <div class="status" id="statusDiv"></div>
+    </div>
+    <script>
+      const { createApp, ref, onMounted } = Vue;      
+      createApp({
+        setup() {
+          const meters = ref([]);
+          const selectedMeterId = ref(null);
+          const editData = ref({
+            name: '',
+            meterNum: '',
+            seal: '',
+            manfDate: '',
+            verifyDate: ''
+          });
+          const error = ref('');
+          const saving = ref(false);
+          const showContinue = ref(false);
+          const streetType = ref('');
+          const streetName = ref('');
+          const house = ref('');
+          const apparts = ref('');
+          const isLoading = ref(false);           
+          const formatDate = (dateStr) => {
+            if (!dateStr) return 'Не указана';
+            const str = String(dateStr).trim();                        
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(str)) return str;
+            const date = new Date(str);                        
+            if (isNaN(date.getTime())) {
+              const parts = str.match(/\d+/g);
+              if (parts && parts.length >= 3) {
+                if (parts[0].length === 4) return `${parts[2].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[0]}`;
+                if (parts[2].length === 4) return `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[2]}`;
+              }
+              return str;
+            }                        
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+          };
+          
+          const loadAddressDisplay = () => {
+            const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+            if (addressData) {
+              const streetParts = (addressData.street || '').split(' ');
+              streetType.value = streetParts[0] || '';
+              streetName.value = streetParts.slice(1).join(' ') || addressData.street || '';
+              house.value = addressData.house || '';
+              apparts.value = addressData.apparts && addressData.apparts !== '-1' ? addressData.apparts : '';
+            }
+          };
+          
+          const loadMeters = async () => {
+            isLoading.value = true;
+            try {
+              let loadedMeters = typeof getAllMeters === 'function' ? getAllMeters() : [];
+              if (!loadedMeters || loadedMeters.length === 0) {
+                const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');                  
+                try {
+                  if (!navigator.onLine) throw new Error('Offline');
+                  if (addressData?.g_licschet && typeof getMetersByLicschet === 'function') {
+                    loadedMeters = await getMetersByLicschet(addressData.g_licschet);
+                  } else if (addressData?.buildingId && typeof getMetersByBuilding === 'function') {
+                    loadedMeters = await getMetersByBuilding(addressData.buildingId);
+                  }
+                } catch (apiErr) {
+                  console.warn('API failed, trying offline cache:', apiErr);
+                  if (addressData?.g_licschet && typeof getOfflineMetersByLicschet === 'function') {
+                    loadedMeters = await getOfflineMetersByLicschet(addressData.g_licschet);
+                  } else if (addressData?.buildingId && typeof getOfflineMetersByBuilding === 'function') {
+                    loadedMeters = await getOfflineMetersByBuilding(addressData.buildingId);
+                  }
+                }
+                if (loadedMeters?.length && typeof saveAllMeters === 'function') {
+                  saveAllMeters(loadedMeters);
+                }
+              }
+              meters.value = loadedMeters || [];                
+              const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+              if (activeMeter) {
+                let targetMeterId = activeMeter.id;
+                if (!targetMeterId && activeMeter.meterNum) {
+                  const foundMeter = meters.value.find(m => m.meterNum === activeMeter.meterNum);
+                  if (foundMeter) {
+                    targetMeterId = foundMeter.id;
+                  }
+                }
+                if (targetMeterId) {
+                  selectedMeterId.value = targetMeterId;
+                  await loadMeterDetails(targetMeterId);
+                } else {
+                  console.warn('Не удалось определить ID активного счётчика для загрузки деталей');
+                }
+              }
+            } catch (err) {
+              console.error('Failed to load meters:', err);
+              error.value = 'Ошибка загрузки счётчиков';
+            } finally {
+              isLoading.value = false;
+            }
+          };  
+          
+          const selectMeter = async (meter) => {
+            isLoading.value = true;
+            try {
+              selectedMeterId.value = meter.id;                      
+              saveActiveMeter(meter);
+              editData.value = {
+                name: meter.name || '',
+                meterNum: meter.meterNum || '',
+                seal: meter.seal || '',
+                manfDate: formatDateForInput(meter.manfDate),
+                verifyDate: formatDateForInput(meter.verifyDate)
+              };
+              sessionStorage.setItem('meternum', JSON.stringify({ meterNum: meter.meterNum }));
+              sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: meter.mountDate }));
+              sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: meter.verifyDate }));
+              if (meter.licschet) {
+                sessionStorage.setItem('licschet', JSON.stringify({ g_licschet: meter.licschet }));
+              }                        
+              await loadMeterDetails(meter.id);
+            } catch (err) {
+              console.error('Failed to select meter:', err);
+            } finally {
+              isLoading.value = false;
+            }
+          }
+
+          const loadMeterDetails = async (meterId) => {
+            if (!meterId) {
+              console.warn('no meterId');
+              return;
+            }            
+            const fillEditData = (result) => {
+              editData.value = {
+                name: result.name || editData.value.name || '',
+                meterNum: result.meterNum || editData.value.meterNum || '',
+                seal: result.seal || editData.value.seal || '',
+                manfDate: formatDateForInput(result.manfDate) || editData.value.manfDate || '',
+                verifyDate: formatDateForInput(result.verifyDate) || editData.value.verifyDate || ''
+              };
+            };
+            try {
+              if (!navigator.onLine) throw new Error('Offline mode');
+              const result = await apiRequest('/get-meter-details', { meterId: meterId });
+              if (result.found) {
+                fillEditData(result);
+              }
+            } catch (err) {
+              console.warn('Failed to load meter details from server, trying offline cache:', err);
+              try {
+                const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+                const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;                  
+                if (controllerId && typeof getControllerPackage === 'function') {
+                  const pkg = await getControllerPackage(controllerId);
+                  if (pkg && pkg.meters) {
+                    const meterRow = pkg.meters.find(m => String(m.ID) === String(meterId));
+                    if (meterRow) {
+                      fillEditData({
+                        found: true,
+                        name: meterRow.NAME,
+                        meterNum: meterRow.METER_NUM,
+                        seal: meterRow.SEAL,
+                        manfDate: meterRow.MANFDATE,
+                        verifyDate: meterRow.VERIFY_DATE
+                      });
+                    return;
+                  }
+                }
+              }
+              const localMeter = meters.value.find(m => String(m.id) === String(meterId));
+              if (localMeter) {
+                fillEditData(localMeter);
+                return;
+              }
+              console.warn('Нет сети и данных в кэше. Используем базовые данные из списка.');
+              } catch (offlineErr) {
+                console.error('Offline fallback failed:', offlineErr);
+              }
+            }
+          };
+          
+          const formatDateForInput = (dateStr) => {
+            if (!dateStr) return '';
+            const str = String(dateStr).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            const date = new Date(str);
+            if (isNaN(date.getTime())) {
+              const parts = str.match(/\d+/g);
+              if (parts && parts.length >= 3) {
+                if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              }
+              return '';
+            }
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${year}-${month}-${day}`;
+          };
+          
+          const saveMeterData = async () => {
+            saving.value = true;
+            error.value = '';
+            try {
+              if (!navigator.onLine) {
+                const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+                if (activeMeter) {
+                  activeMeter.meterNum = editData.value.meterNum;
+                  activeMeter.verifyDate = editData.value.verifyDate;
+                  if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
+                  sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
+                  sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
+                }
+                if (typeof showAlert === 'function') {
+                  showAlert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.', 'success');
+                } else {
+                  alert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.');
+                }
+                return;
+              }
+              const result = await apiRequest('/update-meter', {
+                meterId: selectedMeterId.value,
+                meterNum: editData.value.meterNum || null,
+                name: editData.value.name || null,
+                seal: editData.value.seal || null,
+                manfDate: editData.value.manfDate || null,
+                mountDate: meters.value.find(m => m.id === selectedMeterId.value)?.mountDate || null,
+                verifyDate: editData.value.verifyDate || null
+              });
+              if (result.status === 'OK') {
+                if (typeof showAlert === 'function') {
+                  showAlert('Данные успешно сохранены', 'success');
+                } else {
+                  alert('Данные успешно сохранены');
+                }
+                const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
+                if (activeMeter) {
+                  activeMeter.meterNum = editData.value.meterNum;
+                  activeMeter.verifyDate = editData.value.verifyDate;
+                  if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
+                  sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
+                  sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
+                }
+              } else {
+                error.value = result.error || 'Ошибка сохранения';
+              }
+            } catch (err) {
+              error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+              console.error(err);
+            } finally {
+              saving.value = false;
+            }
+          };
+          
+          const checkSession = () => {
+            const authData = getAuthData ? getAuthData() : JSON.parse(sessionStorage.getItem('authData'));            
+            if (!authData) {
+              error.value = 'Сессия не найдена';
+              showContinue.value = true;
+              setTimeout(() => window.location.href = 'ActWindow.html', 2000);
+              return false;
+            }            
+            const now = Date.now();
+            const EXPIRY_MS = 24000000;            
+            if (now - authData.authDate > EXPIRY_MS) {
+              error.value = 'Истёк срок сессии';
+              showContinue.value = true;
+              sessionStorage.setItem('lastAuthDate', authData.authDate);
+              return false;
+            }            
+            showContinue.value = false;
+            return true;
+          };                    
+          
+          const logout = () => {
+            sessionStorage.removeItem('allMeters');
+            sessionStorage.removeItem('activeMeter');
+            sessionStorage.removeItem('selectedMeter');
+            sessionStorage.removeItem('meternum');
+            sessionStorage.removeItem('mountdate');
+            sessionStorage.removeItem('verifydate');
+            sessionStorage.removeItem('licschet');
+            sessionStorage.removeItem('userAddress');
+            sessionStorage.removeItem('currentAct');
+            sessionStorage.removeItem('ph');
+            //clearSessionAndLogout();
+            window.location.href = 'address.html';
+          };
+          
+          const info = () => {
+            const activeMeter = getActiveMeter ? getActiveMeter() : null;
+            if (activeMeter) {
+              sessionStorage.setItem('activeMeter', JSON.stringify(activeMeter));
+            }
+            window.location.href = 'violationform.html';
+          };
+          
+          const cont = () => {
+            sessionStorage.removeItem('authData');
+            window.location.href = 'oldtokenwindow.html';
+          };          
+          onMounted(async () => {
+            loadAddressDisplay();
+            await loadMeters();
+            checkSession();
+          });          
+          return {
+            meters,
+            selectedMeterId,
+            editData,
+            error,
+            saving,
+            isLoading,
+            showContinue,
+            streetType,
+            streetName,
+            house,
+            apparts,
+            formatDate,
+            selectMeter,
+            saveMeterData,
+            logout,
+            info,
+            cont
+          };
+        }
+      }).mount('#app');
+    </script>
+    <script>
+      let statusTimeout;    
+      let isInitialLoad = true;
+      function updateStatus(isOnline) {
+        var statusDiv = document.getElementById("statusDiv");
+        if (!statusDiv) return;
+        clearTimeout(statusTimeout);
+        if (isOnline) {
+          if (!isInitialLoad) {
+            statusDiv.style.backgroundColor = "#44ff00";
+            statusDiv.textContent = "Подключено";
+            statusDiv.classList.remove("status-hidden");        
+            statusTimeout = setTimeout(function() {
+              statusDiv.classList.add("status-hidden");
+            }, 5000);
+          }
+        } else {
+          statusDiv.style.backgroundColor = "#ff0007";
+          statusDiv.textContent = "Нет подключения";
+          statusDiv.classList.remove("status-hidden");
+          statusTimeout = setTimeout(function() {
+            statusDiv.classList.add("status-hidden");
+          }, 5000);
+        }
+        isInitialLoad = false;
+      }   
+      updateStatus(navigator.onLine);
+      window.addEventListener("online", () => updateStatus(true));
+      window.addEventListener("offline", () => updateStatus(false));
+    </script>
+  </body>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 20px 16px;            
+    }
+
+    .page-wrapper {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .page-header {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .page-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 15px;
+      color: #C62828;
+      min-height: 22px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .content-card {
+      width: 100%;
+      max-width: 480px;
+      border: 2px solid #45B0E1;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .address-section {
+      padding: 16px 20px;
+      background-color: #D1D1D1;
+      border-bottom: 2px solid #45B0E1;
+    }
+
+    .address-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .address-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .address-part {
+      font-size: 18px;
+      font-weight: 600;
+      color: #000000;
+      word-break: break-word;
+    }
+
+    .meters-section {
+      padding: 16px 20px;
+      background-color: #FFFFFF;
+    }
+
+    .meters-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .meter-block {
+      border: 2px solid #45B0E1;
+      padding: 16px;
+      background-color: #FFFFFF;
+      transition: border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .meter-block.selected {
+      border-color: #2E8BC0;
+      background-color: #F0F9FC;
+      border-width: 3px;
+    }
+
+    .meter-block h4 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 12px;
+      text-align: center;
+      border-bottom: 2px solid #D1D1D1;
+      padding-bottom: 8px;
+    }
+
+    .meter-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .detail-label {
+      font-size: 16px;
+      color: #333333;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      font-size: 17px;
+      color: #000000;
+      font-weight: 600;
+      text-align: right;
+      word-break: break-word;
+      min-width: 120px;
+    }
+
+    .select-btn {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #45B0E1;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+      touch-action: manipulation;
+    }
+
+    .select-btn:hover {
+      background-color: #F0F9FC;
+    }
+
+    .select-btn:active {
+      background-color: #E0F4FA;
+    }
+
+    .select-btn:disabled {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .no-meters {
+      text-align: center;
+      color: #C62828;
+      font-size: 16px;
+      font-weight: 500;
+      padding: 12px;
+    }
+
+    .actions-section {
+      padding: 16px 20px 24px; 
+      background-color: #D1D1D1; 
+      border-top: 2px solid #45B0E1;
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      gap: 12px;
+    }
+
+    .action-buttons {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button {
+      width: 100%;
+      max-width: 320px;
+      min-height: 56px;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+      text-align: center;
+      touch-action: manipulation;
+    }
+
+    .status {    
+      position: fixed;
+      bottom: 0;      
+      left: 0;        
+      right: 0;       
+      width: 100%;    
+      text-align: center;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 12px 0;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
+      
+    .status.status-hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none; 
+    }
+
+    .edit-input {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 15px;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .edit-input:focus {
+      border-color: #2E8BC0;
+    }
+
+    button:hover {
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+
+    button:active {
+      background-color: #1A6B96;
+      border-color: #1A6B96;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+
+    .btn-secondary:active {
+      background-color: #E0F4FA;
+    }
+
+    .ContinueButton {
+      visibility: visible;
+    }
+
+    .loading-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      color: #45B0E1;
+      font-weight: 600;
+      font-size: 18px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid #E0F4FA;
+      border-top: 5px solid #45B0E1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px;
+      }
+      
+      .page-header h1 {
+        font-size: 22px;
+      }
+      
+      .content-card {
+        padding: 0;
+      }
+      
+      .address-section,
+      .meters-section,
+      .actions-section {
+        padding: 14px 16px;
+      }
+      
+      .address-part {
+        font-size: 17px;
+      }
+      
+      .detail-label {
+        font-size: 15px;
+      }
+      
+      .detail-value {
+        font-size: 16px;
+      }
+      
+      .select-btn {
+        min-height: 44px;
+        font-size: 15px;
+      }
+      
+      button {
+        min-height: 52px;
+        font-size: 17px;
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      
+      .detail-value {
+        text-align: left;
+        width: 100%;
+      }
+    }
+  </style>
+</html>

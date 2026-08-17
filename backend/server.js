@@ -459,6 +459,7 @@ app.post('/update-token', (req, res) => {
 });
 
 app.post('/generate-act', (req, res) => {
+  const { serviceId } = req.body || {};
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
@@ -504,12 +505,12 @@ app.post('/generate-act', (req, res) => {
         }
         const insertQuery = `
           INSERT INTO BUILD_MAINT_ACTS
-            (ID, ACT_NO, ACT_BDATE, ACT_EDATE, ACT_DATE, CREATEDATE)
-          VALUES (?, ?, ?, ?, ?, ?)
+            (ID, ACT_NO, ACT_BDATE, ACT_EDATE, ACT_DATE, SERVICE_ID, CREATEDATE)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         db.query(
           insertQuery,
-          [newId, newActNo, bdateStr, edateStr, actDateStr, actDateStr],
+          [newId, newActNo, bdateStr, edateStr, actDateStr, serviceId || null, actDateStr],
           (err) => {
             db.detach();
             if (err) {
@@ -526,6 +527,32 @@ app.post('/generate-act', (req, res) => {
           }
         );
       });
+    });
+  });
+});
+
+app.post('/update-act-service', (req, res) => {
+  const { actId, serviceId } = req.body;
+  if (!actId) {
+    return res.status(400).json({ error: 'actId required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const updateQuery = `
+      UPDATE BUILD_MAINT_ACTS
+      SET SERVICE_ID = ?
+      WHERE ID = ?
+    `;
+    db.query(updateQuery, [serviceId || null, actId], (err) => {
+      db.detach();
+      if (err) {
+        console.error('Update error:', err);
+        return res.status(500).json({ error: 'Update failed', details: err.message });
+      }
+      res.json({ status: 'OK', message: 'SERVICE_ID updated' });
     });
   });
 });
@@ -1233,6 +1260,33 @@ app.post('/update-meter', (req, res) => {
         status: 'OK',
         message: 'Data updated'
       });
+    });
+  });
+});
+
+app.post('/save-boiler-status', (req, res) => {
+  const body = req.body || {};
+  const {status, meterId} = req.body;
+  if (!status) {
+    return res.status(400).json({ error: 'status required'});
+  }
+  const createdate = new Date().toISOString().replace('T', ' ').slice(0,19);
+  firebird.attach(config, (err,db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const insertQuery = `
+      INSERT INTO BOILER_STATUS (ID, STATUS, METER_ID, CREATEDATE)
+      VALUES (GEN_ID(BOILER_STATUS_GEN, 1), ?, ?, ?)
+    `;
+    db.query(insertQuery, [status, meterId || null, createdate], (err) => {
+      db.detach();
+      if (err) {
+        console.error('insert error', err);
+        return res.status(500).json({ error: 'insert error', details: err.message});
+      }
+      res.json({ status: 'OK', message: 'boiler status saved'});
     });
   });
 });

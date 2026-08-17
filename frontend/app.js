@@ -390,7 +390,7 @@ createApp({
               actEdate: formatDate(d)
             };
           } else {
-            actResult = await apiRequest('/generate-act', {});
+            actResult = await apiRequest('/generate-act', { serviceId: null });
             await apiRequest('/update-act-building', {
               actId: actResult.actId,
               buildingId: selectedBuildingId.value
@@ -447,6 +447,29 @@ createApp({
             return;
           }          
           saveAllMeters(allMeters);
+          if (allMeters.length > 0 && actResult.actId) {
+            const firstMeter = allMeters[0];
+            try {
+              const pkg = await getControllerPackage(
+                sessionStorage.getItem('controllerId') ||
+                JSON.parse(sessionStorage.getItem('authData') || '{}').controllerId
+              );
+              if (pkg) {
+                const meterRow = pkg.meters?.find(m => m.ID === firstMeter.id);
+                if (meterRow?.METER_TYPE) {
+                  const meterType = pkg.meterTypes?.find(t => t.ID === meterRow.METER_TYPE);
+                  if (meterType?.LOW_QUALITY_GRP_TARIFF) {
+                    await apiRequest('/update-act-service', {
+                      actId: actResult.actId,
+                      serviceId: meterType.LOW_QUALITY_GRP_TARIFF
+                    });
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Не удалось обновить SERVICE_ID акта:', e);
+            }
+          }
           const g_licschet = allMeters[0]?.licschet || null;          
           if (allMeters.length === 1) {
             saveMeterDataToSession(allMeters[0]);

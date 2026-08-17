@@ -23,7 +23,7 @@
           </label>
         </div>
         <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>
-        <button @click="continueAction" v-if="!showContinue" class="btn-primary">Продолжить</button>
+        <button @click="continueAction" v-if="!showContinue" :disabled="saving" class="btn-primary">{{ saving ? 'Сохранение...' : 'Продолжить' }}</button>
         <button @click="logout" v-if="!showContinue" class="btn-secondary">Назад</button>
         <p v-if="error" class="error-message">{{ error }}</p>
       </div>
@@ -37,14 +37,41 @@
         const showContinue = ref(false);
         const boilerStatus = ref('');
         const error = ref('');
-        const continueAction = () => {
+        const saving = ref(false);
+        const continueAction = async () => {
           error.value = '';
           if (!boilerStatus.value) {
             error.value = 'Выберите статус бойлера';
             return;
           }
-          sessionStorage.setItem('boilerStatus', boilerStatus.value);
-          window.location.href = 'violationwindow.html';
+          saving.value = true;
+          try {
+            let meterId = null;
+            if (typeof getActiveMeter === 'function') {
+              const activeMeter = getActiveMeter();
+              if (activeMeter?.id) {
+                meterId = activeMeter.id;
+              }
+            }
+            await apiRequest('/save-boiler-status', {
+              status: boilerStatus.value,
+              meterId: meterId
+            });
+            sessionStorage.setItem('boilerStatus', boilerStatus.value);
+            window.location.href = 'violationwindow.html';
+          } catch (err) {
+            console.error('Error saving boiler status:', err);
+            sessionStorage.setItem('boilerStatus', boilerStatus.value);
+            if (typeof showAlert === 'function') {
+              showAlert(
+                'Не удалось сохранить статус бойлера на сервере. Значение сохранено локально.',
+                'error'
+              );
+            }
+            window.location.href = 'violationwindow.html';
+          } finally {
+            saving.value = false;
+          }
         };
         const logout = () => {
           window.location.href = 'address.html';
@@ -75,6 +102,7 @@
         return {
           boilerStatus,
           error,
+          saving,
           continueAction,
           logout,
           showContinue, cont
