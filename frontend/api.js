@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = true;
+  const USE_LOCAL_DB = false;
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
   const LOCAL_MOCK_PERSIST = true;
@@ -26,7 +26,7 @@
         CONTROLLER_PSWD: '1234',
         TOKEN: 'LOCAL_TOKEN_112',
         AUTHDATE: 0,
-        FIO: 'Контролер'
+        FIO: 'Контролер1234'
       },
       {
         ID: 91,
@@ -34,7 +34,7 @@
         CONTROLLER_PSWD: 'qwerty',
         TOKEN: 'LOCAL_TOKEN_91',
         AUTHDATE: 0,
-        FIO: 'Контролер2'
+        FIO: 'Контролерqwerty'
       }
     ],
 
@@ -1431,19 +1431,19 @@
       };
     },
 
-    '/generate-act': () => {
-      const serviceId = toNumber(body.serviceId || body.service_id);
+    '/generate-act': ({ body }) => {
+      const serviceId = body ? toNumber(body.serviceId || body.service_id) : null;
       const now = new Date();
       const actBdate = new Date(now.getFullYear(), now.getMonth(), 1);
       const actEdate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const bdateStr = formatDateOnly(actBdate);
       const edateStr = formatDateOnly(actEdate);
-      const actDateStr = nowDateTime();
+      const actDateStr = nowDateTime();     
       const monthPrefix = bdateStr.slice(0, 7);
       const maxNo = LOCAL_DB.BUILD_MAINT_ACTS
         .filter(a => String(a.ACT_BDATE || '').startsWith(monthPrefix))
-        .reduce((max, a) => Math.max(max, parseInt(a.ACT_NO, 10) || 0), 0);
-      const newActNo = String(maxNo + 1).padStart(5, '0');
+        .reduce((max, a) => Math.max(max, parseInt(a.ACT_NO, 10) || 0), 0);       
+      const newActNo = String(maxNo + 1).padStart(5, '0');   
       const act = {
         ID: nextId('BUILD_MAINT_ACTS'),
         BUILDING_ID: null,
@@ -1453,10 +1453,9 @@
         ACT_DATE: actDateStr,
         SERVICE_ID: serviceId || null,
         CREATEDATE: actDateStr
-      };
-
+      };   
       LOCAL_DB.BUILD_MAINT_ACTS.push(act);
-      persistDb();
+      persistDb();     
       return {
         actId: act.ID,
         actNo: act.ACT_NO,
@@ -1646,9 +1645,12 @@
         }
       }
       return {
-        found: true,
+        found: false, 
         id: meter.ID,
         meterNum: null,
+        name: null,
+        seal: null,
+        manfDate: null,
         mountDate: null,
         verifyDate: null,
         groupName: null,
@@ -1828,27 +1830,6 @@
       };
     },
 
-    '/save-boiler-status': ({ body }) => {
-      const status = String(body.status || '').trim();
-      if (!status) {
-        return httpResponse(400, { error: 'status required' });
-      }
-      const meterId = toNumber(body.meterId);
-      if (!LOCAL_DB.BOILER_STATUS) LOCAL_DB.BOILER_STATUS = [];
-      const record = {
-        ID: nextId('BOILER_STATUS'),
-        STATUS: status,
-        METER_ID: meterId,
-        CREATEDATE: nowDateTime()
-      };
-      LOCAL_DB.BOILER_STATUS.push(record);
-      persistDb();
-      return {
-        status: 'OK',
-        message: 'Boiler status saved',
-        id: record.ID
-      };
-    },
   };
 
   /* ========================================================== */

@@ -1,7 +1,7 @@
 const DB_NAME = 'MeterOfflineStorage';
 const STORE_NAME = 'pendingReadings';
 const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 function openLocalDB() {
   return new Promise((resolve, reject) => {
