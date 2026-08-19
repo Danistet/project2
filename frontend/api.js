@@ -1999,7 +1999,7 @@ async function clearSessionAndLogout() {
     if (typeof clearControllerPackage === 'function') {
       await clearControllerPackage();
     } else {
-      const request = indexedDB.open('MeterOfflineStorage', 3);
+      const request = indexedDB.open('MeterOfflineStorage', 4);/////////indexedDBversion
       request.onsuccess = (event) => {
         const db = event.target.result;
         if (db.objectStoreNames.contains('controllerPackages')) {

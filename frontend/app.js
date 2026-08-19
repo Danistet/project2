@@ -168,12 +168,43 @@ createApp({
     const streetSearch = ref('');
     const houseSearch = ref('');
     const appartsSearch = ref('');
-    const showApparts = ref(true); 
+    const showApparts = ref(true);
+    const todayOnly = ref(false);
     const PH = ref('');
     const PHData = ref('');
     const meters = ref([]);
     const showMeterSelect = ref(false);
-    const selectedMeter = ref(null);        
+    const selectedMeter = ref(null);
+    const isVerifyDateToday = (dateStr) => {
+      if (!dateStr) return false;
+      const s = String(dateStr).trim();
+      const dmY = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+      if (dmY) {
+        const d = new Date(`${dmY[3]}-${dmY[2]}-${dmY[1]}`);
+        if (!isNaN(d.getTime())) {
+          const today = new Date();
+          return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+        }
+      }
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+          const today = new Date();
+          return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+        }
+      }
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        const today = new Date();
+        return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      }
+      return false;
+    };
+    const getFilteredCatalog = () => {
+      if (!todayOnly.value) return addressCatalog.value;
+      return Array.isArray(addressCatalog.value) ? addressCatalog.value.filter(a => isVerifyDateToday(a.verifyDate || a.VERIFY_DATE)) : [];
+    };
     const isLoading = ref(false); 
     const showContinue = ref(false);
     const showOverlay = ref(false);
@@ -212,6 +243,23 @@ createApp({
           if (input) input.focus();
         }, 100);
       }
+    });
+
+    watch(todayOnly, (newVal) => {
+      streetSearch.value = '';
+      houseSearch.value = '';
+      appartsSearch.value = '';
+      selectedStreetId.value = null;
+      selectedBuildingId.value = null;
+      selectedAppartId.value = null;
+      buildings.value = [];
+      apparts.value = [];
+      meters.value = [];
+      showMeterSelect.value = false;
+      selectedMeter.value = null;
+      clearMeterDataToSession();
+      try { sessionStorage.removeItem('userAddress'); } catch (e) { /* ignore */ }
+      try { loadStreets(selectedTownId.value); } catch (e) { /* ignore */ }
     });
 
     const formatWithThousands = (value) => {
@@ -560,8 +608,10 @@ createApp({
           }
         }
         addressCatalog.value = Array.isArray(data) ? data : [];
+        // Use filtered catalog when "todayOnly" is active
+        const catalog = getFilteredCatalog();
         const streetMap = new Map();
-        addressCatalog.value.forEach(addr => {
+        catalog.forEach(addr => {
           if (!addr || addr.streetId === null || addr.streetId === undefined) return;
           if (!streetMap.has(addr.streetId)) {
             streetMap.set(addr.streetId, addr.streetName);
@@ -589,7 +639,7 @@ createApp({
           await loadStreets(selectedTownId.value);
         }
         const buildingMap = new Map();
-        addressCatalog.value
+        getFilteredCatalog()
           .filter(a => String(a.streetId) === String(streetId))
           .forEach(a => {
             if (a.buildingsId === null || a.buildingsId === undefined) return;
@@ -635,6 +685,20 @@ createApp({
               const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
               return { ...appr, displayHouse: uniqueName, rawHouse: baseName };
             });
+            if (todayOnly.value) {
+              const filtered = [];
+              for (const appr of apparts.value) {
+                if (!appr.g_licschet) continue;
+                try {
+                  const metersForLs = navigator.onLine ? await getMetersByLicschet(appr.g_licschet) : await getOfflineMetersByLicschet(appr.g_licschet);
+                  const hasToday = Array.isArray(metersForLs) && metersForLs.some(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+                  if (hasToday) filtered.push(appr);
+                } catch (e) {
+                  // ignore errors and skip
+                }
+              }
+              apparts.value = filtered;
+            }
             return;
           }
         }
@@ -1224,7 +1288,7 @@ createApp({
       password, response, error, meternum, mountdate, verifydate,
       streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
-       streetSearch, houseSearch, appartsSearch, showApparts,
+      streetSearch, houseSearch, appartsSearch, showApparts, todayOnly,
       currentBuildingLicschet, meters, showMeterSelect, selectedMeter,
       selectMeter, loadMetersByBuilding, loadMetersByLicschet,
       NewPH, 
