@@ -16,7 +16,7 @@
           <label class="form-label checkbox-label" :class="{ disabled: !isOnline || isLoading }">
             <input type="checkbox" :disabled="!isOnline || isLoading" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
             <span class="checkbox-text">Все адреса</span>
-          </label>
+          </label>          
           <label for="streetInput" class="form-label">Улица</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
             <div class="custom-datalist-input-wrapper">
@@ -84,6 +84,10 @@
             </div>
           </div>
         </div>
+        <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
+          <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
+          <span  class="checkbox-text">Адреса без назначенной даты посещения</span>
+        </label>
         <div class="form-group">
           <label for="listInput" class="form-label">Список адресов</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
@@ -224,6 +228,7 @@
         const streets = ref([]);
         const buildings = ref([]);
         const filteredAddressList = ref([]);
+        const showOnlyWithoutDate = ref(false);
         const selectedStreetId = ref(null);
         const streetSearch = ref('');
         const selectedBuildingId = ref(null);
@@ -236,6 +241,7 @@
         const isStreetOpen = ref(false);
         const isHouseOpen = ref(false);
         const isListOpen = ref(false);
+
         watch(showAllAddresses, async (newVal) => {
           if (!navigator.onLine && newVal === true) {
             showAllAddresses.value = false;
@@ -263,6 +269,12 @@
             selectedAddress.value = null;
             selectedAddressText.value = '';
           }
+        });
+
+        watch(showOnlyWithoutDate, () => {
+          selectAddress.value = null;
+          selectedAddressText.value = '';
+          isListOpen.value = false;
         });
 
         const loadData = async () => {
@@ -325,15 +337,24 @@
         });
 
         const filteredBuildings = computed(() => {
-          if (!houseSearch.value) return buildings.value;
+          if (!houseSearch.value) return buildings.value;          
           const term = houseSearch.value.toLowerCase();
           return buildings.value.filter(b => b.name.toLowerCase().includes(term));
         });
 
         const filteredAddresses = computed(() => {
-          if (!selectedAddressText.value) return filteredAddressList.value;
-          const term = selectedAddressText.value.toLowerCase();
-          return filteredAddressList.value.filter(a => a.displayText.toLowerCase().includes(term));
+          let list = filteredAddressList.value;
+          if (showOnlyWithoutDate.value) {
+           list = list.filter(a => {
+            const v = a.verifyDate;
+            return !v || String(v).trim() === '';
+           });
+          }
+          if (selectedAddressText.value) {
+            const term = selectedAddressText.value.toLowerCase();
+            list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
+          }
+          return list;
         });
 
         const loadControllers = async () => {
@@ -611,7 +632,7 @@
           selectedAddress, editData, isOnline,
           clearStreet, clearHouse, clearList,
           isStreetOpen, isHouseOpen, isListOpen,
-          filteredStreets, filteredBuildings, filteredAddresses,
+          filteredStreets, filteredBuildings, filteredAddresses, showOnlyWithoutDate,
           selectStreet, selectHouse, selectAddress,
           closeStreet, closeHouse, closeList,
           saveVerifyDate, controllers, showAllAddresses,
