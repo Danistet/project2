@@ -8,8 +8,6 @@
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
   const USE_LOCAL_DB = false;
-  // true = изменения сохраняются в localStorage и переживают переходы между страницами
-  // false = изменения только в памяти до перезагрузки страницы
   const LOCAL_MOCK_PERSIST = true;
   const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V3';
   if (!USE_LOCAL_DB) {
@@ -984,7 +982,7 @@
     try {
       localStorage.removeItem(LOCAL_DB_KEY);
     } catch (e) {
-      // ignore
+      console.log('error: ', e);
     }
     window.location.reload();
   };
@@ -2000,7 +1998,7 @@ async function clearSessionAndLogout() {
     if (typeof clearControllerPackage === 'function') {
       await clearControllerPackage();
     } else {
-      const request = indexedDB.open('MeterOfflineStorage', 4);/////////indexedDBversion
+      const request = indexedDB.open('MeterOfflineStorage', 4);
       request.onsuccess = (event) => {
         const db = event.target.result;
         if (db.objectStoreNames.contains('controllerPackages')) {

@@ -549,13 +549,37 @@
           saving.value = true;
           error.value = '';
           try {
-            await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
-            await apiRequest('/update-meter-controller', {
-              meterId: editData.value.meterId,
-              controllerId: editData.value.controllerId
-            });
-            if (typeof showAlert === 'function') {
-              showAlert('Дата проверки и контролёр успешно обновлены', 'success');
+            if (!navigator.onLine) {
+              await savePendingVerifyUpdate({
+                meterId: editData.value.meterId,
+                verifyDate: editData.value.verifyDate,
+                controllerId: editData.value.controllerId
+              });
+              await updateLocalMeterCache(
+                editData.value.meterId,
+                editData.value.verifyDate,
+                editData.value.controllerId
+              );
+              if (typeof showAlert === 'function') {
+                showAlert(
+                  'Нет подключения. Изменения сохранены локально.',
+                  'info'
+                );
+              }
+            } else {
+              await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
+              await apiRequest('/update-meter-controller', {
+                meterId: editData.value.meterId,
+                controllerId: editData.value.controllerId
+              });
+              await updateLocalMeterCache(
+                editData.value.meterId,
+                editData.value.verifyDate,
+                editData.value.controllerId
+              );
+              if (typeof showAlert === 'function') {
+                showAlert('Дата обновлена', 'success');
+              }
             }
             await loadData();
             selectedAddress.value = null;
@@ -610,8 +634,29 @@
           window.location.href='historywindow.html';
         };
 
+        const handleOnline = async () => {
+          updateOnlineStatus();
+          if (typeof syncPendingVerifyUpdates === 'function') {
+            try {
+              await syncPendingVerifyUpdates();
+            } catch (e) {
+              console.warn('Ошибка синхронизации обновлений:', e);
+            }
+          }
+          if (typeof syncPendingReadings === 'function') {
+            try {
+              await syncPendingReadings();
+            } catch (e) {
+              console.warn('Ошибка синхронизации показаний:', e);
+            }
+          }
+          if (checkSession()) {
+            await loadData();
+          }
+        };
+
         onMounted(() => {
-          window.addEventListener('online', updateOnlineStatus);
+          window.addEventListener('online', handleOnline);
           window.addEventListener('offline', updateOnlineStatus);
           if (checkSession()) {
             loadData();
@@ -620,7 +665,7 @@
         });
 
         onUnmounted(() => {
-          window.removeEventListener('online', updateOnlineStatus);
+          window.removeEventListener('online', handleOnline);
           window.removeEventListener('offline', updateOnlineStatus);
         });
 

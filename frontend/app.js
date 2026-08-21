@@ -87,6 +87,92 @@ async function saveReadingLocally(readingData) {
   });
 }
 
+async function savePendingVerifyUpdate(updateData) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.add({
+      type: 'verifyUpdate',
+      meterId: updateData.meterId,
+      verifyDate: updateData.verifyDate,
+      controllerId: updateData.controllerId,
+      timestamp: Date.now()
+    });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getPendingVerifyUpdates() {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const all = request.result || [];
+      resolve(all.filter(r => r.type === 'verifyUpdate'));
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deletePendingVerifyUpdate(id) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function updateLocalMeterCache(meterId, verifyDate, controllerId) {
+  try {
+    const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+    const currentControllerId =
+      sessionStorage.getItem('controllerId') || authData.controllerId;
+    if (!currentControllerId) return;
+    const pkg = await getControllerPackage(currentControllerId);
+    if (!pkg || !Array.isArray(pkg.meters)) return;
+    const meter = pkg.meters.find(m => String(m.ID) === String(meterId));
+    if (meter) {
+      if (verifyDate !== undefined) meter.VERIFY_DATE = verifyDate;
+      if (controllerId !== undefined && controllerId !== null) {
+        meter.CONTROLER_ID = controllerId;
+      }
+      await saveControllerPackage(currentControllerId, pkg);
+    }
+  } catch (e) {
+    console.warn('Не удалось обновить локальный кэш счётчика:', e);
+  }
+}
+
+async function syncPendingVerifyUpdates() {
+  if (!navigator.onLine) return;
+  const updates = await getPendingVerifyUpdates();
+  if (updates.length === 0) return;
+  console.log(`Найдено ${updates.length} отложенных обновлений даты проверки`);
+  for (const upd of updates) {
+    try {
+      await updateVerifyDate(upd.meterId, upd.verifyDate);
+      if (upd.controllerId) {
+        await apiRequest('/update-meter-controller', {
+          meterId: upd.meterId,
+          controllerId: upd.controllerId
+        });
+      }
+      await updateLocalMeterCache(upd.meterId, upd.verifyDate, upd.controllerId);
+      await deletePendingVerifyUpdate(upd.id);
+      console.log(`Обновление даты проверки ID ${upd.id} синхронизировано`);
+    } catch (err) {
+      console.error(`Ошибка синхронизации обновления ID ${upd.id}:`, err);
+    }
+  }
+}
+
 async function getPendingReadings() {
   const db = await openLocalDB();
   return new Promise((resolve, reject) => {
