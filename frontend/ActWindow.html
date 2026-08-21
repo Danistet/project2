@@ -141,7 +141,7 @@
                 </option>
               </select>
             </div>
-            <button type="submit" class="save-btn" :disabled="saving">
+            <button type="submit" class="save-btn" :disabled="saving" v-if="!showContinue">
               {{ saving ? 'Сохранение...' : 'Сохранить' }}
             </button>
           </div>
@@ -160,9 +160,9 @@
           <p class="error-message">{{ error }}</p>
           <button @click="cont" class="btn-primary">Продолжить</button>
         </div>
-        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
-        <button type="button" @click="viewhistory" class="btn-secondary">история работ</button>
-        <button type="button" @click="logout" class="btn-secondary">Выход</button>
+        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;" v-if="!showContinue">Продолжить</button>
+        <button type="button" @click="viewhistory" class="btn-secondary" v-if="!showContinue">история работ</button>
+        <button type="button" @click="logout" class="btn-secondary" v-if="!showContinue">Выход</button>
       </form>
     <div class="status" id="statusDiv"></div>
   </div>
@@ -272,7 +272,7 @@
         });
 
         watch(showOnlyWithoutDate, () => {
-          selectAddress.value = null;
+          selectedAddress.value = null;
           selectedAddressText.value = '';
           isListOpen.value = false;
         });
@@ -579,6 +579,7 @@
           const EXPIRY_MS = 24000000;
           if (now - authData.authDate > EXPIRY_MS) {
             error.value = 'Истёк срок сессии';
+            sessionStorage.setItem('lastAuthDate', authData.authDate);
             showContinue.value = true;
             return false;
           }

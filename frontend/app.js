@@ -245,7 +245,7 @@ createApp({
       }
     });
 
-    watch(todayOnly, (newVal) => {
+    watch(todayOnly, async (newVal) => {
       streetSearch.value = '';
       houseSearch.value = '';
       appartsSearch.value = '';
@@ -258,8 +258,25 @@ createApp({
       showMeterSelect.value = false;
       selectedMeter.value = null;
       clearMeterDataToSession();
-      try { sessionStorage.removeItem('userAddress'); } catch (e) { /* ignore */ }
-      try { loadStreets(selectedTownId.value); } catch (e) { /* ignore */ }
+      try { sessionStorage.removeItem('userAddress'); } catch (e) { 
+        console.error('error: ', e);
+      }
+      const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+      const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+      if (!controllerId) {
+        streets.value = [];
+        return;
+      }
+      if (navigator.onLine) {
+        await loadStreets(selectedTownId.value);
+      } else {
+        const pkg = await getControllerPackage(controllerId);
+        if (pkg && pkg.streets) {
+          await loadStreets(selectedTownId.value);
+        } else {
+          streets.value = [];
+        }
+      }
     });
 
     const formatWithThousands = (value) => {
@@ -475,6 +492,9 @@ createApp({
                 allMeters = allMeters.filter(m => !m.apparts || String(m.apparts).trim() === '');
               }
             }
+            if (todayOnly.value) {
+              allMeters = allMeters.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+            }          
           } catch (meterErr) {
             console.warn('Ошибка загрузки счетчиков, попытка взять из офлайн-кэша:', meterErr);
             if (showApparts.value && selectedAppartId.value) {
@@ -487,6 +507,9 @@ createApp({
               if (!showApparts.value) {
                 allMeters = allMeters.filter(m => !m.apparts || String(m.apparts).trim() === '');
               }
+            }            
+            if (todayOnly.value) {
+              allMeters = allMeters.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
             }
           }
           if (!allMeters || allMeters.length === 0) {
@@ -553,32 +576,32 @@ createApp({
     async function getOfflineControllerAddresses(controllerId) {
       if (typeof getControllerPackage !== 'function') return [];
       const pkg = await getControllerPackage(controllerId);
-      if (!pkg || !Array.isArray(pkg.meters)) return [];
+      if (!pkg || !Array.isArray(pkg.meters)) return [];      
       const rows = [];
       pkg.meters.forEach(meter => {
-        if (String(meter.CONTROLER_ID) !== String(controllerId)) return;
-        const abonents = pkg.abonents?.find(
-          a => String(a.G_LICSCHET) === String(meters.LS)
-        );
-        if (!abonent) return;
-        const client = pkg.clients?.find(c => c.ID === abonents.CLIENT_ID);
-        const building = pkg.buildings?.find(d => d.ID === abonents.BUILDINGS_ID);
-        if (!building) return;
-        const street = pkg.street?.find(s => s.ID === building.STREET_ID);
-        if (!street) return;
-        const letterPart = client?.NAME || 'ФИО не указано';
-        const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';
+        if (String(meter.CONTROLER_ID) !== String(controllerId)) return;        
+        const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
+        if (!abonent) return;        
+        const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
+        const building = pkg.buildings?.find(b => b.ID === abonent.BUILDINGS_ID);
+        if (!building) return;        
+        const street = pkg.streets?.find(s => s.ID === building.STREET_ID);
+        if (!street) return;        
+        const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
+        const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
+        const namePart = client?.NAME || 'ФИО не указано';
+        const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';        
         const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
         const corpsPart = building.CORPS ? ` ${building.CORPS}` : '';
-        const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();
+        const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();      
         rows.push({
           meterId: meter.ID,
           controllerId: meter.CONTROLER_ID,
           verifyDate: meter.VERIFY_DATE,
           buildingsId: building.ID,
           streetId: street.ID,
-          streetName,
-          houseName,
+          streetName: streetName,
+          houseName: houseName,
           displayText: `${appartsPart}, ${namePart}${phonePart}`
         });
       });
@@ -608,7 +631,6 @@ createApp({
           }
         }
         addressCatalog.value = Array.isArray(data) ? data : [];
-        // Use filtered catalog when "todayOnly" is active
         const catalog = getFilteredCatalog();
         const streetMap = new Map();
         catalog.forEach(addr => {
@@ -667,59 +689,47 @@ createApp({
       try {
         const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
         const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+        let abonentsList = [];
         if (!navigator.onLine) {
           const pkg = controllerId ? await getControllerPackage(controllerId) : null;
           if (pkg && pkg.abonents) {
-            const buildingAbonents = pkg.abonents.filter(a => a.BUILDINGS_ID == buildingId);                  
-            const result = buildingAbonents.map(a => {
-              const letterPart = a.LETTER ? ` ${a.LETTER}` : '';
-              const house = a.APPARTS == null ? `${letterPart}`.trim() : `кв. ${a.APPARTS}${letterPart}`.trim();
-              return { id: a.ID, house: house, g_licschet: a.G_LICSCHET };
-            });                    
+            abonentsList = pkg.abonents.filter(a => String(a.BUILDINGS_ID) === String(buildingId));
+          }
+        } else {
+          try {
+            const result = await apiRequest(`/apparts?buildingId=${buildingId}&controllerId=${controllerId}`);
             const emptyAppart = result.find(appr => (!appr.house || appr.house.trim() === '') && appr.g_licschet);
-            currentBuildingLicschet.value = emptyAppart?.g_licschet || null;                    
+            currentBuildingLicschet.value = emptyAppart?.g_licschet || null;
             apparts.value = result
-            .filter(appr => appr.house && appr.house.trim() !== '')
-            .map(appr => {
-              const baseName = appr.house;
-              const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
-              return { ...appr, displayHouse: uniqueName, rawHouse: baseName };
-            });
+              .filter(appr => appr.house && appr.house.trim() !== '')
+              .map(appr => {
+                const baseName = appr.house;
+                const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
+                return { ...appr, displayHouse: uniqueName, rawHouse: baseName };
+              });
             if (todayOnly.value) {
               const filtered = [];
               for (const appr of apparts.value) {
                 if (!appr.g_licschet) continue;
                 try {
-                  const metersForLs = navigator.onLine ? await getMetersByLicschet(appr.g_licschet) : await getOfflineMetersByLicschet(appr.g_licschet);
+                  const metersForLs = await getMetersByLicschet(appr.g_licschet);
                   const hasToday = Array.isArray(metersForLs) && metersForLs.some(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
                   if (hasToday) filtered.push(appr);
-                } catch (e) {
-                  // ignore errors and skip
-                }
+                } catch (e) { console.error('error: ', e); }
               }
               apparts.value = filtered;
             }
             return;
+          } catch (err) {
+            console.warn('API failed, fallback to offline:', err);
+            const pkg = controllerId ? await getControllerPackage(controllerId) : null;
+            if (pkg && pkg.abonents) {
+              abonentsList = pkg.abonents.filter(a => String(a.BUILDINGS_ID) === String(buildingId));
+            }
           }
         }
-        const result = await apiRequest(`/apparts?buildingId=${buildingId}&controllerId=${controllerId}`);
-        const emptyAppart = result.find(appr => (!appr.house || appr.house.trim() === '') && appr.g_licschet);
-        currentBuildingLicschet.value = emptyAppart?.g_licschet || null;
-        apparts.value = result
-        .filter(appr => appr.house && appr.house.trim() !== '')
-        .map(appr => {
-          const baseName = appr.house;
-          const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
-          return { ...appr, displayHouse: uniqueName, rawHouse: baseName };
-        });
-      } catch (err) {
-        console.error('Failed to load apartments:', err);      
-        const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-        const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
-        const pkg = controllerId ? await getControllerPackage(controllerId) : null;
-        if (pkg && pkg.abonents) {
-          const buildingAbonents = pkg.abonents.filter(a => a.BUILDINGS_ID == buildingId);
-          const result = buildingAbonents.map(a => {
+        if (abonentsList.length > 0) {
+          const result = abonentsList.map(a => {
             const letterPart = a.LETTER ? ` ${a.LETTER}` : '';
             const house = a.APPARTS == null ? `${letterPart}`.trim() : `кв. ${a.APPARTS}${letterPart}`.trim();
             return { id: a.ID, house: house, g_licschet: a.G_LICSCHET };
@@ -733,135 +743,152 @@ createApp({
               const uniqueName = appr.g_licschet ? `${baseName} (Л/С: ${appr.g_licschet})` : baseName;
               return { ...appr, displayHouse: uniqueName, rawHouse: baseName };
             });
+          if (todayOnly.value) {
+            const filtered = [];
+            for (const appr of apparts.value) {
+              if (!appr.g_licschet) continue;
+              try {
+                const metersForLs = await getOfflineMetersByLicschet(appr.g_licschet);
+                const hasToday = Array.isArray(metersForLs) && metersForLs.some(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+                if (hasToday) filtered.push(appr);
+              } catch (e) {
+                console.error('error:', e);
+              }
+            }
+            apparts.value = filtered;
+          }
         } else {
-          currentBuildingLicschet.value = null; 
+          currentBuildingLicschet.value = null;
           apparts.value = [];
         }
-      } finally { 
-        isLoading.value = false; 
+      } catch (err) {
+        console.error('Failed to load apartments:', err);
+        currentBuildingLicschet.value = null;
+        apparts.value = [];
+      } finally {
+        isLoading.value = false;
       }
     };
 
-      const isStreetOpen = ref(false);
-      const isHouseOpen = ref(false);
-      const isAppartsOpen = ref(false);
+    const isStreetOpen = ref(false);
+    const isHouseOpen = ref(false);
+    const isAppartsOpen = ref(false);
 
-      const filteredStreets = computed(() => {
-        if (!streetSearch.value) return streets.value;
-        const term = streetSearch.value.toLowerCase();
-        return streets.value.filter(s => s.name.toLowerCase().includes(term));
-      });
+    const filteredStreets = computed(() => {
+      if (!streetSearch.value) return streets.value;
+      const term = streetSearch.value.toLowerCase();
+      return streets.value.filter(s => s.name.toLowerCase().includes(term));
+    });
 
-      const filteredBuildings = computed(() => {
-        if (!houseSearch.value) return buildings.value;
-        const term = houseSearch.value.toLowerCase();
-        return buildings.value.filter(b => b.house.toLowerCase().includes(term));
-      });
+    const filteredBuildings = computed(() => {
+      if (!houseSearch.value) return buildings.value;
+      const term = houseSearch.value.toLowerCase();
+      return buildings.value.filter(b => b.house.toLowerCase().includes(term));
+    });
 
-      const filteredApparts = computed(() => {
-        if (!appartsSearch.value) return apparts.value;
-        const term = appartsSearch.value.toLowerCase();
-        return apparts.value.filter(a => (a.displayHouse || '').toLowerCase().includes(term));
-      });
+    const filteredApparts = computed(() => {
+      if (!appartsSearch.value) return apparts.value;
+      const term = appartsSearch.value.toLowerCase();
+      return apparts.value.filter(a => (a.displayHouse || '').toLowerCase().includes(term));
+    });
 
-      const refreshMeters = async () => {
-        showMeterSelect.value = false;
-        selectedMeter.value = null;
-        
-        if (selectedAppartId.value && showApparts.value) {
-          const appr = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
-          if (appr?.g_licschet) {
-            await loadMetersByLicschet(appr.g_licschet);
-          }
-        } else if (selectedBuildingId.value) {
-          if (currentBuildingLicschet.value && !showApparts.value) {
-            await loadMetersByLicschet(currentBuildingLicschet.value);
-          } else {
-            await loadMetersByBuilding(selectedBuildingId.value);
-          }
+    const refreshMeters = async () => {
+      showMeterSelect.value = false;
+      selectedMeter.value = null;  
+      if (selectedAppartId.value && showApparts.value) {
+        const appr = apparts.value.find(a => String(a.id) === String(selectedAppartId.value));
+        if (appr?.g_licschet) {
+          await loadMetersByLicschet(appr.g_licschet);
+        }
+      } else if (selectedBuildingId.value) {
+        if (currentBuildingLicschet.value && !showApparts.value) {
+          await loadMetersByLicschet(currentBuildingLicschet.value);
         } else {
-          meters.value = [];
-          clearMeterDataToSession();
+          await loadMetersByBuilding(selectedBuildingId.value);
         }
-      };
+      } else {
+        meters.value = [];
+        clearMeterDataToSession();
+      }
+    };
 
-      const selectStreet = (street) => {
-        streetSearch.value = street.name;
-        selectedStreetId.value = street.id;
-        isStreetOpen.value = false;
-        loadBuildings(street.id);
-      };
+    const selectStreet = (street) => {
+      streetSearch.value = street.name;
+      selectedStreetId.value = street.id;
+      isStreetOpen.value = false;
+      loadBuildings(street.id);
+    };
 
-      const selectHouse = (bld) => {
-        houseSearch.value = bld.house;
-        selectedBuildingId.value = bld.id;
-        isHouseOpen.value = false;
-        loadApparts(bld.id);
-      };
+    const selectHouse = (bld) => {
+      houseSearch.value = bld.house;
+      selectedBuildingId.value = bld.id;
+      isHouseOpen.value = false;
+      loadApparts(bld.id);
+    };
 
-      const selectAppart = async (appr) => {
-        appartsSearch.value = appr.displayHouse;
-        selectedAppartId.value = appr.id;
-        isAppartsOpen.value = false;
-        await refreshMeters();
-      };
+    const selectAppart = async (appr) => {
+      appartsSearch.value = appr.displayHouse;
+      selectedAppartId.value = appr.id;
+      isAppartsOpen.value = false;
+      await refreshMeters();
+    };
 
-      const closeStreet = () => {
-        isStreetOpen.value = false;
-        if (streetSearch.value) {
-          const match = streets.value.find(s => s.name === streetSearch.value);
-          if (!match) {
-            selectedStreetId.value = null;
-            houseSearch.value = '';
-            selectedBuildingId.value = null;
-            buildings.value = [];
-            appartsSearch.value = '';
-            selectedAppartId.value = null;
-            apparts.value = [];
-          }
+    const closeStreet = () => {
+      isStreetOpen.value = false;
+      if (streetSearch.value) {
+        const match = streets.value.find(s => s.name === streetSearch.value);
+        if (!match) {
+          selectedStreetId.value = null;
+          houseSearch.value = '';
+          selectedBuildingId.value = null;
+          buildings.value = [];
+          appartsSearch.value = '';
+          selectedAppartId.value = null;
+          apparts.value = [];
         }
-        refreshMeters();
-      };
+      }
+      refreshMeters();
+    };
 
-      const closeHouse = () => {
-        isHouseOpen.value = false;
-        if (houseSearch.value) {
-          const match = buildings.value.find(b => b.house === houseSearch.value);
-          if (!match) {
-            selectedBuildingId.value = null;
-            appartsSearch.value = '';
-            selectedAppartId.value = null;
-            apparts.value = [];
-          }
+    const closeHouse = () => {
+      isHouseOpen.value = false;
+      if (houseSearch.value) {
+        const match = buildings.value.find(b => b.house === houseSearch.value);
+        if (!match) {
+          selectedBuildingId.value = null;
+          appartsSearch.value = '';
+          selectedAppartId.value = null;
+          apparts.value = [];
         }
-        refreshMeters();
-      };
+      }
+      refreshMeters();
+    };
 
-      const closeAppart = () => {
-        isAppartsOpen.value = false;
-        if (appartsSearch.value && showApparts.value) {
-          const match = apparts.value.find(a => a.displayHouse === appartsSearch.value);
-          if (!match) {
-            selectedAppartId.value = null;
-          }
+    const closeAppart = () => {
+      isAppartsOpen.value = false;
+      if (appartsSearch.value && showApparts.value) {
+        const match = apparts.value.find(a => a.displayHouse === appartsSearch.value);
+        if (!match) {
+          selectedAppartId.value = null;
         }
-        refreshMeters();
-      };
+      }
+      refreshMeters();
+    };
 
-      const clearStreet = () => {
-        streetSearch.value = '';
-        closeStreet();
-      };
+    const clearStreet = () => {
+      streetSearch.value = '';
+      closeStreet();
+    };
 
-      const clearHouse = () => {
-        houseSearch.value = '';
-        closeHouse();
-      };
+    const clearHouse = () => {
+      houseSearch.value = '';
+      closeHouse();
+    };
 
-      const clearAppart = () => {
-        appartsSearch.value = '';
-        closeAppart();
-      };
+    const clearAppart = () => {
+      appartsSearch.value = '';
+      closeAppart();
+    };
 
     const clearMeterDataToSession = () => {
       sessionStorage.setItem('meternum', JSON.stringify({meterNum: null }));
@@ -912,6 +939,9 @@ createApp({
         } else {
           meterList = await apiRequest('/meters-by-building', {buildingId});
         }
+        if (todayOnly.value) {
+          meterList = meterList.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+        }
         meters.value = meterList;
         if (meterList.length === 1) selectMeter(meterList[0]);
         else if (meterList.length > 1) showMeterSelect.value = true;
@@ -919,7 +949,10 @@ createApp({
       } catch (err) { 
         console.error("error:" , err); 
         try {
-          const offlineMeters = await getOfflineMetersByBuilding(buildingId);
+          let offlineMeters = await getOfflineMetersByBuilding(buildingId);
+          if (todayOnly.value) {
+            offlineMeters = offlineMeters.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+          }
           meters.value = offlineMeters;
           if (offlineMeters.length === 1) selectMeter(offlineMeters[0]);
           else if (offlineMeters.length > 1) showMeterSelect.value = true;
@@ -937,20 +970,15 @@ createApp({
         return;
       }
       try {
+        let meterList;
         if (!navigator.onLine) {
-          const offlineMeters = await getOfflineMetersByLicschet(g_licschet.trim());
-          meters.value = offlineMeters;
-          if (offlineMeters.length === 1) {
-            selectMeter(offlineMeters[0]);
-          } else if (offlineMeters.length > 1) {
-            showMeterSelect.value = true;
-          } else {
-            clearMeterDataToSession();
-            showMeterSelect.value = false;
-          }
-          return;
+          meterList = await getOfflineMetersByLicschet(g_licschet.trim());
+        } else {
+          meterList = await apiRequest('/meters-by-licschet', { g_licschet });
         }
-        const meterList = await apiRequest('/meters-by-licschet', { g_licschet });
+        if (todayOnly.value) {
+          meterList = meterList.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+        }      
         meters.value = meterList;
         if (meterList.length === 1) {
           selectMeter(meterList[0]);
@@ -963,7 +991,10 @@ createApp({
       } catch (err) {
         console.error('error:', err);
         try {
-          const offlineMeters = await getOfflineMetersByLicschet(g_licschet.trim());
+          let offlineMeters = await getOfflineMetersByLicschet(g_licschet.trim());          
+          if (todayOnly.value) {
+            offlineMeters = offlineMeters.filter(m => isVerifyDateToday(m.verifyDate || m.VERIFY_DATE));
+          }          
           meters.value = offlineMeters;
           if (offlineMeters.length === 1) {
             selectMeter(offlineMeters[0]);
@@ -992,8 +1023,6 @@ createApp({
       addressData.selectMeterNum = meter.meterNum;
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
     };
-
-    
 
     const submitViolationReport = async () => {
       if (isLoading.value) return;

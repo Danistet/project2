@@ -64,7 +64,7 @@ app.post('/auth', (req, res) => {
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
       db.query(meterQuery, (err, meterResult) => {                          
         const now = Date.now();
-        const minute = 24000000;        
+        const minute = 24000000;       
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate, controllerId) => {
           db.detach();
           res.json({ 

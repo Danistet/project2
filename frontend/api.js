@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = true;
+  const USE_LOCAL_DB = false;
   // true = изменения сохраняются в localStorage и переживают переходы между страницами
   // false = изменения только в памяти до перезагрузки страницы
   const LOCAL_MOCK_PERSIST = true;
@@ -1972,6 +1972,7 @@ function checkSession() {
   const EXPIRY_MS = 24000000;
   if (!isOffline && (now - data.authDate > EXPIRY_MS)) {
     console.warn("Сессия истекла");
+    sessionStorage.setItem('lastAuthDate', authData.authDate);
     return false; 
   }
   return true;
