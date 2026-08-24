@@ -86,7 +86,7 @@
         </div>
         <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
           <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
-          <span  class="checkbox-text">Адреса без назначенной даты посещения</span>
+          <span class="checkbox-text">Адреса без назначенной даты посещения</span>
         </label>
         <div class="form-group">
           <label for="listInput" class="form-label">Список адресов</label>
@@ -164,298 +164,406 @@
         <button type="button" @click="viewhistory" class="btn-secondary" v-if="!showContinue">история работ</button>
         <button type="button" @click="logout" class="btn-secondary" v-if="!showContinue">Выход</button>
       </form>
-    <div class="status" id="statusDiv"></div>
-  </div>
-  <script>
-    (function () {
-      if (typeof window.getControllerPackage === 'function') {
-        return;
-      }
-      const DB_NAME = 'MeterOfflineStorage';
-      const STORE_NAME = 'pendingReadings';
-      const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
-      const DB_VERSION = 4;
-      function openLocalDB() {
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open(DB_NAME, DB_VERSION);
-          request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (db.objectStoreNames.contains('pendiReadings')) {
-              db.deleteObjectStore('pendiReadings');
-            }
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-              db.createObjectStore(STORE_NAME, {
-                keyPath: 'id',
-                autoIncrement: true
-              });
-            }
-            if (!db.objectStoreNames.contains(CONTROLLER_PACKAGE_STORE)) {
-              db.createObjectStore(CONTROLLER_PACKAGE_STORE, {
-                keyPath: 'controllerId'
-              });
-            }
-          };
-          request.onsuccess = (event) => resolve(event.target.result);
-          request.onerror = (event) => reject(event.target.error);
-        });
-      }
-      window.getControllerPackage = async function (controllerId) {
-        const db = await openLocalDB();
-        return new Promise((resolve, reject) => {
-          const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readonly');
-          const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
-          const request = store.get(Number(controllerId));
-          request.onsuccess = () => resolve(request.result || null);
-          request.onerror = () => reject(request.error);
-        });
-      };
-    })();
-  </script>
-  <script>
-    const { createApp, ref, onMounted, onUnmounted, watch, computed } = Vue;
-    createApp({
-      setup() {
-        const showContinue = ref(false);
-        const showOverlay = ref(true);
-        const actNo = ref('');
-        const actDate = ref('');
-        const checkType = ref('planned');
-        const error = ref('');
-        const isLoading = ref(false);
-        const isOnline = ref(navigator.onLine);
-        const saving = ref(false);
-        const allAddresses = ref([]);
-        const streets = ref([]);
-        const buildings = ref([]);
-        const filteredAddressList = ref([]);
-        const showOnlyWithoutDate = ref(false);
-        const selectedStreetId = ref(null);
-        const streetSearch = ref('');
-        const selectedBuildingId = ref(null);
-        const houseSearch = ref('');
-        const selectedAddressText = ref('');
-        const selectedAddress = ref(null);
-        const controllers = ref([]);
-        const showAllAddresses = ref(false);
-        const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
-        const isStreetOpen = ref(false);
-        const isHouseOpen = ref(false);
-        const isListOpen = ref(false);
+      <div class="status" id="statusDiv"></div>
+    </div>
+    <script>
+      (function () {
+        if (typeof window.getControllerPackage === 'function') {
+          return;
+        }
+        const DB_NAME = 'MeterOfflineStorage';
+        const STORE_NAME = 'pendingReadings';
+        const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
+        const DB_VERSION = 4;
 
-        watch(showAllAddresses, async (newVal) => {
-          if (!navigator.onLine && newVal === true) {
-            showAllAddresses.value = false;
-            if (typeof showAlert === 'function') {
-              showAlert('Просмотр всех адресов доступен только при подключении к интернету', 'info');
-            } else {
-              alert('Просмотр всех адресов доступен только при подключении к интернету');
+        function openLocalDB() {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (event) => {
+              const db = event.target.result;
+              if (db.objectStoreNames.contains('pendiReadings')) {
+                db.deleteObjectStore('pendiReadings');
+              }
+              if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, {
+                  keyPath: 'id',
+                  autoIncrement: true
+                });
+              }
+              if (!db.objectStoreNames.contains(CONTROLLER_PACKAGE_STORE)) {
+                db.createObjectStore(CONTROLLER_PACKAGE_STORE, {
+                  keyPath: 'controllerId'
+                });
+              }
+            };
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
+          });
+        }
+        window.getControllerPackage = async function (controllerId) {
+          const db = await openLocalDB();
+          return new Promise((resolve, reject) => {
+            const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readonly');
+            const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
+            const request = store.get(Number(controllerId));
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+          });
+        };
+        window.saveControllerPackage = async function (controllerId, packageData) {
+          const db = await openLocalDB();
+          return new Promise((resolve, reject) => {
+            const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readwrite');
+            const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
+            const request = store.put({
+              controllerId,
+              savedAt: Date.now(),
+              ...packageData
+            });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        };
+        window.savePendingVerifyUpdate = async function (updateData) {
+          const db = await openLocalDB();
+          return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.add({
+              type: 'verifyUpdate',
+              meterId: updateData.meterId,
+              verifyDate: updateData.verifyDate,
+              controllerId: updateData.controllerId,
+              timestamp: Date.now()
+            });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        };
+        window.getPendingVerifyUpdates = async function () {
+          const db = await openLocalDB();
+          return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+            request.onsuccess = () => {
+              const all = request.result || [];
+              resolve(all.filter(r => r.type === 'verifyUpdate'));
+            };
+            request.onerror = () => reject(request.error);
+          });
+        };
+        window.deletePendingVerifyUpdate = async function (id) {
+          const db = await openLocalDB();
+          return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+          });
+        };
+        window.updateLocalMeterCache = async function (meterId, verifyDate, controllerId) {
+          try {
+            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+            const currentControllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+            if (!currentControllerId) return;
+            const pkg = await window.getControllerPackage(currentControllerId);
+            if (!pkg || !Array.isArray(pkg.meters)) return;
+            const meter = pkg.meters.find(m => String(m.ID) === String(meterId));
+            if (meter) {
+              if (verifyDate !== undefined) meter.VERIFY_DATE = verifyDate;
+              if (controllerId !== undefined && controllerId !== null) {
+                meter.CONTROLER_ID = controllerId;
+              }
+              await window.saveControllerPackage(currentControllerId, pkg);
+            }
+          } catch (e) {
+            console.warn('Не удалось обновить локальный кэш счётчика:', e);
+          }
+        };
+        window.syncPendingVerifyUpdates = async function () {
+          if (!navigator.onLine) return;
+          const updates = await window.getPendingVerifyUpdates();
+          if (updates.length === 0) return;
+          console.log(`Найдено ${updates.length} отложенных обновлений даты проверки`);
+          for (const upd of updates) {
+            try {
+              if (typeof updateVerifyDate === 'function') {
+                await updateVerifyDate(upd.meterId, upd.verifyDate);
+              } else {
+                await apiRequest('/update-verify-date', { meterId: upd.meterId, verifyDate: upd.verifyDate });
+              }
+              if (upd.controllerId) {
+                await apiRequest('/update-meter-controller', {
+                  meterId: upd.meterId,
+                  controllerId: upd.controllerId
+                });
+              }
+              await window.updateLocalMeterCache(upd.meterId, upd.verifyDate, upd.controllerId);
+              await window.deletePendingVerifyUpdate(upd.id);
+              console.log(`Обновление даты проверки ID ${upd.id} синхронизировано`);
+            } catch (err) {
+              console.error(`Ошибка синхронизации обновления ID ${upd.id}:`, err);
             }
           }
-          filteredAddressList.value = [];
-          selectedBuildingId.value = null;
-          houseSearch.value = '';
-          selectedAddressText.value = '';
-          selectedAddress.value = null;
-          await loadData();
-          if (
-            selectedStreetId.value &&
-            !streets.value.some(s => String(s.id) === String(selectedStreetId.value))
-          ) {
-            selectedStreetId.value = null;
+        };
+      })();
+    </script>
+    <script>
+      const { createApp, ref, onMounted, onUnmounted, watch, computed } = Vue;
+      createApp({
+        setup() {
+          const showContinue = ref(false);
+          const showOverlay = ref(true);
+          const actNo = ref('');
+          const actDate = ref('');
+          const checkType = ref('planned');
+          const error = ref('');
+          const isLoading = ref(false);
+          const isOnline = ref(navigator.onLine);
+          const saving = ref(false);
+          const allAddresses = ref([]);
+          const streets = ref([]);
+          const buildings = ref([]);
+          const filteredAddressList = ref([]);
+          const showOnlyWithoutDate = ref(false);
+          const selectedStreetId = ref(null);
+          const streetSearch = ref('');
+          const selectedBuildingId = ref(null);
+          const houseSearch = ref('');
+          const selectedAddressText = ref('');
+          const selectedAddress = ref(null);
+          const controllers = ref([]);
+          const showAllAddresses = ref(false);
+          const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
+          const isStreetOpen = ref(false);
+          const isHouseOpen = ref(false);
+          const isListOpen = ref(false);
+          watch(showAllAddresses, async (newVal) => {
+            if (!navigator.onLine && newVal === true) {
+              showAllAddresses.value = false;
+              if (typeof showAlert === 'function') {
+                showAlert('Просмотр всех адресов доступен только при подключении к интернету', 'info');
+              } else {
+                alert('Просмотр всех адресов доступен только при подключении к интернету');
+              }
+            }
+            filteredAddressList.value = [];
+            selectedBuildingId.value = null;
+            houseSearch.value = '';
+            selectedAddressText.value = '';
+            selectedAddress.value = null;
+            await loadData();
+            if (
+              selectedStreetId.value &&
+              !streets.value.some(s => String(s.id) === String(selectedStreetId.value))
+            ) {
+              selectedStreetId.value = null;
+              streetSearch.value = '';
+              buildings.value = [];
+              houseSearch.value = '';
+              filteredAddressList.value = [];
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+            }
+          });
+
+          watch(showOnlyWithoutDate, () => {
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
+            isListOpen.value = false;
+          });
+
+          const loadData = async () => {
+            isLoading.value = true;
+            error.value = '';           
+            if (!navigator.onLine && showAllAddresses.value) {
+              showAllAddresses.value = false;
+            }          
+            try {
+              const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+              const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;            
+              if (!controllerId) {
+                error.value = 'Не найден ID контроллера. Выполните вход заново.';
+                return;
+              }
+              let data = [];
+              if (showAllAddresses.value) {
+                if (!navigator.onLine) {
+                  showAllAddresses.value = false;
+                  data = await getOfflineAddresses(controllerId);
+                } else {
+                  try {
+                    data = await apiRequest('/all-addresses', {});
+                  } catch (e) {
+                    console.warn('Ошибка сети при загрузке всех адресов, переход в офлайн', e);
+                    data = await getOfflineAddresses(controllerId);
+                  }
+                }
+              } else {
+                if (!navigator.onLine) {
+                  data = await getOfflineAddresses(controllerId);
+                } else {
+                  try {
+                    data = await getControllerAddresses(controllerId);
+                  } catch (e) {
+                    console.warn('Ошибка сети, загрузка из офлайн-кэша', e);
+                    data = await getOfflineAddresses(controllerId);
+                  }
+                }
+              }                        
+              allAddresses.value = data || [];
+              const streetMap = new Map();
+              allAddresses.value.forEach(addr => {
+                if (!streetMap.has(addr.streetId)) {
+                  streetMap.set(addr.streetId, addr.streetName);
+                }
+              });
+              streets.value = Array.from(streetMap, ([id, name]) => ({ id, name }));
+            } catch (err) {
+              console.error(err);
+              error.value = 'Ошибка загрузки адресов';
+            } finally {
+              isLoading.value = false;
+            }
+          };
+
+          const filteredStreets = computed(() => {
+            if (!streetSearch.value) return streets.value;
+            const term = streetSearch.value.toLowerCase();
+            return streets.value.filter(s => s.name.toLowerCase().includes(term));
+          });
+
+          const filteredBuildings = computed(() => {
+            if (!houseSearch.value) return buildings.value;          
+            const term = houseSearch.value.toLowerCase();
+            return buildings.value.filter(b => b.name.toLowerCase().includes(term));
+          });
+
+          const filteredAddresses = computed(() => {
+            let list = filteredAddressList.value;
+            if (showOnlyWithoutDate.value) {
+              list = list.filter(a => {
+                const v = a.verifyDate;
+                return !v || String(v).trim() === '';
+              });
+            }
+            if (selectedAddressText.value) {
+              const term = selectedAddressText.value.toLowerCase();
+              list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
+            }
+            return list;
+          });
+
+          const loadControllers = async () => {
+            try {
+              const data = await apiRequest('/controllers', {});
+              controllers.value = data;
+            } catch (err) {
+              console.error('Failed to load controllers:', err);
+            }
+          };
+
+          const getOfflineAddresses = async (controllerId) => {
+            if (typeof getControllerPackage !== 'function') return [];
+            const pkg = await getControllerPackage(controllerId);
+            if (!pkg || !Array.isArray(pkg.meters)) return [];
+            const rows = [];
+            pkg.meters.forEach(meter => {
+              if (String(meter.CONTROLER_ID) !== String(controllerId)) return;          
+              const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
+              if (!abonent) return;            
+              const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
+              const building = pkg.buildings?.find(b => b.ID === abonent.BUILDINGS_ID);
+              if (!building) return;            
+              const street = pkg.streets?.find(s => s.ID === building.STREET_ID);
+              if (!street) return;
+              const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
+              const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
+              const namePart = client?.NAME || 'ФИО не указано';
+              const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';
+              const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
+              const corpsPart = building.CORPS ? ` ${building.CORPS}` : '';
+              const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();
+              rows.push({
+                meterId: meter.ID,
+                controllerId: meter.CONTROLER_ID,
+                verifyDate: meter.VERIFY_DATE,
+                buildingsId: building.ID,
+                streetId: street.ID,
+                streetName: streetName,
+                houseName: houseName,
+                displayText: `${appartsPart}, ${namePart}${phonePart}`
+              });
+            });
+            return rows;
+          };
+
+          const updateOnlineStatus = () => {
+            const wasOnline = isOnline.value;
+            isOnline.value = navigator.onLine;
+            if (wasOnline && !isOnline.value && showAllAddresses.value) {
+              showAllAddresses.value = false;
+              if (typeof showAlert === 'function') {
+                showAlert('Потеряно подключение. Отображаются только ваши адреса', 'info');
+              } else {
+                alert('Потеряно подключение. Отображаются только ваши адреса');
+              }
+              loadData();
+            }
+          };
+
+          const clearStreet = () => {
             streetSearch.value = '';
+            closeStreet();
+          };
+
+          const clearHouse = () => {
+            houseSearch.value = '';
+            closeHouse();
+          };
+
+          const clearList = () => {
+            selectedAddressText.value = '';
+            closeList();
+          };
+
+          const selectStreet = (street) => {
+            streetSearch.value = street.name;
+            selectedStreetId.value = street.id;
+            isStreetOpen.value = false;          
             buildings.value = [];
+            selectedBuildingId.value = null;
             houseSearch.value = '';
             filteredAddressList.value = [];
             selectedAddress.value = null;
-            selectedAddressText.value = '';
-          }
-        });
-
-        watch(showOnlyWithoutDate, () => {
-          selectedAddress.value = null;
-          selectedAddressText.value = '';
-          isListOpen.value = false;
-        });
-
-        const loadData = async () => {
-          isLoading.value = true;
-          error.value = '';           
-          if (!navigator.onLine && showAllAddresses.value) {
-            showAllAddresses.value = false;
-          }          
-          try {
-            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-            const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;            
-            if (!controllerId) {
-              error.value = 'Не найден ID контроллера. Выполните вход заново.';
-              return;
-            }
-            let data = [];
-            if (showAllAddresses.value) {
-              if (!navigator.onLine) {
-                showAllAddresses.value = false;
-                data = await getOfflineAddresses(controllerId);
-              } else {
-                try {
-                  data = await apiRequest('/all-addresses', {});
-                } catch (e) {
-                  console.warn('Ошибка сети при загрузке всех адресов, переход в офлайн', e);
-                  data = await getOfflineAddresses(controllerId);
+            selectedAddressText.value = '';          
+            const bldMap = new Map();
+            allAddresses.value
+              .filter(a => String(a.streetId) === String(selectedStreetId.value))
+              .forEach(addr => {
+                if (!bldMap.has(addr.buildingsId)) {
+                  bldMap.set(addr.buildingsId, addr.houseName);
                 }
+              });
+            buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
+          };
+
+          const closeStreet = () => {
+            isStreetOpen.value = false;
+            if (streetSearch.value) {
+              const match = streets.value.find(s => s.name === streetSearch.value);
+              if (!match) {
+                selectedStreetId.value = null;
+                buildings.value = [];
+                selectedBuildingId.value = null;
+                houseSearch.value = '';
+                filteredAddressList.value = [];
+                selectedAddress.value = null;
+                selectedAddressText.value = '';
               }
             } else {
-              if (!navigator.onLine) {
-                data = await getOfflineAddresses(controllerId);
-              } else {
-                try {
-                  data = await getControllerAddresses(controllerId);
-                } catch (e) {
-                  console.warn('Ошибка сети, загрузка из офлайн-кэша', e);
-                  data = await getOfflineAddresses(controllerId);
-                }
-              }
-            }                        
-            allAddresses.value = data || [];
-            const streetMap = new Map();
-            allAddresses.value.forEach(addr => {
-              if (!streetMap.has(addr.streetId)) {
-                streetMap.set(addr.streetId, addr.streetName);
-              }
-            });
-            streets.value = Array.from(streetMap, ([id, name]) => ({ id, name }));
-          } catch (err) {
-            console.error(err);
-            error.value = 'Ошибка загрузки адресов';
-          } finally {
-            isLoading.value = false;
-          }
-        };
-        const filteredStreets = computed(() => {
-          if (!streetSearch.value) return streets.value;
-          const term = streetSearch.value.toLowerCase();
-          return streets.value.filter(s => s.name.toLowerCase().includes(term));
-        });
-
-        const filteredBuildings = computed(() => {
-          if (!houseSearch.value) return buildings.value;          
-          const term = houseSearch.value.toLowerCase();
-          return buildings.value.filter(b => b.name.toLowerCase().includes(term));
-        });
-
-        const filteredAddresses = computed(() => {
-          let list = filteredAddressList.value;
-          if (showOnlyWithoutDate.value) {
-           list = list.filter(a => {
-            const v = a.verifyDate;
-            return !v || String(v).trim() === '';
-           });
-          }
-          if (selectedAddressText.value) {
-            const term = selectedAddressText.value.toLowerCase();
-            list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
-          }
-          return list;
-        });
-
-        const loadControllers = async () => {
-          try {
-            const data = await apiRequest('/controllers', {});
-            controllers.value = data;
-          } catch (err) {
-            console.error('Failed to load controllers:', err);
-          }
-        };
-
-        const getOfflineAddresses = async (controllerId) => {
-          if (typeof getControllerPackage !== 'function') return [];
-          const pkg = await getControllerPackage(controllerId);
-          if (!pkg || !Array.isArray(pkg.meters)) return [];
-          const rows = [];
-          pkg.meters.forEach(meter => {
-            if (String(meter.CONTROLER_ID) !== String(controllerId)) return;          
-            const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
-            if (!abonent) return;            
-            const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
-            const building = pkg.buildings?.find(b => b.ID === abonent.BUILDINGS_ID);
-            if (!building) return;            
-            const street = pkg.streets?.find(s => s.ID === building.STREET_ID);
-            if (!street) return;
-            const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
-            const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
-            const namePart = client?.NAME || 'ФИО не указано';
-            const phonePart = client?.PHONE ? `, тел: ${client.PHONE}` : '';
-            const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
-            const corpsPart = building.CORPS ? ` ${building.CORPS}` : '';
-            const houseName = `${building.HOUSE || ''}${corpsPart}`.trim();
-            rows.push({
-              meterId: meter.ID,
-              controllerId: meter.CONTROLER_ID,
-              verifyDate: meter.VERIFY_DATE,
-              buildingsId: building.ID,
-              streetId: street.ID,
-              streetName: streetName,
-              houseName: houseName,
-              displayText: `${appartsPart}, ${namePart}${phonePart}`
-            });
-          });
-          return rows;
-        };
-
-        const updateOnlineStatus = () => {
-          const wasOnline = isOnline.value;
-          isOnline.value = navigator.onLine;
-          if (wasOnline && !isOnline.value && showAllAddresses.value) {
-            showAllAddresses.value = false;
-            if (typeof showAlert === 'function') {
-              showAlert('Потеряно подключение. Отображаются только ваши адреса', 'info');
-            } else {
-              alert('Потеряно подключение. Отображаются только ваши адреса');
-            }
-            loadData();
-          }
-        };
-
-        const clearStreet = () => {
-          streetSearch.value = '';
-          closeStreet();
-        };
-
-        const clearHouse = () => {
-          houseSearch.value = '';
-          closeHouse();
-        };
-
-        const clearList = () => {
-          selectedAddressText.value = '';
-          closeList();
-        };
-
-        const selectStreet = (street) => {
-          streetSearch.value = street.name;
-          selectedStreetId.value = street.id;
-          isStreetOpen.value = false;          
-          buildings.value = [];
-          selectedBuildingId.value = null;
-          houseSearch.value = '';
-          filteredAddressList.value = [];
-          selectedAddress.value = null;
-          selectedAddressText.value = '';          
-          const bldMap = new Map();
-          allAddresses.value
-            .filter(a => String(a.streetId) === String(selectedStreetId.value))
-            .forEach(addr => {
-              if (!bldMap.has(addr.buildingsId)) {
-                bldMap.set(addr.buildingsId, addr.houseName);
-              }
-            });
-          buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
-        };
-
-        const closeStreet = () => {
-          isStreetOpen.value = false;
-          if (streetSearch.value) {
-            const match = streets.value.find(s => s.name === streetSearch.value);
-            if (!match) {
               selectedStreetId.value = null;
               buildings.value = [];
               selectedBuildingId.value = null;
@@ -464,261 +572,254 @@
               selectedAddress.value = null;
               selectedAddressText.value = '';
             }
-          } else {
-            selectedStreetId.value = null;
-            buildings.value = [];
-            selectedBuildingId.value = null;
-            houseSearch.value = '';
+          };
+
+          const selectHouse = (bld) => {
+            houseSearch.value = bld.name;
+            selectedBuildingId.value = bld.id;
+            isHouseOpen.value = false;          
             filteredAddressList.value = [];
             selectedAddress.value = null;
-            selectedAddressText.value = '';
-          }
-        };
+            selectedAddressText.value = '';          
+            filteredAddressList.value = allAddresses.value.filter(
+              a => String(a.buildingsId) === String(selectedBuildingId.value)
+            );
+          };
 
-        const selectHouse = (bld) => {
-          houseSearch.value = bld.name;
-          selectedBuildingId.value = bld.id;
-          isHouseOpen.value = false;          
-          filteredAddressList.value = [];
-          selectedAddress.value = null;
-          selectedAddressText.value = '';          
-          filteredAddressList.value = allAddresses.value.filter(
-            a => String(a.buildingsId) === String(selectedBuildingId.value)
-          );
-        };
-
-        const closeHouse = () => {
-          isHouseOpen.value = false;
-          if (houseSearch.value) {
-            const match = buildings.value.find(b => b.name === houseSearch.value);
-            if (!match) {
+          const closeHouse = () => {
+            isHouseOpen.value = false;
+            if (houseSearch.value) {
+              const match = buildings.value.find(b => b.name === houseSearch.value);
+              if (!match) {
+                selectedBuildingId.value = null;
+                filteredAddressList.value = [];
+                selectedAddress.value = null;
+                selectedAddressText.value = '';
+              }
+            } else {
               selectedBuildingId.value = null;
               filteredAddressList.value = [];
               selectedAddress.value = null;
               selectedAddressText.value = '';
             }
-          } else {
-            selectedBuildingId.value = null;
-            filteredAddressList.value = [];
-            selectedAddress.value = null;
-            selectedAddressText.value = '';
-          }
-        };
+          };
 
-        const selectAddress = (addr) => {
-          selectedAddressText.value = addr.displayText;
-          selectedAddress.value = addr;
-          editData.value.meterId = addr.meterId;
-          editData.value.controllerId = addr.controllerId;
-          isListOpen.value = false;          
-          let vDate = addr.verifyDate;
-          if (vDate) {
-            const str = String(vDate).trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-              editData.value.verifyDate = str;
-            } else {
-              const date = new Date(str);
-              if (!isNaN(date.getTime())) {
-                const y = date.getFullYear();
-                const m = String(date.getMonth() + 1).padStart(2, '0');
-                const d = String(date.getDate()).padStart(2, '0');
-                editData.value.verifyDate = `${y}-${m}-${d}`;
+          const selectAddress = (addr) => {
+            selectedAddressText.value = addr.displayText;
+            selectedAddress.value = addr;
+            editData.value.meterId = addr.meterId;
+            editData.value.controllerId = addr.controllerId;
+            isListOpen.value = false;          
+            let vDate = addr.verifyDate;
+            if (vDate) {
+              const str = String(vDate).trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                editData.value.verifyDate = str;
               } else {
-                editData.value.verifyDate = '';
+                const date = new Date(str);
+                if (!isNaN(date.getTime())) {
+                  const y = date.getFullYear();
+                  const m = String(date.getMonth() + 1).padStart(2, '0');
+                  const d = String(date.getDate()).padStart(2, '0');
+                  editData.value.verifyDate = `${y}-${m}-${d}`;
+                } else {
+                  editData.value.verifyDate = '';
+                }
               }
+            } else {
+              editData.value.verifyDate = '';
             }
-          } else {
-            editData.value.verifyDate = '';
-          }
-        };
+          };
 
-        const closeList = () => {
-          isListOpen.value = false;
-          if (selectedAddressText.value) {
-            const match = filteredAddressList.value.find(a => a.displayText === selectedAddressText.value);
-            if (!match) {
+          const closeList = () => {
+            isListOpen.value = false;
+            if (selectedAddressText.value) {
+              const match = filteredAddressList.value.find(a => a.displayText === selectedAddressText.value);
+              if (!match) {
+                selectedAddress.value = null;
+              }
+            } else {
               selectedAddress.value = null;
             }
-          } else {
-            selectedAddress.value = null;
-          }
-        };
+          };
 
-        const saveVerifyDate = async () => {
-          if (!editData.value.meterId) return;
-          saving.value = true;
-          error.value = '';
-          try {
-            if (!navigator.onLine) {
-              await savePendingVerifyUpdate({
-                meterId: editData.value.meterId,
-                verifyDate: editData.value.verifyDate,
-                controllerId: editData.value.controllerId
-              });
-              await updateLocalMeterCache(
-                editData.value.meterId,
-                editData.value.verifyDate,
-                editData.value.controllerId
-              );
-              if (typeof showAlert === 'function') {
-                showAlert(
-                  'Нет подключения. Изменения сохранены локально.',
-                  'info'
+          const saveVerifyDate = async () => {
+            if (!editData.value.meterId) return;
+            saving.value = true;
+            error.value = '';
+            try {
+              if (!navigator.onLine) {
+                if (typeof savePendingVerifyUpdate !== 'function') {
+                  throw new Error('Функция savePendingVerifyUpdate не найдена');
+                }
+                await savePendingVerifyUpdate({
+                  meterId: editData.value.meterId,
+                  verifyDate: editData.value.verifyDate,
+                  controllerId: editData.value.controllerId
+                });
+                await updateLocalMeterCache(
+                  editData.value.meterId,
+                  editData.value.verifyDate,
+                  editData.value.controllerId
                 );
+                if (typeof showAlert === 'function') {
+                  showAlert(
+                    'Нет подключения. Изменения сохранены локально.',
+                    'info'
+                  );
+                }
+              } else {
+                await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
+                await apiRequest('/update-meter-controller', {
+                  meterId: editData.value.meterId,
+                  controllerId: editData.value.controllerId
+                });
+                await updateLocalMeterCache(
+                  editData.value.meterId,
+                  editData.value.verifyDate,
+                  editData.value.controllerId
+                );
+                if (typeof showAlert === 'function') {
+                  showAlert('Дата обновлена', 'success');
+                }
               }
-            } else {
-              await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
-              await apiRequest('/update-meter-controller', {
-                meterId: editData.value.meterId,
-                controllerId: editData.value.controllerId
-              });
-              await updateLocalMeterCache(
-                editData.value.meterId,
-                editData.value.verifyDate,
-                editData.value.controllerId
-              );
-              if (typeof showAlert === 'function') {
-                showAlert('Дата обновлена', 'success');
+              await loadData();
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+            } catch (err) {
+              error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+            } finally {
+              saving.value = false;
+            }
+          };
+
+          const checkSession = () => {
+            const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
+            if (!authData || !authData.token) {
+              error.value = 'Сессия не найдена';
+              showContinue.value = true;
+              setTimeout(() => window.location.href = 'index.html', 2000);
+              return false;
+            }
+            const now = Date.now();
+            const EXPIRY_MS = 24000000;
+            if (now - authData.authDate > EXPIRY_MS) {
+              error.value = 'Истёк срок сессии';
+              sessionStorage.setItem('lastAuthDate', authData.authDate);
+              showContinue.value = true;
+              return false;
+            }
+            showContinue.value = false;
+            return true;
+          };
+
+          const cont = () => {
+            sessionStorage.removeItem('authData');
+            window.location.href = 'oldtokenwindow.html';
+          };      
+
+          const continueAction = () => {
+            if (!checkType.value) {
+              error.value = 'Выберите тип проверки';
+              return;
+            }
+            sessionStorage.setItem('checkType', checkType.value);
+            window.location.href = 'address.html';
+          };
+
+          const logout = () => {
+            clearSessionAndLogout();
+            window.location.href = 'index.html';
+          };
+
+          const viewhistory = () => {
+            window.location.href = 'historywindow.html';
+          };
+
+          const handleOnline = async () => {
+            updateOnlineStatus();
+            if (typeof syncPendingVerifyUpdates === 'function') {
+              try {
+                await syncPendingVerifyUpdates();
+              } catch (e) {
+                console.warn('Ошибка синхронизации обновлений:', e);
               }
             }
-            await loadData();
-            selectedAddress.value = null;
-            selectedAddressText.value = '';
-          } catch (err) {
-            error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
-          } finally {
-            saving.value = false;
-          }
-        };
-
-        const checkSession = () => {
-          const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-          if (!authData || !authData.token) {
-            error.value = 'Сессия не найдена';
-            showContinue.value = true;
-            setTimeout(() => window.location.href = 'index.html', 2000);
-            return false;
-          }
-          const now = Date.now();
-          const EXPIRY_MS = 24000000;
-          if (now - authData.authDate > EXPIRY_MS) {
-            error.value = 'Истёк срок сессии';
-            sessionStorage.setItem('lastAuthDate', authData.authDate);
-            showContinue.value = true;
-            return false;
-          }
-          showContinue.value = false;
-          return true;
-        };
-
-        const cont = () => {
-          sessionStorage.removeItem('authData');
-          window.location.href = 'oldtokenwindow.html';
-        };      
-
-        const continueAction = () => {
-          if (!checkType.value) {
-            error.value = 'Выберите тип проверки';
-            return;
-          }
-          sessionStorage.setItem('checkType', checkType.value);
-          window.location.href = 'address.html';
-        };
-
-        const logout = () => {
-          clearSessionAndLogout();
-          window.location.href = 'index.html';
-        };
-
-        const viewhistory = () => {
-          window.location.href='historywindow.html';
-        };
-
-        const handleOnline = async () => {
-          updateOnlineStatus();
-          if (typeof syncPendingVerifyUpdates === 'function') {
-            try {
-              await syncPendingVerifyUpdates();
-            } catch (e) {
-              console.warn('Ошибка синхронизации обновлений:', e);
+            if (typeof syncPendingReadings === 'function') {
+              try {
+                await syncPendingReadings();
+              } catch (e) {
+                console.warn('Ошибка синхронизации показаний:', e);
+              }
             }
-          }
-          if (typeof syncPendingReadings === 'function') {
-            try {
-              await syncPendingReadings();
-            } catch (e) {
-              console.warn('Ошибка синхронизации показаний:', e);
+            if (checkSession()) {
+              await loadData();
             }
+          };
+
+          onMounted(() => {
+            window.addEventListener('online', handleOnline);
+            window.addEventListener('offline', updateOnlineStatus);
+            if (checkSession()) {
+              loadData();
+              loadControllers();
+            }
+          });
+
+          onUnmounted(() => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', updateOnlineStatus);
+          });
+
+          return {
+            showContinue, showOverlay, actNo, actDate, checkType,
+            error, isLoading, saving,
+            streets, buildings, filteredAddressList,
+            streetSearch, houseSearch, selectedAddressText,
+            selectedStreetId, selectedBuildingId,
+            selectedAddress, editData, isOnline,
+            clearStreet, clearHouse, clearList,
+            isStreetOpen, isHouseOpen, isListOpen,
+            filteredStreets, filteredBuildings, filteredAddresses, showOnlyWithoutDate,
+            selectStreet, selectHouse, selectAddress,
+            closeStreet, closeHouse, closeList,
+            saveVerifyDate, controllers, showAllAddresses,
+            cont, continueAction, logout, viewhistory
+          };
+        }
+      }).mount('#app');
+    </script>
+
+    <script>
+      let statusTimeout;    
+      let isInitialLoad = true;
+      function updateStatus(isOnline) {
+        var statusDiv = document.getElementById("statusDiv");
+        if (!statusDiv) return;
+        clearTimeout(statusTimeout);
+        if (isOnline) {
+          if (!isInitialLoad) {
+            statusDiv.style.backgroundColor = "#44ff00";
+            statusDiv.textContent = "Подключено";
+            statusDiv.classList.remove("status-hidden");        
+            statusTimeout = setTimeout(function() {
+              statusDiv.classList.add("status-hidden");
+            }, 5000);
           }
-          if (checkSession()) {
-            await loadData();
-          }
-        };
-
-        onMounted(() => {
-          window.addEventListener('online', handleOnline);
-          window.addEventListener('offline', updateOnlineStatus);
-          if (checkSession()) {
-            loadData();
-            loadControllers();
-          }
-        });
-
-        onUnmounted(() => {
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', updateOnlineStatus);
-        });
-
-        return {
-          showContinue, showOverlay, actNo, actDate, checkType,
-          error, isLoading, saving,
-          streets, buildings, filteredAddressList,
-          streetSearch, houseSearch, selectedAddressText,
-          selectedStreetId, selectedBuildingId,
-          selectedAddress, editData, isOnline,
-          clearStreet, clearHouse, clearList,
-          isStreetOpen, isHouseOpen, isListOpen,
-          filteredStreets, filteredBuildings, filteredAddresses, showOnlyWithoutDate,
-          selectStreet, selectHouse, selectAddress,
-          closeStreet, closeHouse, closeList,
-          saveVerifyDate, controllers, showAllAddresses,
-          cont, continueAction, logout, viewhistory
-        };
-      }
-    }).mount('#app');
-  </script>
-
-  <script>
-    let statusTimeout;    
-    let isInitialLoad = true;
-    function updateStatus(isOnline) {
-      var statusDiv = document.getElementById("statusDiv");
-      if (!statusDiv) return;
-      clearTimeout(statusTimeout);
-      if (isOnline) {
-        if (!isInitialLoad) {
-          statusDiv.style.backgroundColor = "#44ff00";
-          statusDiv.textContent = "Подключено";
-          statusDiv.classList.remove("status-hidden");        
+        } else {
+          statusDiv.style.backgroundColor = "#ff0007";
+          statusDiv.textContent = "Нет подключения";
+          statusDiv.classList.remove("status-hidden");
           statusTimeout = setTimeout(function() {
             statusDiv.classList.add("status-hidden");
           }, 5000);
         }
-      } else {
-        statusDiv.style.backgroundColor = "#ff0007";
-        statusDiv.textContent = "Нет подключения";
-        statusDiv.classList.remove("status-hidden");
-        statusTimeout = setTimeout(function() {
-          statusDiv.classList.add("status-hidden");
-        }, 5000);
-      }
-      isInitialLoad = false;
-    }   
-    updateStatus(navigator.onLine);
-    window.addEventListener("online", () => updateStatus(true));
-    window.addEventListener("offline", () => updateStatus(false));
-  </script>
-  
+        isInitialLoad = false;
+      }   
+      updateStatus(navigator.onLine);
+      window.addEventListener("online", () => updateStatus(true));
+      window.addEventListener("offline", () => updateStatus(false));
+    </script>
   </body> 
   <style>
     * { 
@@ -1042,8 +1143,7 @@
       h1 { font-size: 22px; margin-bottom: 20px; } 
       button { padding: 12px 14px; } 
     }
-  </style>
-  <style>
+
     .custom-datalist {
       position: relative;
       width: 100%;
