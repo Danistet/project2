@@ -121,19 +121,20 @@ app.post('/controller-addresses', (req, res) => {
     }
     const query = `
       SELECT
-      M.ID AS METER_ID,
-      M.CONTROLER_ID,
-      M.VERIFY_DATE,
-      A.APPARTS,
-      A.LETTER,
-      A.BUILDINGS_ID,
-      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
-      CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
-      CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
-      CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
-      RS.ID AS STREET_ID,
-      CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
-      CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
+        M.ID AS METER_ID,
+        M.CONTROLER_ID,
+        M.VERIFY_DATE,
+        A.APPARTS,
+        A.LETTER,
+        A.BUILDINGS_ID,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        RS.ID AS STREET_ID,
+        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
+        (SELECT MAX(MI.CREATEDATE) FROM METERS_IND MI WHERE TRIM(MI.METER_ID) = TRIM(M.METER_NUM)) AS LAST_IND_DATE
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
@@ -147,7 +148,7 @@ app.post('/controller-addresses', (req, res) => {
         B.HOUSE,
         A.APPARTS,
         A.LETTER
-    `;     
+    `;
     const ctrlIdNum = parseInt(controllerId, 10);
     if (isNaN(ctrlIdNum)) {
       db.detach();
@@ -158,7 +159,7 @@ app.post('/controller-addresses', (req, res) => {
       if (err) {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
-      }            
+      }
       res.json(result.map(r => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
         const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
@@ -166,7 +167,26 @@ app.post('/controller-addresses', (req, res) => {
         const phonePart = r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : '';
         const streetName = `${r.STREET_TYPE} ${r.STREET_NAME}`.trim();
         const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
-        const houseName = `${r.HOUSE} ${corpsPart}`.trim();
+        const houseName = `${r.HOUSE} ${corpsPart}`.trim();       
+        let lastIndDate = null;
+        if (r.LAST_IND_DATE) {
+          let d;
+          const dateStr = String(r.LAST_IND_DATE).trim();
+          if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            if (parts.length === 3) {
+              d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+          } else {
+            d = new Date(dateStr);
+          }
+          if (d && !isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            lastIndDate = `${y}-${m}-${day}`;
+          }
+        }
         return {
           meterId: r.METER_ID,
           controllerId: r.CONTROLER_ID,
@@ -175,7 +195,8 @@ app.post('/controller-addresses', (req, res) => {
           streetId: r.STREET_ID,
           streetName: streetName,
           houseName: houseName,
-          displayText: `${appartsPart}, ${namePart}${phonePart}`
+          displayText: `${appartsPart}, ${namePart}${phonePart}`,
+          lastIndDate: lastIndDate
         };
       }));
     });
@@ -208,24 +229,26 @@ app.post('/all-addresses', (req, res) => {
     }
     const query = `
       SELECT
-      M.ID AS METER_ID,
-      M.CONTROLER_ID,
-      M.VERIFY_DATE,
-      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-      CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
-      A.BUILDINGS_ID,
-      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
-      CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
-      CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
-      CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
-      RS.ID AS STREET_ID,
-      CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
-      CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
+        M.ID AS METER_ID,
+        M.CONTROLER_ID,
+        M.VERIFY_DATE,
+        A.APPARTS,
+        A.LETTER,
+        A.BUILDINGS_ID,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        RS.ID AS STREET_ID,
+        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
+        (SELECT MAX(MI.CREATEDATE) FROM METERS_IND MI WHERE TRIM(MI.METER_ID) = TRIM(M.METER_NUM)) AS LAST_IND_DATE
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
       ORDER BY
         M.CONTROLER_ID DESC NULLS LAST,
         RS.STREET_TYPE,
@@ -233,13 +256,13 @@ app.post('/all-addresses', (req, res) => {
         B.HOUSE,
         A.APPARTS,
         A.LETTER
-    `;     
-    db.query(query, [], (err, result) => {
+    `;    
+    db.query(query, [ctrlIdNum], (err, result) => {
       db.detach();
       if (err) {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
-      }            
+      }
       res.json(result.map(r => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
         const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
@@ -247,7 +270,26 @@ app.post('/all-addresses', (req, res) => {
         const phonePart = r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : '';
         const streetName = `${r.STREET_TYPE} ${r.STREET_NAME}`.trim();
         const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
-        const houseName = `${r.HOUSE} ${corpsPart}`.trim();
+        const houseName = `${r.HOUSE} ${corpsPart}`.trim();      
+        let lastIndDate = null;
+        if (r.LAST_IND_DATE) {
+          let d;
+          const dateStr = String(r.LAST_IND_DATE).trim();
+          if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            if (parts.length === 3) {
+              d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+          } else {
+            d = new Date(dateStr);
+          }
+          if (d && !isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            lastIndDate = `${y}-${m}-${day}`;
+          }
+        }
         return {
           meterId: r.METER_ID,
           controllerId: r.CONTROLER_ID,
@@ -256,7 +298,8 @@ app.post('/all-addresses', (req, res) => {
           streetId: r.STREET_ID,
           streetName: streetName,
           houseName: houseName,
-          displayText: `${appartsPart}, ${namePart}${phonePart}`
+          displayText: `${appartsPart}, ${namePart}${phonePart}`,
+          lastIndDate: lastIndDate
         };
       }));
     });
@@ -1293,180 +1336,145 @@ app.post('/save-boiler-status', (req, res) => {
 
 app.post('/controller-offline-package', (req, res) => {
   const { controllerId } = req.body;
-  const ctrlIdNum = parseInt(controllerId, 10);
-  if (isNaN(ctrlIdNum)) {
-    return res.status(400).json({ error: 'Invalid controllerId' });
+  if (!controllerId) {
+    return res.status(400).json({ error: 'controllerId required' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
-    }
-    const query = (sql, params = []) => {
-      return new Promise((resolve, reject) => {
-        db.query(sql, params, (queryErr, result) => {
-          if (queryErr) reject(queryErr);
-          else resolve(result || []);
-        });
-      });
-    };
-    const run = async () => {
-      const meterByControllerFilter = `
-        SELECT M.LS
-        FROM METERS M
-        WHERE M.CONTROLER_ID = ?
-      `;
-      const meters = await query(`
-        SELECT
-          M.ID,
-          M.METER_NUM,
-          M.NAME,
-          M.SEAL,
-          M.MANFDATE,
-          M.MOUNT_DATE,
-          M.VERIFY_DATE,
-          M.LS,
-          M.CONTROLER_ID,
-          M.METER_TYPE,
-          M.STATUS
-        FROM METERS M
-        WHERE M.CONTROLER_ID = ?
-      `, [ctrlIdNum]);
-      const abonents = await query(`
-        SELECT
-          A.ID,
-          A.G_LICSCHET,
-          A.CLIENT_ID,
-          A.BUILDINGS_ID,
-          CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-          CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER
-        FROM ABONENTS A
-        WHERE A.G_LICSCHET IN (${meterByControllerFilter})
-      `, [ctrlIdNum]);
-      const clients = await query(`
-        SELECT
-          C.ID,
-          CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME,
-          CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS PHONE,
-          CAST(C.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS MAIL
-        FROM CLIENTS C
-        WHERE C.ID IN (
-          SELECT A.CLIENT_ID
-          FROM ABONENTS A
-          WHERE A.G_LICSCHET IN (${meterByControllerFilter})
-        )
-      `, [ctrlIdNum]);
-      const buildings = await query(`
-        SELECT
-          B.ID,
-          B.STREET_ID,
-          CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
-          CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS
-        FROM BUILDINGS B
-        WHERE B.ID IN (
-          SELECT A.BUILDINGS_ID
-          FROM ABONENTS A
-          WHERE A.G_LICSCHET IN (${meterByControllerFilter})
-        )
-      `, [ctrlIdNum]);
-      const streets = await query(`
-        SELECT
-          RS.ID,
-          RS.TOWN_ID,
-          CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET,
-          CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE
-        FROM RSTREETS RS
-        WHERE RS.ID IN (
-          SELECT B.STREET_ID
-          FROM BUILDINGS B
-          WHERE B.ID IN (
-            SELECT A.BUILDINGS_ID
-            FROM ABONENTS A
-            WHERE A.G_LICSCHET IN (${meterByControllerFilter})
-          )
-        )
-      `, [ctrlIdNum]);
-      const meterTypes = await query(`
-        SELECT
-          MT.ID,
-          MT.LOW_QUALITY_GRP_TARIFF
-        FROM METER_TYPES MT
-        WHERE MT.ID IN (
-          SELECT M.METER_TYPE
-          FROM METERS M
-          WHERE M.CONTROLER_ID = ?
-        )
-      `, [ctrlIdNum]);
-      const services = await query(`
-        SELECT
-          S.ID,
-          S.GROUP_ID,
-          CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME
-        FROM SERVICES S
-        WHERE S.ID IN (
-          SELECT MT.LOW_QUALITY_GRP_TARIFF
-          FROM METER_TYPES MT
-          WHERE MT.ID IN (
-            SELECT M.METER_TYPE
-            FROM METERS M
-            WHERE M.CONTROLER_ID = ?
-          )
-        )
-      `, [ctrlIdNum]);
-      const meterStatuses = await query(`
-        SELECT
-          RS.ID
-        FROM RMETER_STATUS RS
-        WHERE RS.ID IN (
-          SELECT M.STATUS
-          FROM METERS M
-          WHERE M.CONTROLER_ID = ?
-        )
-      `, [ctrlIdNum]);
-      const meterIndLast = await query(`
-        SELECT
-          MI.ID,
-          MI.METER_ID,
-          MI.PH,
-          MI.CREATEDATE,
-          MI.ACT_ID
-        FROM METERS_IND MI
-        WHERE MI.METER_ID IN (
-          SELECT M.METER_NUM
-          FROM METERS M
-          WHERE M.CONTROLER_ID = ?
-        )
-        AND MI.ID IN (
-          SELECT MAX(MI2.ID)
-          FROM METERS_IND MI2
-          WHERE MI2.METER_ID = MI.METER_ID
-        )
-      `, [ctrlIdNum]);
-      res.json({
-        controllerId: ctrlIdNum,
-        generatedAt: new Date().toISOString(),
-        meters,
-        abonents,
-        clients,
-        buildings,
-        streets,
-        meterTypes,
-        services,
-        meterStatuses,
-        meterIndLast
-      });
-    };
-    run()
-      .catch(e => {
-        console.error('Offline package error:', e);
-        res.status(500).json({
-          error: 'Failed to build controller offline package',
-          details: e.message
-        });
-      })
-      .finally(() => {
+    }    
+    const query = `
+      SELECT
+        M.ID AS METER_ID,
+        M.CONTROLER_ID,
+        M.VERIFY_DATE,
+        M.LS,
+        M.METER_NUM,
+        M.NAME AS METER_NAME,
+        M.SEAL,
+        M.MANFDATE,
+        M.MOUNT_DATE,
+        M.METER_TYPE,
+        A.APPARTS,
+        A.LETTER,
+        A.BUILDINGS_ID,
+        A.G_LICSCHET,
+        A.CLIENT_ID,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        RS.ID AS STREET_ID,
+        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
+        B.ID AS BUILDING_ID,
+        IND.LAST_IND_DATE,
+        MT.ID AS METER_TYPE_ID,
+        CAST(MT.NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS METER_TYPE_NAME,
+        MT.LOW_QUALITY_GRP_TARIFF AS SERVICE_ID,
+        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_GROUP_NAME
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
+      INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      LEFT JOIN (
+        SELECT METER_ID, MAX(CREATEDATE) AS LAST_IND_DATE
+        FROM METERS_IND
+        GROUP BY METER_ID
+      ) IND ON TRIM(IND.METER_ID) = TRIM(M.METER_NUM)
+      LEFT JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      LEFT JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
+    `;    
+    const ctrlIdNum = parseInt(controllerId, 10);
+    if (isNaN(ctrlIdNum)) {
+      db.detach();
+      return res.status(400).json({ error: 'Invalid controllerId' });
+    }    
+    db.query(query, [ctrlIdNum], (err, result) => {
+      if (err) {
+        console.error('🔥 Firebird Query Error in /controller-offline-package:', err.message);
         db.detach();
-      });
+        return res.status(500).json({ error: 'Failed to build controller offline package: ' + err.message });
+      }
+      db.detach();      
+      const packageData = {
+        meters: [], abonents: [], clients: [], buildings: [], streets: [], meterTypes: [], services: []
+      };
+      const streetMap = new Map();
+      const buildingMap = new Map();
+      const clientMap = new Map();
+      const abonentMap = new Map();
+      const meterTypeMap = new Map();
+      const serviceMap = new Map();      
+      result.forEach(r => {
+        if (r.STREET_ID && !streetMap.has(r.STREET_ID)) {
+          streetMap.set(r.STREET_ID, { ID: r.STREET_ID, STREET_TYPE: r.STREET_TYPE, STREET: r.STREET_NAME });
+        }
+        if (r.BUILDING_ID && !buildingMap.has(r.BUILDING_ID)) {
+          buildingMap.set(r.BUILDING_ID, { ID: r.BUILDING_ID, HOUSE: r.HOUSE, CORPS: r.CORPS, STREET_ID: r.STREET_ID });
+        }
+        if (r.CLIENT_ID && !clientMap.has(r.CLIENT_ID)) {
+          clientMap.set(r.CLIENT_ID, { ID: r.CLIENT_ID, NAME: r.CLIENT_NAME, PHONE: r.CLIENT_PHONE });
+        }
+        if (r.G_LICSCHET && !abonentMap.has(r.G_LICSCHET)) {
+          abonentMap.set(r.G_LICSCHET, { 
+            G_LICSCHET: r.G_LICSCHET, CLIENT_ID: r.CLIENT_ID, BUILDINGS_ID: r.BUILDING_ID, 
+            APPARTS: r.APPARTS, LETTER: r.LETTER 
+          });
+        }
+        if (r.METER_TYPE_ID && !meterTypeMap.has(r.METER_TYPE_ID)) {
+          meterTypeMap.set(r.METER_TYPE_ID, { 
+            ID: r.METER_TYPE_ID, 
+            NAME: r.METER_TYPE_NAME, 
+            LOW_QUALITY_GRP_TARIFF: r.SERVICE_ID 
+          });
+        }
+        if (r.SERVICE_ID && !serviceMap.has(r.SERVICE_ID)) {
+          serviceMap.set(r.SERVICE_ID, { ID: r.SERVICE_ID, GROUP_NAME: r.SERVICE_GROUP_NAME });
+        }        
+        let lastIndDate = null;
+        if (r.LAST_IND_DATE) {
+          let d;
+          if (typeof r.LAST_IND_DATE === 'string' && r.LAST_IND_DATE.includes('.')) {
+            const parts = r.LAST_IND_DATE.split('.');
+            if (parts.length === 3) {
+              d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+          } else {
+            d = new Date(r.LAST_IND_DATE);
+          }          
+          if (d && !isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            lastIndDate = `${y}-${m}-${day}`;
+          }
+        }
+        packageData.meters.push({
+          ID: r.METER_ID,
+          CONTROLER_ID: r.CONTROLER_ID,
+          VERIFY_DATE: r.VERIFY_DATE,
+          LS: r.LS,
+          METER_NUM: r.METER_NUM,
+          NAME: r.METER_NAME,
+          SEAL: r.SEAL,
+          MANFDATE: r.MANFDATE,
+          MOUNT_DATE: r.MOUNT_DATE,
+          METER_TYPE: r.METER_TYPE,
+          LAST_IND_DATE: lastIndDate
+        });
+      });      
+      packageData.streets = Array.from(streetMap.values());
+      packageData.buildings = Array.from(buildingMap.values());
+      packageData.clients = Array.from(clientMap.values());
+      packageData.abonents = Array.from(abonentMap.values());
+      packageData.meterTypes = Array.from(meterTypeMap.values());
+      packageData.services = Array.from(serviceMap.values());      
+      res.json(packageData);
+    });
   });
 });
 

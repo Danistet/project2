@@ -16,7 +16,7 @@
           <label class="form-label checkbox-label" :class="{ disabled: !isOnline || isLoading }">
             <input type="checkbox" :disabled="!isOnline || isLoading" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
             <span class="checkbox-text">Все адреса</span>
-          </label>          
+          </label>              
           <label for="streetInput" class="form-label">Улица</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
             <div class="custom-datalist-input-wrapper">
@@ -84,6 +84,10 @@
             </div>
           </div>
         </div>
+        <label style="visibility: collapse;" class="form-label checkbox-label" :class="{ disabled: isLoading }">
+          <input type="checkbox" id="noReadings" checked="true" v-model="showNoReadings" :disabled="isLoading" class="form-checkbox">
+          <span class="checkbox-text">Не передавали показания</span>
+        </label>    
         <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
           <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
           <span class="checkbox-text">Адреса без назначенной даты посещения</span>
@@ -141,6 +145,20 @@
                 </option>
               </select>
             </div>
+            <div v-if="showNoReadings" class="detail-row">
+              <span class="detail-label" style="margin: 0;">Не передавали показания более</span>
+              <input
+                type="number"
+                id="noReadingsMonths"
+                v-model.number="noReadingsMonths"
+                min="1"
+                max="120"
+                class="edit-input"
+                :disabled="saving"
+                readonly
+              >
+              <span class="detail-label" style="margin: 0;">месяцев</span>
+            </div>
             <button type="submit" class="save-btn" :disabled="saving" v-if="!showContinue">
               {{ saving ? 'Сохранение...' : 'Сохранить' }}
             </button>
@@ -175,7 +193,6 @@
         const STORE_NAME = 'pendingReadings';
         const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
         const DB_VERSION = 4;
-
         function openLocalDB() {
           return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -328,6 +345,8 @@
           const buildings = ref([]);
           const filteredAddressList = ref([]);
           const showOnlyWithoutDate = ref(false);
+          const showNoReadings = ref(true);
+          const noReadingsMonths = ref(3);
           const selectedStreetId = ref(null);
           const streetSearch = ref('');
           const selectedBuildingId = ref(null);
@@ -340,6 +359,24 @@
           const isStreetOpen = ref(false);
           const isHouseOpen = ref(false);
           const isListOpen = ref(false);
+          const calculateMonthsSinceLastReading = (dateStr) => {
+            if (!dateStr || String(dateStr).trim() === '') {
+              return 1; 
+            }
+            const lastDate = new Date(dateStr);
+            const now = new Date();            
+            if (isNaN(lastDate.getTime())) return 1;            
+            let months = (now.getFullYear() - lastDate.getFullYear()) * 12;
+            months -= lastDate.getMonth();
+            months += now.getMonth();            
+            return months <= 0 ? 1 : months;
+          };
+          watch([selectedAddress, showNoReadings], ([newAddr, isShowing]) => {
+            if (isShowing && newAddr) {
+              const months = calculateMonthsSinceLastReading(newAddr.lastIndDate);
+              noReadingsMonths.value = months;
+            }
+          });
           watch(showAllAddresses, async (newVal) => {
             if (!navigator.onLine && newVal === true) {
               showAllAddresses.value = false;
@@ -368,13 +405,11 @@
               selectedAddressText.value = '';
             }
           });
-
           watch(showOnlyWithoutDate, () => {
             selectedAddress.value = null;
             selectedAddressText.value = '';
             isListOpen.value = false;
           });
-
           const loadData = async () => {
             isLoading.value = true;
             error.value = '';           
@@ -449,9 +484,29 @@
                 return !v || String(v).trim() === '';
               });
             }
+            if (showNoReadings.value) {
+              const months = Number(noReadingsMonths.value) || 1;
+              const cutoffDate = new Date();
+              cutoffDate.setMonth(cutoffDate.getMonth() - months);
+              list = list.filter(a => {
+                const lastDateStr = a.lastIndDate;
+                if (!lastDateStr || String(lastDateStr).trim() === '') {
+                  return true; 
+                }
+                const lastDate = new Date(lastDateStr);
+                return lastDate < cutoffDate;
+              });
+            }
             if (selectedAddressText.value) {
               const term = selectedAddressText.value.toLowerCase();
               list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
+            }
+            if (showNoReadings.value) {
+              list.sort((a, b) => {
+                const timeA = a.lastIndDate ? new Date(a.lastIndDate).getTime() : 0;
+                const timeB = b.lastIndDate ? new Date(b.lastIndDate).getTime() : 0;
+                return timeA - timeB;
+              });
             }
             return list;
           });
@@ -490,6 +545,7 @@
                 meterId: meter.ID,
                 controllerId: meter.CONTROLER_ID,
                 verifyDate: meter.VERIFY_DATE,
+                lastIndDate: meter.LAST_IND_DATE || null,
                 buildingsId: building.ID,
                 streetId: street.ID,
                 streetName: streetName,
@@ -781,6 +837,7 @@
             clearStreet, clearHouse, clearList,
             isStreetOpen, isHouseOpen, isListOpen,
             filteredStreets, filteredBuildings, filteredAddresses, showOnlyWithoutDate,
+            showNoReadings, noReadingsMonths, 
             selectStreet, selectHouse, selectAddress,
             closeStreet, closeHouse, closeList,
             saveVerifyDate, controllers, showAllAddresses,

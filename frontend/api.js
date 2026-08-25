@@ -9,7 +9,7 @@
   // false = обычный режим через сервер
   const USE_LOCAL_DB = false;
   const LOCAL_MOCK_PERSIST = true;
-  const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V3';
+  const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4S';
   if (!USE_LOCAL_DB) {
     return;
   }
@@ -1156,6 +1156,36 @@
         if (!building) return;
         const street = LOCAL_DB.RSTREETS.find(s => s.ID === building.STREET_ID);
         if (!street) return;
+         let lastIndDate = null;
+        if (Array.isArray(LOCAL_DB.METERS_IND)) {
+          const inds = LOCAL_DB.METERS_IND.filter(
+            ind => String(ind.METER_ID).trim() === String(meter.METER_NUM).trim() && ind.CREATEDATE
+          );
+          if (inds.length > 0) {
+            let maxDate = null;
+            inds.forEach(ind => {
+              let d;
+              const dateStr = String(ind.CREATEDATE).trim();
+              if (dateStr.includes('.')) {
+                const parts = dateStr.split('.');
+                if (parts.length === 3) {
+                  d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }
+              } else {
+                d = new Date(dateStr);
+              }
+              if (d && !isNaN(d.getTime()) && (maxDate === null || d > maxDate)) {
+                maxDate = d;
+              }
+            });
+            if (maxDate) {
+              const y = maxDate.getFullYear();
+              const m = String(maxDate.getMonth() + 1).padStart(2, '0');
+              const day = String(maxDate.getDate()).padStart(2, '0');
+              lastIndDate = `${y}-${m}-${day}`;
+            }
+          }
+        }
         const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
         const appartsPart = abonent.APPARTS
           ? `кв. ${abonent.APPARTS}${letterPart}`
@@ -1173,35 +1203,28 @@
           streetName,
           houseName,
           displayText: `${appartsPart}, ${namePart}${phonePart}`,
+          lastIndDate: lastIndDate,
           _apparts: abonent.APPARTS || '',
           _letter: abonent.LETTER || ''
         });
       });
-
       rows.sort((a, b) => {
         const byController = compareByControllerIdDesc(a, b);
         if (byController !== 0) return byController;
         const byStreet = String(a.streetName || '').localeCompare(
-          String(b.streetName || ''),
-          'ru',
-          { numeric: true }
+          String(b.streetName || ''), 'ru', { numeric: true }
         );
         if (byStreet !== 0) return byStreet;
         const byHouse = String(a.houseName || '').localeCompare(
-          String(b.houseName || ''),
-          'ru',
-          { numeric: true }
+          String(b.houseName || ''), 'ru', { numeric: true }
         );
         if (byHouse !== 0) return byHouse;
         const byApparts = String(a._apparts ?? '').localeCompare(
-          String(b._apparts ?? ''),
-          'ru',
-          { numeric: true }
+          String(b._apparts ?? ''), 'ru', { numeric: true }
         );
         if (byApparts !== 0) return byApparts;
         return String(a._letter ?? '').localeCompare(
-          String(b._letter ?? ''),
-          'ru'
+          String(b._letter ?? ''), 'ru'
         );
       });
       return rows.map(({ _apparts, _letter, ...rest }) => rest);
@@ -1212,13 +1235,53 @@
       if (!controllerId) {
         return httpResponse(400, { error: 'controllerId required' });
       }
+      const controllerMeters = LOCAL_DB.METERS.filter(
+        m => toNumber(m.CONTROLER_ID) === controllerId
+      );
+      const metersWithLastInd = controllerMeters.map(meter => {
+        let lastIndDate = null;
+        if (Array.isArray(LOCAL_DB.METERS_IND)) {
+          const inds = LOCAL_DB.METERS_IND.filter(
+            ind => String(ind.METER_ID).trim() === String(meter.METER_NUM).trim() && ind.CREATEDATE
+          );
+          if (inds.length > 0) {
+            let maxDate = null;
+            inds.forEach(ind => {
+              let d;
+              const dateStr = String(ind.CREATEDATE).trim();
+              if (dateStr.includes('.')) {
+                const parts = dateStr.split('.');
+                if (parts.length === 3) {
+                  d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }
+              } else {
+                d = new Date(dateStr);
+              }
+              if (d && !isNaN(d.getTime()) && (maxDate === null || d > maxDate)) {
+                maxDate = d;
+              }
+            });
+            if (maxDate) {
+              const y = maxDate.getFullYear();
+              const m = String(maxDate.getMonth() + 1).padStart(2, '0');
+              const day = String(maxDate.getDate()).padStart(2, '0');
+              lastIndDate = `${y}-${m}-${day}`;
+            }
+          }
+        }
+        return {
+          ...meter,
+          LAST_IND_DATE: lastIndDate
+        };
+      });
+
       return {
         controllerId: controllerId,
         savedAt: Date.now(),
         streets: LOCAL_DB.RSTREETS,
         buildings: LOCAL_DB.BUILDINGS,
         abonents: LOCAL_DB.ABONENTS,
-        meters: LOCAL_DB.METERS.filter(m => toNumber(m.CONTROLER_ID) === controllerId),
+        meters: metersWithLastInd, // <-- Теперь с LAST_IND_DATE
         clients: LOCAL_DB.CLIENTS,
         meterTypes: LOCAL_DB.METER_TYPES,
         services: LOCAL_DB.SERVICES
@@ -1940,11 +2003,19 @@ async function apiRequest(endpoint, data = {}, method = 'POST') {
       throw new Error(`Сервер вернул HTML вместо JSON (Статус: ${response.status}). URL: ${endpoint}`);
     }
     if (!response.ok) {
-      throw new Error(result.error || `Ошибка сервера: ${response.status}`);
-    }  
+      const err = new Error(result.error || `Ошибка сервера: ${response.status}`);
+      err.status = response.status;
+      err.body = result;
+      console.error(`API request failed (${endpoint}): status=${response.status}`, result);
+      throw err;
+    }
     return result;
   } catch (error) {
-    console.error(`API request failed (${endpoint}):`, error);
+    if (error && error.status) {
+      console.error(`API request failed (${endpoint}): status=${error.status}`, error.body || error.message);
+    } else {
+      console.error(`API request failed (${endpoint}):`, error);
+    }
     throw error;
   }
 }
