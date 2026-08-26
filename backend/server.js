@@ -232,8 +232,8 @@ app.post('/all-addresses', (req, res) => {
         M.ID AS METER_ID,
         M.CONTROLER_ID,
         M.VERIFY_DATE,
-        A.APPARTS,
-        A.LETTER,
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
         A.BUILDINGS_ID,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
         CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
@@ -248,7 +248,6 @@ app.post('/all-addresses', (req, res) => {
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
-      WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
       ORDER BY
         M.CONTROLER_ID DESC NULLS LAST,
         RS.STREET_TYPE,
@@ -256,13 +255,13 @@ app.post('/all-addresses', (req, res) => {
         B.HOUSE,
         A.APPARTS,
         A.LETTER
-    `;    
-    db.query(query, [ctrlIdNum], (err, result) => {
+    `;     
+    db.query(query, [], (err, result) => {
       db.detach();
       if (err) {
         console.error('Query error:', err);
         return res.status(500).json({ error: 'Query failed' });
-      }
+      }            
       res.json(result.map(r => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
         const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
@@ -270,7 +269,7 @@ app.post('/all-addresses', (req, res) => {
         const phonePart = r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : '';
         const streetName = `${r.STREET_TYPE} ${r.STREET_NAME}`.trim();
         const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
-        const houseName = `${r.HOUSE} ${corpsPart}`.trim();      
+        const houseName = `${r.HOUSE} ${corpsPart}`.trim();       
         let lastIndDate = null;
         if (r.LAST_IND_DATE) {
           let d;
@@ -308,8 +307,8 @@ app.post('/all-addresses', (req, res) => {
 
 app.post('/update-meter-controller', (req, res) => {
   const { meterId, controllerId } = req.body;
-  if (!meterId || !controllerId) {
-    return res.status(400).json({ error: 'meterId and controllerId required' });
+  if (!meterId) {
+    return res.status(400).json({ error: 'meterId required' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
@@ -317,7 +316,8 @@ app.post('/update-meter-controller', (req, res) => {
       return res.status(500).json({ error: 'DB connection failed' });
     }
     const updateQuery = `UPDATE METERS SET CONTROLER_ID = ? WHERE ID = ?`;
-    db.query(updateQuery, [controllerId, meterId], (err) => {
+    const safeControllerId = controllerId === undefined ? null : controllerId;
+    db.query(updateQuery, [safeControllerId, meterId], (err) => {
       db.detach();
       if (err) {
         console.error('Update error:', err);

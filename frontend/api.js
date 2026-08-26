@@ -1395,9 +1395,12 @@
 
     '/update-meter-controller': ({ body }) => {
       const meterId = toNumber(body.meterId);
-      const controllerId = toNumber(body.controllerId);    
-      if (!meterId || !controllerId) {
-        return httpResponse(400, { error: 'meterId and controllerId required' });
+      let controllerId = null;
+      if (body.controllerId !== null && body.controllerId !== undefined && String(body.controllerId).trim() !== '' && String(body.controllerId).toLowerCase() !== 'null') {
+        controllerId = toNumber(body.controllerId);
+      }
+      if (!meterId) {
+        return httpResponse(400, { error: 'meterId required' });
       }    
       const meter = LOCAL_DB.METERS.find(m => m.ID === meterId);
       if (!meter) {
@@ -1405,10 +1408,10 @@
       }    
       meter.CONTROLER_ID = controllerId;
       persistDb(); 
-      return {
+      return httpResponse(200, {
         status: 'OK',
         message: 'Контролёр обновлён'
-      };
+      });
     },
 
     '/add-representative': ({ body }) => {

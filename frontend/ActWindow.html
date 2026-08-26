@@ -140,6 +140,7 @@
             <div class="detail-row">
               <span class="detail-label">Ответственный контролёр</span>
               <select v-model="editData.controllerId" class="edit-input" :disabled="saving || controllers.length === 0">
+                <option :value="null">Нет</option>
                 <option v-for="ctrl in controllers" :key="ctrl.ID" :value="ctrl.ID">
                   {{ ctrl.FIO }}
                 </option>
@@ -290,7 +291,7 @@
             const meter = pkg.meters.find(m => String(m.ID) === String(meterId));
             if (meter) {
               if (verifyDate !== undefined) meter.VERIFY_DATE = verifyDate;
-              if (controllerId !== undefined && controllerId !== null) {
+              if (controllerId !== undefined) {
                 meter.CONTROLER_ID = controllerId;
               }
               await window.saveControllerPackage(currentControllerId, pkg);
@@ -664,7 +665,9 @@
             selectedAddressText.value = addr.displayText;
             selectedAddress.value = addr;
             editData.value.meterId = addr.meterId;
-            editData.value.controllerId = addr.controllerId;
+            editData.value.controllerId = (addr.controllerId !== undefined && addr.controllerId !== null) 
+              ? addr.controllerId 
+              : null;
             isListOpen.value = false;          
             let vDate = addr.verifyDate;
             if (vDate) {
