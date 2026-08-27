@@ -1297,15 +1297,16 @@
       const history = [];
       LOCAL_DB.METERS_IND.forEach(ind => {
         if (ind.IS_DELETED) return;
+        if (toNumber(ind.CONTROLLER_ID) !== controllerId) return;        
         const meter = LOCAL_DB.METERS.find(m => String(m.METER_NUM) === String(ind.METER_ID));
-        if (!meter || toNumber(meter.CONTROLER_ID) !== controllerId) return;
+        if (!meter) return;        
         const act = LOCAL_DB.BUILD_MAINT_ACTS.find(a => a.ID === ind.ACT_ID);
-        if (!act) return;
+        if (!act) return;        
         const abonent = LOCAL_DB.ABONENTS.find(a => String(a.G_LICSCHET) === String(meter.LS));
         const building = abonent ? LOCAL_DB.BUILDINGS.find(b => b.ID === abonent.BUILDINGS_ID) : null;
         const street = building ? LOCAL_DB.RSTREETS.find(s => s.ID === building.STREET_ID) : null;
-        const meterType = LOCAL_DB.METER_TYPES.find(t => t.ID === meter.METER_TYPE)
-        const service =   meterType ? LOCAL_DB.SERVICES.find(s => s.ID == meterType.LOW_QUALITY_GRP_TARIFF) : null;
+        const meterType = LOCAL_DB.METER_TYPES.find(t => t.ID === meter.METER_TYPE);
+        const service = meterType ? LOCAL_DB.SERVICES.find(s => s.ID === meterType.LOW_QUALITY_GRP_TARIFF) : null;        
         let addressStr = 'адрес не найден';
         if (street && building) {
           const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
@@ -1756,13 +1757,18 @@
         return httpResponse(400, { error: 'invalid ph' });
       }
       const actId = toNumber(body.act_id || body.actId);
+      let safeControllerId = null;
+      if (body.controllerId !== undefined && body.controllerId !== null && String(body.controllerId).trim() !== '' && String(body.controllerId).toLowerCase() !== 'null') {
+        safeControllerId = toNumber(body.controllerId);
+      }
       const indication = {
         ID: nextId('METERS_IND'),
         METER_ID: meter.METER_NUM,
         ACT_ID: actId,
         PH: ph,
         CREATEDATE: nowDateTime(),
-        IS_DELETED: 0
+        IS_DELETED: 0,
+        CONTROLLER_ID: safeControllerId
       };
 
       LOCAL_DB.METERS_IND.push(indication);

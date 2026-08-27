@@ -495,7 +495,7 @@
                   return true; 
                 }
                 const lastDate = new Date(lastDateStr);
-                return lastDate < cutoffDate;
+                return lastDate <= cutoffDate;
               });
             }
             if (selectedAddressText.value) {
@@ -583,7 +583,12 @@
 
           const clearList = () => {
             selectedAddressText.value = '';
-            closeList();
+            selectedAddress.value = null;
+            editData.value.meterId = null;
+            editData.value.controllerId = null;
+            editData.value.verifyDate = '';
+            isListOpen.value = false;
+            noReadingsMonths.value = 3;
           };
 
           const selectStreet = (street) => {

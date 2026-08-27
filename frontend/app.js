@@ -395,7 +395,9 @@ createApp({
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
         const licschet = addressData.g_licschet || meterData.licschet || '';    
         const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
-        const actId = currentAct?.actId || null;                    
+        const actId = currentAct?.actId || null;
+        const authDataSession = JSON.parse(sessionStorage.getItem('authData') || '{}');
+        const currentControllerId = sessionStorage.getItem('controllerId') || authDataSession.controllerId;
         let filesDataForStorage = [];
         let fileNamesForServer = [];
         if (files && files.length > 0) {
@@ -425,7 +427,8 @@ createApp({
           filesData: filesDataForStorage,
           createdate: new Date().toISOString().replace('T', ' ').slice(0, 19),
           isViolation: false,
-          actId
+          actId,
+          controllerId: currentControllerId
         };         
         const recordId = await saveReadingLocally(payload);         
         if (navigator.onLine) {          
@@ -434,7 +437,10 @@ createApp({
           formData.append('meter_id', payload.meter_id);
           formData.append('licschet', payload.licschet); 
           formData.append('abonent_name', payload.abonent_name);
-          formData.append('description', payload.description);   
+          formData.append('description', payload.description);
+          if (payload.controllerId) {
+            formData.append('controllerId', payload.controllerId);
+          } 
           if (payload.actId) {
             formData.append('act_id', payload.actId);
           }       

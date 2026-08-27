@@ -245,6 +245,13 @@
               formData.append('licschet', record.licschet);
               formData.append('abonent_name', record.abonent_name);
               formData.append('description', record.description);
+              if (record.controllerId) {
+                formData.append('controllerId', record.controllerId);
+              };            
+              if (record.fileBase64) {
+                const blob = base64ToBlob(record.fileBase64, record.fileType);
+                formData.append('file', blob, record.fileName);
+              };
               if (record.fileBase64) {
                 const blob = base64ToBlob(record.fileBase64, record.fileType);
                 formData.append('file', blob, record.fileName);

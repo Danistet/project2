@@ -1014,7 +1014,7 @@ app.post('/meters-by-building', (req, res) => {
 });
 
 app.post('/PH', upload.array('files', 5), (req, res) => {
-  const { ph, meter_id, licschet, abonent_name, description } = req.body;
+  const { ph, meter_id, licschet, abonent_name, description, controllerId } = req.body;
   const actIdRaw = req.body.act_id ?? req.body.actId ?? null;
   let actId = null;
   if (
@@ -1029,6 +1029,11 @@ app.post('/PH', upload.array('files', 5), (req, res) => {
   }
   if (ph === undefined || ph === null || !meter_id) {
     return res.status(400).json({ error: 'ph и meter_id required' });
+  }
+  let safeControllerId = null;
+  if (controllerId !== undefined && controllerId !== null && String(controllerId).trim() !== '') {
+    const parsed = parseInt(controllerId, 10);
+    if (!isNaN(parsed)) safeControllerId = parsed;
   }
   const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
   firebird.attach(config, (err, db) => {
@@ -1049,8 +1054,8 @@ app.post('/PH', upload.array('files', 5), (req, res) => {
       const meterNum = checkResult[0].METER_NUM;
       const dbLicschet = checkResult[0].LS;
       const targetLicschet = licschet || dbLicschet;
-      const insertQuery = `INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE, ACT_ID) VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?, ?)`;
-      db.query(insertQuery, [ph, meterNum, createdate, actId], (err) => {
+      const insertQuery = `INSERT INTO METERS_IND (ID, PH, METER_ID, CREATEDATE, ACT_ID, CONTROLLER_ID) VALUES (GEN_ID(METERS_IND_GEN, 1), ?, ?, ?, ?, ?)`;
+      db.query(insertQuery, [ph, meterNum, createdate, actId, safeControllerId], (err) => {
         if (err) {
           db.detach();
           return res.status(500).json({ error: 'error', details: err.message });
@@ -1514,11 +1519,11 @@ app.post('/controller-history', (req, res) => {
       LEFT JOIN RSTREETS st ON st.ID = b.STREET_ID
       LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
       LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
-      WHERE m.CONTROLER_ID = ? 
+      WHERE ind.CONTROLLER_ID = ? 
         AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
         AND CAST(a.ACT_DATE AS DATE) >= CAST(? AS DATE)
       ORDER BY a.ACT_DATE DESC, ind.ID DESC
-    `;     
+    `;    
     db.query(query, [ctrlIdNum, isoDate], (err, result) => {
       db.detach();         
       if (err) {
