@@ -88,7 +88,7 @@
         </section>
         <div class="button-group"> 
           <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">Продолжить</button>         
-          <button @click="submitViolationReport" :disabled="isLoading" class="btn-primary">Отправить отчет о нарушении</button>
+          <button @click="submitViolationReport" :disabled="isLoading || cooldown > 0" class="btn-primary">Отправить отчет о нарушении</button>
           <button onclick="main()" :disabled="isLoading" class="btn-secondary">Назад к списку</button>
         </div>      
       </main>

@@ -49,7 +49,7 @@
           <button @click="cont" id="ContinueButton" class="btn-secondary ContinueButton" v-if="showContinue">
             Продолжить
           </button>          
-          <button @click="NewPH" v-if="!showContinue" class="btn-primary">Передать</button>                             
+          <button @click="NewPH" v-if="!showContinue" :disabled="isLoading || cooldown > 0" class="btn-primary">Передать</button>                             
           <button onclick="main()" v-if="!showContinue" class="btn-secondary">Назад</button>
         </div>
       </main>

@@ -146,7 +146,7 @@
                 </option>
               </select>
             </div>
-            <div v-if="showNoReadings" class="detail-row">
+            <div v-if="showNoReadings && noReadingsMonths >= 1 && noReadingsMonths < 120" class="detail-row">
               <span class="detail-label" style="margin: 0;">Не передавали показания более</span>
               <input
                 type="number"
@@ -362,18 +362,18 @@
           const isListOpen = ref(false);
           const calculateMonthsSinceLastReading = (dateStr) => {
             if (!dateStr || String(dateStr).trim() === '') {
-              return 1; 
+              return 120;
             }
             const lastDate = new Date(dateStr);
-            const now = new Date();            
-            if (isNaN(lastDate.getTime())) return 1;            
+            const now = new Date();
+            if (isNaN(lastDate.getTime())) return 120;
             let months = (now.getFullYear() - lastDate.getFullYear()) * 12;
             months -= lastDate.getMonth();
-            months += now.getMonth();            
-            return months <= 0 ? 1 : months;
+            months += now.getMonth();
+            return months <= 0 ? 0 : months;
           };
-          watch([selectedAddress, showNoReadings], ([newAddr, isShowing]) => {
-            if (isShowing && newAddr) {
+          watch(selectedAddress, (newAddr) => {
+            if (newAddr) {
               const months = calculateMonthsSinceLastReading(newAddr.lastIndDate);
               noReadingsMonths.value = months;
             }
@@ -485,30 +485,15 @@
                 return !v || String(v).trim() === '';
               });
             }
-            if (showNoReadings.value) {
-              const months = Number(noReadingsMonths.value) || 1;
-              const cutoffDate = new Date();
-              cutoffDate.setMonth(cutoffDate.getMonth() - months);
-              list = list.filter(a => {
-                const lastDateStr = a.lastIndDate;
-                if (!lastDateStr || String(lastDateStr).trim() === '') {
-                  return true; 
-                }
-                const lastDate = new Date(lastDateStr);
-                return lastDate <= cutoffDate;
-              });
-            }
             if (selectedAddressText.value) {
               const term = selectedAddressText.value.toLowerCase();
               list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
             }
-            if (showNoReadings.value) {
-              list.sort((a, b) => {
-                const timeA = a.lastIndDate ? new Date(a.lastIndDate).getTime() : 0;
-                const timeB = b.lastIndDate ? new Date(b.lastIndDate).getTime() : 0;
-                return timeA - timeB;
-              });
-            }
+            list.sort((a, b) => {
+              const timeA = a.lastIndDate ? new Date(a.lastIndDate).getTime() : 0;
+              const timeB = b.lastIndDate ? new Date(b.lastIndDate).getTime() : 0;
+              return timeA - timeB;
+            });
             return list;
           });
 
@@ -750,6 +735,15 @@
               await loadData();
               selectedAddress.value = null;
               selectedAddressText.value = '';
+              streetSearch.value = '';
+              selectedStreetId.value = null;
+              houseSearch.value = '';
+              selectedBuildingId.value = null;
+              buildings.value = [];
+              filteredAddressList.value = [];
+              isStreetOpen.value = false;
+              isHouseOpen.value = false;
+              isListOpen.value = false;
             } catch (err) {
               error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
             } finally {

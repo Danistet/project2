@@ -259,6 +259,13 @@ createApp({
     const PH = ref('');
     const PHData = ref('');
     const meters = ref([]);
+    const cooldown = ref(0);
+    let cooldownTimer = null;
+    const isLoading = ref(false); 
+    const showContinue = ref(false);
+    const showOverlay = ref(false);
+    const actNo = ref('');
+    const actDate = ref(''); 
     const showMeterSelect = ref(false);
     const selectedMeter = ref(null);
     const isVerifyDateToday = (dateStr) => {
@@ -291,11 +298,18 @@ createApp({
       if (!todayOnly.value) return addressCatalog.value;
       return Array.isArray(addressCatalog.value) ? addressCatalog.value.filter(a => isVerifyDateToday(a.verifyDate || a.VERIFY_DATE)) : [];
     };
-    const isLoading = ref(false); 
-    const showContinue = ref(false);
-    const showOverlay = ref(false);
-    const actNo = ref('');
-    const actDate = ref('');   
+    const startCooldown = () => {
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldown.value = 5;
+      cooldownTimer = setInterval(() => {
+        cooldown.value--;
+        if (cooldown.value <= 0) {
+          clearInterval(cooldownTimer);
+          cooldownTimer = null;
+        }
+      }, 1000);
+    };
+      
     const { onMounted } = Vue;
 
     watch(streetSearch, (newVal) => {
@@ -460,8 +474,10 @@ createApp({
             await deletePendingReading(recordId);
           }
           showAlert(result.message || 'Показания и фото успешно переданы на сервер!', 'success');
+          startCooldown();
         } else {          
-          showAlert('Интернет отсутствует. Показания сохранены локально.', 'info');          
+          showAlert('Интернет отсутствует. Показания сохранены локально.', 'info');   
+          startCooldown();       
         }       
         const phElement = document.getElementById('PH');
         if (phElement) phElement.textContent = formatted;
@@ -1203,8 +1219,10 @@ createApp({
             await deletePendingReading(recordId);
           }
           showAlert(result.message || 'Отчет о нарушении успешно отправлен!', 'success');
+          startCooldown();
         } else {
           showAlert('Интернет отсутствует, сохранено локально, ожидание сети', 'info');
+          startCooldown();
         }     
         document.getElementById('violationsForm')?.reset();
         document.getElementById('techcheckForm')?.reset();
@@ -1412,7 +1430,7 @@ createApp({
       streetSearch, houseSearch, appartsSearch, showApparts, todayOnly,
       currentBuildingLicschet, meters, showMeterSelect, selectedMeter,
       selectMeter, loadMetersByBuilding, loadMetersByLicschet,
-      NewPH, 
+      NewPH, cooldown,
       isStreetOpen, isHouseOpen, isAppartsOpen,
       filteredStreets, filteredBuildings, filteredApparts,
       selectStreet, selectHouse, selectAppart,
