@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Формирование списка</title>
+    <link rel="icon" href="data:,">
+    <script src="./vendor/vue.global.js"></script>
+    <script src="./apiadmin.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <h1>Формирование списка</h1>
+      <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
+        <div class="form-group">
+          <label class="form-label checkbox-label">
+            <input type="checkbox" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
+            <span class="checkbox-text">Все адреса</span>
+          </label>              
+          <label for="streetInput" class="form-label">Улица</label>
+          <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
+            <div class="custom-datalist-input-wrapper">
+              <input type="text" id="streetInput" placeholder="Введите улицу" autocomplete="off" v-model="streetSearch" class="form-input custom-datalist-input" :disabled="isLoading || streets.length === 0" @focus="isStreetOpen = true" @blur="closeStreet" @input="isStreetOpen = true">
+              <span v-if="streetSearch" class="clear-input-btn" @mousedown.prevent="clearStreet">✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+            </div>
+            <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+              <div v-for="street in filteredStreets" :key="street.id" class="custom-datalist-option" @mousedown.prevent="selectStreet(street)">{{ street.name }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="houseInput" class="form-label">Дом</label>
+          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedStreetId }">
+            <div class="custom-datalist-input-wrapper">
+              <input type="text" id="houseInput" placeholder="Введите номер дома" autocomplete="off" v-model="houseSearch" class="form-input custom-datalist-input" :disabled="isLoading || !selectedStreetId" @focus="isHouseOpen = true" @blur="closeHouse" @input="isHouseOpen = true">
+              <span v-if="houseSearch" class="clear-input-btn" @mousedown.prevent="clearHouse">✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
+            </div>
+            <div v-if="isHouseOpen && filteredBuildings.length" class="custom-datalist-dropdown">
+              <div v-for="bld in filteredBuildings" :key="bld.id" class="custom-datalist-option" @mousedown.prevent="selectHouse(bld)">{{ bld.name }}</div>
+            </div>
+          </div>
+        </div>
+        <label style="visibility: collapse;" class="form-label checkbox-label" :class="{ disabled: isLoading }">
+          <input type="checkbox" id="noReadings" checked="true" v-model="showNoReadings" :disabled="isLoading" class="form-checkbox">
+          <span class="checkbox-text">Не передавали показания</span>
+        </label>    
+        <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
+          <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
+          <span class="checkbox-text">Адреса без назначенной даты посещения</span>
+        </label>
+        <div class="form-group">
+          <label for="listInput" class="form-label">Список адресов</label>
+          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
+            <div class="custom-datalist-input-wrapper">
+              <input type="text" id="listInput" placeholder="Выберите адрес из списка" autocomplete="off" v-model="selectedAddressText" class="form-input custom-datalist-input" :disabled="isLoading || !selectedBuildingId" @focus="isListOpen = true" @blur="closeList" @input="isListOpen = true">
+              <span v-if="selectedAddressText" class="clear-input-btn" @mousedown.prevent="clearList">✕</span>
+              <span class="custom-datalist-arrow" :class="{ open: isListOpen }">▼</span>
+            </div>
+            <div v-if="isListOpen && filteredAddresses.length" class="custom-datalist-dropdown">
+              <div v-for="addr in filteredAddresses" :key="addr.meterId" class="custom-datalist-option" @mousedown.prevent="selectAddress(addr)">{{ addr.displayText }}</div>
+            </div>
+          </div>
+        </div>
+        <div v-if="selectedAddress" class="meter-block selected">
+          <h4>Выбранный объект</h4>
+          <div class="meter-details">
+            <div class="detail-row">
+              <span class="detail-label">Адрес:</span>
+              <span class="detail-value">{{ selectedAddress.displayText }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Дата проверки:</span>
+              <input v-model="editData.verifyDate" type="date" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Ответственный контролёр</span>
+              <select v-model="editData.controllerId" class="edit-input" :disabled="saving || controllers.length === 0">
+                <option :value="null">Нет</option>
+                <option v-for="ctrl in controllers" :key="ctrl.ID" :value="ctrl.ID">{{ ctrl.FIO }}</option>
+              </select>
+            </div>
+            <div v-if="showNoReadings && noReadingsMonths >= 1 && noReadingsMonths < 120" class="detail-row">
+              <span class="detail-label" style="margin: 0;">Не передавали показания более</span>
+              <input type="number" id="noReadingsMonths" v-model.number="noReadingsMonths" min="1" max="120" class="edit-input" :disabled="saving" readonly>
+              <span class="detail-label" style="margin: 0;">месяцев</span>
+            </div>
+            <button type="submit" class="save-btn" :disabled="saving">
+              {{ saving ? 'Сохранение...' : 'Сохранить' }}
+            </button>
+          </div>
+        </div>  
+        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
+        <button type="button" @click="logout" class="btn-secondary">Выход</button>
+      </form>
+      <div class="status" id="statusDiv"></div>
+    </div>
+
+    <script>
+      const { createApp, ref, onMounted, watch, computed } = Vue;
+      createApp({
+        setup() {
+          const error = ref('');
+          const isLoading = ref(false);
+          const saving = ref(false);
+          const allAddresses = ref([]);
+          const streets = ref([]);
+          const buildings = ref([]);
+          const filteredAddressList = ref([]);
+          const showOnlyWithoutDate = ref(false);
+          const showNoReadings = ref(true);
+          const noReadingsMonths = ref(3);
+          const selectedStreetId = ref(null);
+          const streetSearch = ref('');
+          const selectedBuildingId = ref(null);
+          const houseSearch = ref('');
+          const selectedAddressText = ref('');
+          const selectedAddress = ref(null);
+          const controllers = ref([]);
+          const showAllAddresses = ref(false);
+          const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
+          const isStreetOpen = ref(false);
+          const isHouseOpen = ref(false);
+          const isListOpen = ref(false);
+
+          const calculateMonthsSinceLastReading = (dateStr) => {
+            if (!dateStr || String(dateStr).trim() === '') return 120;
+            const lastDate = new Date(dateStr);
+            const now = new Date();
+            if (isNaN(lastDate.getTime())) return 120;
+            let months = (now.getFullYear() - lastDate.getFullYear()) * 12;
+            months -= lastDate.getMonth();
+            months += now.getMonth();
+            return months <= 0 ? 0 : months;
+          };
+
+          watch(selectedAddress, (newAddr) => {
+            if (newAddr) {
+              noReadingsMonths.value = calculateMonthsSinceLastReading(newAddr.lastIndDate);
+            }
+          });
+
+          watch(showAllAddresses, async () => {
+            filteredAddressList.value = [];
+            selectedBuildingId.value = null;
+            houseSearch.value = '';
+            selectedAddressText.value = '';
+            selectedAddress.value = null;
+            await loadData();
+          });
+
+          watch(showOnlyWithoutDate, () => {
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
+            isListOpen.value = false;
+          });
+
+          const loadData = async () => {
+            isLoading.value = true;
+            error.value = '';           
+            try {
+              const controllerId = sessionStorage.getItem('controllerId') || '0';            
+              let data = [];
+              if (showAllAddresses.value) {
+                data = await apiRequest('/all-addresses', {});
+              } else {
+                data = await getControllerAddresses(controllerId);
+              }                        
+              allAddresses.value = data || [];           
+              const streetMap = new Map();
+              allAddresses.value.forEach(addr => {
+                if (!streetMap.has(addr.streetId)) {
+                  streetMap.set(addr.streetId, addr.streetName);
+                }
+              });
+              streets.value = Array.from(streetMap, ([id, name]) => ({ id, name }));
+            } catch (err) {
+              console.error(err);
+              error.value = 'Ошибка загрузки адресов. Проверьте подключение к серверу.';
+            } finally {
+              isLoading.value = false;
+            }
+          };
+
+          const filteredStreets = computed(() => {
+            if (!streetSearch.value) return streets.value;
+            const term = streetSearch.value.toLowerCase();
+            return streets.value.filter(s => s.name.toLowerCase().includes(term));
+          });
+
+          const filteredBuildings = computed(() => {
+            if (!houseSearch.value) return buildings.value;          
+            const term = houseSearch.value.toLowerCase();
+            return buildings.value.filter(b => b.name.toLowerCase().includes(term));
+          });
+
+          const filteredAddresses = computed(() => {
+            let list = filteredAddressList.value;
+            if (showOnlyWithoutDate.value) {
+              list = list.filter(a => !a.verifyDate || String(a.verifyDate).trim() === '');
+            }
+            if (selectedAddressText.value) {
+              const term = selectedAddressText.value.toLowerCase();
+              list = list.filter(a => (a.displayText || '').toLowerCase().includes(term));
+            }
+            list.sort((a, b) => {
+              const timeA = a.lastIndDate ? new Date(a.lastIndDate).getTime() : 0;
+              const timeB = b.lastIndDate ? new Date(b.lastIndDate).getTime() : 0;
+              return timeA - timeB;
+            });
+            return list;
+          });
+
+          const loadControllers = async () => {
+            try {
+              controllers.value = await apiRequest('/controllers', {});
+            } catch (err) {
+              console.error('Failed to load controllers:', err);
+            }
+          };    
+
+          const clearStreet = () => { streetSearch.value = ''; closeStreet(); };
+          const clearHouse = () => { houseSearch.value = ''; closeHouse(); };
+          const clearList = () => {
+            selectedAddressText.value = '';
+            selectedAddress.value = null;
+            editData.value = { meterId: null, verifyDate: '', controllerId: null };
+            isListOpen.value = false;
+            noReadingsMonths.value = 3;
+          };
+
+          const selectStreet = (street) => {
+            streetSearch.value = street.name;
+            selectedStreetId.value = street.id;
+            isStreetOpen.value = false;          
+            buildings.value = [];
+            selectedBuildingId.value = null;
+            houseSearch.value = '';
+            filteredAddressList.value = [];
+            selectedAddress.value = null;
+            selectedAddressText.value = '';                    
+            const bldMap = new Map();
+            allAddresses.value
+              .filter(a => String(a.streetId) === String(selectedStreetId.value))
+              .forEach(addr => {
+                if (!bldMap.has(addr.buildingsId)) bldMap.set(addr.buildingsId, addr.houseName);
+              });
+            buildings.value = Array.from(bldMap, ([id, name]) => ({ id, name }));
+          };
+
+          const closeStreet = () => {
+            isStreetOpen.value = false;
+            if (streetSearch.value && !streets.value.find(s => s.name === streetSearch.value)) {
+              selectedStreetId.value = null; buildings.value = []; selectedBuildingId.value = null;
+              houseSearch.value = ''; filteredAddressList.value = []; selectedAddress.value = null; selectedAddressText.value = '';
+            }
+          };
+
+          const selectHouse = (bld) => {
+            houseSearch.value = bld.name;
+            selectedBuildingId.value = bld.id;
+            isHouseOpen.value = false;          
+            filteredAddressList.value = allAddresses.value.filter(a => String(a.buildingsId) === String(selectedBuildingId.value));
+            selectedAddress.value = null;
+            selectedAddressText.value = '';          
+          };
+
+          const closeHouse = () => {
+            isHouseOpen.value = false;
+            if (houseSearch.value && !buildings.value.find(b => b.name === houseSearch.value)) {
+              selectedBuildingId.value = null; filteredAddressList.value = []; selectedAddress.value = null; selectedAddressText.value = '';
+            }
+          };
+
+          const selectAddress = (addr) => {
+            selectedAddressText.value = addr.displayText;
+            selectedAddress.value = addr;
+            editData.value.meterId = addr.meterId;
+            editData.value.controllerId = (addr.controllerId !== undefined && addr.controllerId !== null) ? addr.controllerId : null;
+            isListOpen.value = false;                     
+            let vDate = addr.verifyDate;
+            if (vDate) {
+              const str = String(vDate).trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                editData.value.verifyDate = str;
+              } else {
+                const date = new Date(str);
+                if (!isNaN(date.getTime())) {
+                  const y = date.getFullYear();
+                  const m = String(date.getMonth() + 1).padStart(2, '0');
+                  const d = String(date.getDate()).padStart(2, '0');
+                  editData.value.verifyDate = `${y}-${m}-${d}`;
+                } else {
+                  editData.value.verifyDate = '';
+                }
+              }
+            } else {
+              editData.value.verifyDate = '';
+            }
+          };
+
+          const closeList = () => {
+            isListOpen.value = false;
+            if (selectedAddressText.value && !filteredAddressList.value.find(a => a.displayText === selectedAddressText.value)) {
+              selectedAddress.value = null;
+            }
+          };
+
+          const saveVerifyDate = async () => {
+            if (!editData.value.meterId) return;
+            saving.value = true;
+            error.value = '';
+            try {
+              await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
+              await apiRequest('/update-meter-controller', {
+                meterId: editData.value.meterId,
+                controllerId: editData.value.controllerId
+              });              
+              showAlert('Дата и контролёр обновлены', 'success');             
+              await loadData();
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+              streetSearch.value = '';
+              selectedStreetId.value = null;
+              houseSearch.value = '';
+              selectedBuildingId.value = null;
+              buildings.value = [];
+              filteredAddressList.value = [];
+              isStreetOpen.value = false;
+              isHouseOpen.value = false;
+              isListOpen.value = false;
+            } catch (err) {
+              error.value = 'Ошибка сохранения: ' + (err.message || 'Неизвестная ошибка');
+              showAlert(error.value, 'error');
+            } finally {
+              saving.value = false;
+            }
+          };           
+
+          const logout = () => {
+            sessionStorage.clear();
+            window.location.href = 'indexadmin.html';
+          };
+
+          const continueAction = () => {
+          };
+
+          onMounted(() => {
+            loadData();
+            loadControllers();
+          });
+
+          return {
+            error, isLoading, saving,
+            streets, buildings, filteredAddressList,
+            streetSearch, houseSearch, selectedAddressText,
+            selectedStreetId, selectedBuildingId,
+            selectedAddress, editData,
+            clearStreet, clearHouse, clearList,
+            isStreetOpen, isHouseOpen, isListOpen,
+            filteredStreets, filteredBuildings, filteredAddresses, showOnlyWithoutDate,
+            showNoReadings, noReadingsMonths, 
+            selectStreet, selectHouse, selectAddress,
+            closeStreet, closeHouse, closeList,
+            saveVerifyDate, controllers, showAllAddresses,
+            continueAction, logout
+          };
+        }
+      }).mount('#app');
+    </script>
+
+    <script>
+      let statusTimeout;    
+      let isInitialLoad = true;
+      function updateStatus(isOnline) {
+        var statusDiv = document.getElementById("statusDiv");
+        if (!statusDiv) return;
+        clearTimeout(statusTimeout);
+        if (isOnline) {
+          if (!isInitialLoad) {
+            statusDiv.style.backgroundColor = "#44ff00";
+            statusDiv.textContent = "Подключено";
+            statusDiv.classList.remove("status-hidden");        
+            statusTimeout = setTimeout(() => statusDiv.classList.add("status-hidden"), 5000);
+          }
+        } else {
+          statusDiv.style.backgroundColor = "#ff0007";
+          statusDiv.textContent = "Нет подключения к сети";
+          statusDiv.classList.remove("status-hidden");
+          statusTimeout = setTimeout(() => statusDiv.classList.add("status-hidden"), 5000);
+        }
+        isInitialLoad = false;
+      }   
+      updateStatus(navigator.onLine);
+      window.addEventListener("online", () => updateStatus(true));
+      window.addEventListener("offline", () => updateStatus(false));
+    </script>
+  </body> 
+  <style>
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
+
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+      font-size: 16px; 
+      line-height: 1.5; 
+      color: #000000; 
+      background-color: #FFFFFF; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center;
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 24px 16px; 
+    }
+
+    h1 { 
+      font-size: 24px; 
+      font-weight: 600; 
+      margin-bottom: 24px; 
+      text-align: center; 
+    }
+      
+    button { 
+      width: 100%; 
+      padding: 14px 16px; 
+      font-size: 16px; 
+      font-weight: 500; 
+      color: #FFFFFF; 
+      background-color: #45B0E1; 
+      border: 2px solid #45B0E1; 
+      border-radius: 0; 
+      cursor: pointer; 
+      transition: background-color 0.2s ease, border-color 0.2s ease; text-align: center; 
+    }
+
+    button:hover { 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    button:active { 
+      background-color: #1A6B96; 
+      border-color: #1A6B96; 
+    }
+      
+    button:disabled { 
+      background-color: #A0D8EF; 
+      cursor: not-allowed; 
+    }
+      
+    .error-message { 
+      color: #C62828; 
+      font-size: 14px; 
+      margin-top: 8px; 
+      word-break: break-word; 
+      text-align: center; 
+    }
+      
+    form { 
+      width: 100%; 
+      max-width: 500px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 20px; 
+    }
+      
+    .form-group { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 8px; 
+      position: relative; 
+    }
+      
+    .form-label { 
+      font-size: 17px; 
+      font-weight: 500; 
+      color: #333333; 
+    }
+      
+    .form-input { 
+      width: 100%; 
+      min-height: 56px; 
+      padding: 16px 20px; 
+      font-size: 18px; 
+      color: #000000; 
+      background-color: #FFFFFF; 
+      border: 2px solid #45B0E1; 
+      border-radius: 0; 
+      outline: none; 
+      transition: border-color 0.2s ease, background-color 0.2s ease; 
+    }
+      
+    .form-input::placeholder { 
+      color: #999999; 
+    }
+      
+    .form-input:focus { 
+      border-color: #2E8BC0; 
+      background-color: #F8FDFF; 
+    }
+      
+    .form-input:disabled { 
+      background-color: #F5F5F5; 
+      border-color: #CCCCCC; 
+      color: #999999; 
+      cursor: not-allowed; 
+    }
+
+    .checkbox-label.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .checkbox-label.disabled .checkbox-text {
+      color: #999999;
+    }
+
+    .form-checkbox:disabled {
+      cursor: not-allowed;
+    }
+      
+    .meter-block.selected { 
+      margin-top: 20px; 
+      padding: 20px; 
+      border: 2px solid #45B0E1; 
+      background-color: #F8FDFF; 
+    }
+      
+    .meter-block h4 { 
+      margin-bottom: 16px; 
+      font-size: 18px; 
+      color: #2E8BC0; 
+    }
+      
+    .meter-details { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+    }
+      
+    .detail-row { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+    }
+      
+    .detail-label { 
+      font-size: 14px; 
+      font-weight: 600; 
+      color: #555555; 
+    }
+      
+    .detail-value { 
+      font-size: 16px; 
+      color: #000000; 
+    }
+      
+    .edit-input { 
+      width: 100%; 
+      min-height: 40px; 
+      padding: 8px 12px; 
+      font-size: 16px; 
+      border: 1px solid #45B0E1; 
+      outline: none; 
+    }
+      
+    .edit-input:focus { 
+      border-color: #2E8BC0; 
+    }
+
+    .overlay { 
+      position: fixed; 
+      top: 0; left: 0; 
+      width: 100%; 
+      height: 100%; 
+      background-color: rgba(0, 0, 0, 0.7); z-index: 9999; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+    }
+
+    .overlay-content { 
+      background: #FFFFFF; 
+      padding: 30px 40px; 
+      border-radius: 8px; 
+      text-align: center; 
+      max-width: 90%; 
+      min-width: 280px; 
+      border: 2px solid #45B0E1; 
+    }
+
+    .overlay-content .act { 
+      font-size: 22px; 
+      font-weight: 600; 
+      margin-bottom: 12px; 
+      color: #000000; 
+    }
+
+    .overlay-content .datetime { 
+      font-size: 16px; 
+      color: #333333; 
+      margin-bottom: 20px; 
+    }
+
+    .overlay-content button { 
+      max-width: 200px; 
+      margin: 0 auto; 
+    }
+
+    .checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+    }
+
+    .form-checkbox {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      accent-color: #45B0E1;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+      
+    .checkbox-text {
+      font-size: 17px;
+      font-weight: 500;
+      color: #333333;
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+
+    .btn-secondary:hover {
+      background-color: #F0F9FC;
+    }
+      
+    .radio-group { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+      padding: 16px; 
+      border: 2px solid #45B0E1; 
+      margin-top: 16px; 
+      background-color: #FFFFFF; 
+    }
+
+    .radio-label { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      cursor: pointer; 
+      font-size: 16px; 
+      padding: 8px; 
+      border-radius: 4px; 
+      transition: background-color 0.2s ease; 
+    }
+
+    .radio-label:hover { 
+      background-color: #F0F9FC; 
+    }
+
+    .radio-label input[type="radio"] { 
+      width: 18px; 
+      height: 18px; 
+      accent-color: #45B0E1; 
+      cursor: pointer; 
+    }
+
+    .save-btn { 
+      margin-top: 12px; 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    .save-btn:hover { 
+      background-color: #2E8BC0; 
+      border-color: #2E8BC0; 
+    }
+      
+    .status { 
+      position: fixed; 
+      bottom: 0; 
+      left: 0; 
+      right: 0; 
+      width: 100%; 
+      text-align: center; 
+      color: #000000; 
+      font-size: 16px; 
+      font-weight: 600; 
+      padding: 12px 0; 
+      z-index: 1000; 
+      transition: transform 0.5s ease, opacity 0.5s ease; 
+      transform: translateY(0); 
+      opacity: 1; 
+    }
+      
+    .status.status-hidden { 
+      transform: translateY(100%); 
+      opacity: 0; 
+      pointer-events: none; 
+    }
+      
+    @media (max-width: 480px) { 
+      body { padding: 16px 12px; } 
+      h1 { font-size: 22px; margin-bottom: 20px; } 
+      button { padding: 12px 14px; } 
+    }
+
+    .custom-datalist {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-datalist-input {
+      width: 100%;
+      padding-right: 75px !important; 
+    }
+
+    .custom-datalist-arrow {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #45B0E1;
+      font-size: 20px;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+      user-select: none;
+    }
+
+    .clear-input-btn {
+      position: absolute;
+      right: 45px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999999;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 8px;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      z-index: 2;
+    }
+
+    .custom-datalist-arrow.open {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-datalist.disabled .custom-datalist-input {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+
+    .custom-datalist-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-top: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-datalist-option {
+      padding: 14px 20px;
+      font-size: 16px;
+      color: #000000;
+      cursor: pointer;
+      border-bottom: 1px solid #F0F0F0;
+      transition: background-color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .custom-datalist-option:last-child {
+      border-bottom: none;
+    }
+
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active {
+      background-color: #F0F9FC;
+      color: #2E8BC0;
+    }
+
+    .custom-datalist-option.empty {
+      color: #999999;
+      font-style: italic;
+      cursor: default;
+      text-align: center;
+    }
+
+    .custom-datalist-option.empty:hover {
+      background-color: transparent;
+      color: #999999;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-track {
+      background: #F8FDFF;
+    }
+
+    .custom-datalist-dropdown::-webkit-scrollbar-thumb {
+      background: #45B0E1;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 480px) {
+      .custom-datalist-dropdown {
+        max-height: 200px;
+      }
+      .custom-datalist-option {
+        padding: 12px 16px;
+        font-size: 15px;
+      }
+    }
+  </style>
+</html>
