@@ -12,85 +12,87 @@
     <div id="app">
       <h1>Формирование списка</h1>
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
-        <div class="form-group">
-          <label class="form-label checkbox-label">
-            <input type="checkbox" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
-            <span class="checkbox-text">Все адреса</span>
-          </label>              
-          <label for="streetInput" class="form-label">Улица</label>
-          <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
-            <div class="custom-datalist-input-wrapper">
-              <input type="text" id="streetInput" placeholder="Введите улицу" autocomplete="off" v-model="streetSearch" class="form-input custom-datalist-input" :disabled="isLoading || streets.length === 0" @focus="isStreetOpen = true" @blur="closeStreet" @input="isStreetOpen = true">
-              <span v-if="streetSearch" class="clear-input-btn" @mousedown.prevent="clearStreet">✕</span>
-              <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+        <div class="main-layout">
+          <div class="left-column">
+            <div class="form-group">              
+              <label for="streetInput" class="form-label">Улица</label>
+              <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
+                <div class="custom-datalist-input-wrapper">
+                  <input type="text" id="streetInput" placeholder="Введите улицу" autocomplete="off" v-model="streetSearch" class="form-input custom-datalist-input" :disabled="isLoading || streets.length === 0" @focus="isStreetOpen = true" @blur="closeStreet" @input="isStreetOpen = true">
+                  <span v-if="streetSearch" class="clear-input-btn" @mousedown.prevent="clearStreet">✕</span>
+                  <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+                </div>
+                <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+                  <div v-for="street in filteredStreets" :key="street.id" class="custom-datalist-option" @mousedown.prevent="selectStreet(street)">{{ street.name }}</div>
+                </div>
+              </div>
             </div>
-            <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
-              <div v-for="street in filteredStreets" :key="street.id" class="custom-datalist-option" @mousedown.prevent="selectStreet(street)">{{ street.name }}</div>
+            <div class="form-group">
+              <label for="houseInput" class="form-label">Дом</label>
+              <div class="custom-datalist" :class="{ disabled: isLoading || !selectedStreetId }">
+                <div class="custom-datalist-input-wrapper">
+                  <input type="text" id="houseInput" placeholder="Введите номер дома" autocomplete="off" v-model="houseSearch" class="form-input custom-datalist-input" :disabled="isLoading || !selectedStreetId" @focus="isHouseOpen = true" @blur="closeHouse" @input="isHouseOpen = true">
+                  <span v-if="houseSearch" class="clear-input-btn" @mousedown.prevent="clearHouse">✕</span>
+                  <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
+                </div>
+                <div v-if="isHouseOpen && filteredBuildings.length" class="custom-datalist-dropdown">
+                  <div v-for="bld in filteredBuildings" :key="bld.id" class="custom-datalist-option" @mousedown.prevent="selectHouse(bld)">{{ bld.name }}</div>
+                </div>
+              </div>
+            </div>  
+            <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
+              <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
+              <span class="checkbox-text">Адреса без назначенной даты посещения</span>
+            </label>
+            <div class="form-group">
+              <label for="listInput" class="form-label">Список адресов</label>
+              <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
+                <div class="custom-datalist-input-wrapper">
+                  <input type="text" id="listInput" placeholder="Выберите адрес из списка" autocomplete="off" v-model="selectedAddressText" class="form-input custom-datalist-input" :disabled="isLoading || !selectedBuildingId" @focus="isListOpen = true" @blur="closeList" @input="isListOpen = true">
+                  <span v-if="selectedAddressText" class="clear-input-btn" @mousedown.prevent="clearList">✕</span>
+                  <span class="custom-datalist-arrow" :class="{ open: isListOpen }">▼</span>
+                </div>
+                <div v-if="isListOpen && filteredAddresses.length" class="custom-datalist-dropdown">
+                  <div v-for="addr in filteredAddresses" :key="addr.meterId" class="custom-datalist-option" @mousedown.prevent="selectAddress(addr)">{{ addr.displayText }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedAddress" class="right-column">
+            <div class="meter-block selected">
+              <h4>Выбранный объект</h4>
+              <div class="meter-details">
+                <div class="detail-row">
+                  <span class="detail-label">Адрес:</span>
+                  <span class="detail-value">{{ selectedAddress.displayText }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Дата проверки:</span>
+                  <input v-model="editData.verifyDate" type="date" class="edit-input" :disabled="saving">
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">ФИО</span>
+                  <input v-model="" type="text" class="edit-input" :disabled="saving">
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Ответственный контролёр</span>
+                  <select v-model="editData.controllerId" class="edit-input" :disabled="saving || controllers.length === 0">
+                    <option :value="null">Нет</option>
+                    <option v-for="ctrl in controllers" :key="ctrl.ID" :value="ctrl.ID">{{ ctrl.FIO }}</option>
+                  </select>
+                </div>
+                <div v-if="showNoReadings && noReadingsMonths >= 1 && noReadingsMonths < 120" class="detail-row">
+                  <span class="detail-label" style="margin: 0;">Не передавали показания более</span>
+                  <input type="number" id="noReadingsMonths" v-model.number="noReadingsMonths" min="1" max="120" class="edit-input" :disabled="saving" readonly>
+                  <span class="detail-label" style="margin: 0;">месяцев</span>
+                </div>
+                <button type="submit" class="save-btn" :disabled="saving">
+                  {{ saving ? 'Сохранение...' : 'Сохранить' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label for="houseInput" class="form-label">Дом</label>
-          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedStreetId }">
-            <div class="custom-datalist-input-wrapper">
-              <input type="text" id="houseInput" placeholder="Введите номер дома" autocomplete="off" v-model="houseSearch" class="form-input custom-datalist-input" :disabled="isLoading || !selectedStreetId" @focus="isHouseOpen = true" @blur="closeHouse" @input="isHouseOpen = true">
-              <span v-if="houseSearch" class="clear-input-btn" @mousedown.prevent="clearHouse">✕</span>
-              <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
-            </div>
-            <div v-if="isHouseOpen && filteredBuildings.length" class="custom-datalist-dropdown">
-              <div v-for="bld in filteredBuildings" :key="bld.id" class="custom-datalist-option" @mousedown.prevent="selectHouse(bld)">{{ bld.name }}</div>
-            </div>
-          </div>
-        </div>
-        <label style="visibility: collapse;" class="form-label checkbox-label" :class="{ disabled: isLoading }">
-          <input type="checkbox" id="noReadings" checked="true" v-model="showNoReadings" :disabled="isLoading" class="form-checkbox">
-          <span class="checkbox-text">Не передавали показания</span>
-        </label>    
-        <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
-          <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
-          <span class="checkbox-text">Адреса без назначенной даты посещения</span>
-        </label>
-        <div class="form-group">
-          <label for="listInput" class="form-label">Список адресов</label>
-          <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
-            <div class="custom-datalist-input-wrapper">
-              <input type="text" id="listInput" placeholder="Выберите адрес из списка" autocomplete="off" v-model="selectedAddressText" class="form-input custom-datalist-input" :disabled="isLoading || !selectedBuildingId" @focus="isListOpen = true" @blur="closeList" @input="isListOpen = true">
-              <span v-if="selectedAddressText" class="clear-input-btn" @mousedown.prevent="clearList">✕</span>
-              <span class="custom-datalist-arrow" :class="{ open: isListOpen }">▼</span>
-            </div>
-            <div v-if="isListOpen && filteredAddresses.length" class="custom-datalist-dropdown">
-              <div v-for="addr in filteredAddresses" :key="addr.meterId" class="custom-datalist-option" @mousedown.prevent="selectAddress(addr)">{{ addr.displayText }}</div>
-            </div>
-          </div>
-        </div>
-        <div v-if="selectedAddress" class="meter-block selected">
-          <h4>Выбранный объект</h4>
-          <div class="meter-details">
-            <div class="detail-row">
-              <span class="detail-label">Адрес:</span>
-              <span class="detail-value">{{ selectedAddress.displayText }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Дата проверки:</span>
-              <input v-model="editData.verifyDate" type="date" class="edit-input" :disabled="saving">
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Ответственный контролёр</span>
-              <select v-model="editData.controllerId" class="edit-input" :disabled="saving || controllers.length === 0">
-                <option :value="null">Нет</option>
-                <option v-for="ctrl in controllers" :key="ctrl.ID" :value="ctrl.ID">{{ ctrl.FIO }}</option>
-              </select>
-            </div>
-            <div v-if="showNoReadings && noReadingsMonths >= 1 && noReadingsMonths < 120" class="detail-row">
-              <span class="detail-label" style="margin: 0;">Не передавали показания более</span>
-              <input type="number" id="noReadingsMonths" v-model.number="noReadingsMonths" min="1" max="120" class="edit-input" :disabled="saving" readonly>
-              <span class="detail-label" style="margin: 0;">месяцев</span>
-            </div>
-            <button type="submit" class="save-btn" :disabled="saving">
-              {{ saving ? 'Сохранение...' : 'Сохранить' }}
-            </button>
-          </div>
-        </div>  
         <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
         <button type="button" @click="logout" class="btn-secondary">Выход</button>
       </form>
@@ -118,7 +120,6 @@
           const selectedAddressText = ref('');
           const selectedAddress = ref(null);
           const controllers = ref([]);
-          const showAllAddresses = ref(false);
           const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
           const isStreetOpen = ref(false);
           const isHouseOpen = ref(false);
@@ -141,15 +142,6 @@
             }
           });
 
-          watch(showAllAddresses, async () => {
-            filteredAddressList.value = [];
-            selectedBuildingId.value = null;
-            houseSearch.value = '';
-            selectedAddressText.value = '';
-            selectedAddress.value = null;
-            await loadData();
-          });
-
           watch(showOnlyWithoutDate, () => {
             selectedAddress.value = null;
             selectedAddressText.value = '';
@@ -160,14 +152,8 @@
             isLoading.value = true;
             error.value = '';           
             try {
-              const controllerId = sessionStorage.getItem('controllerId') || '0';            
-              let data = [];
-              if (showAllAddresses.value) {
-                data = await apiRequest('/all-addresses', {});
-              } else {
-                data = await getControllerAddresses(controllerId);
-              }                        
-              allAddresses.value = data || [];           
+              const data = await apiRequest('/all-addresses', {});              
+              allAddresses.value = data || [];            
               const streetMap = new Map();
               allAddresses.value.forEach(addr => {
                 if (!streetMap.has(addr.streetId)) {
@@ -250,12 +236,19 @@
           };
 
           const closeStreet = () => {
-            isStreetOpen.value = false;
-            if (streetSearch.value && !streets.value.find(s => s.name === streetSearch.value)) {
-              selectedStreetId.value = null; buildings.value = []; selectedBuildingId.value = null;
-              houseSearch.value = ''; filteredAddressList.value = []; selectedAddress.value = null; selectedAddressText.value = '';
-            }
-          };
+          isStreetOpen.value = false;
+          const match = streets.value.find(s => s.name === streetSearch.value);
+          if (!match) {
+            selectedStreetId.value = null;
+            buildings.value = [];
+            selectedBuildingId.value = null;
+            houseSearch.value = '';
+            filteredAddressList.value = [];
+            selectedAddress.value = null;
+            selectedAddressText.value = '';
+            editData.value = { meterId: null, verifyDate: '', controllerId: null };
+          }
+        };
 
           const selectHouse = (bld) => {
             houseSearch.value = bld.name;
@@ -268,8 +261,13 @@
 
           const closeHouse = () => {
             isHouseOpen.value = false;
-            if (houseSearch.value && !buildings.value.find(b => b.name === houseSearch.value)) {
-              selectedBuildingId.value = null; filteredAddressList.value = []; selectedAddress.value = null; selectedAddressText.value = '';
+            const match = buildings.value.find(b => b.name === houseSearch.value);
+            if (!match) {
+              selectedBuildingId.value = null;
+              filteredAddressList.value = [];
+              selectedAddress.value = null;
+              selectedAddressText.value = '';
+              editData.value = { meterId: null, verifyDate: '', controllerId: null };
             }
           };
 
@@ -363,7 +361,7 @@
             showNoReadings, noReadingsMonths, 
             selectStreet, selectHouse, selectAddress,
             closeStreet, closeHouse, closeList,
-            saveVerifyDate, controllers, showAllAddresses,
+            saveVerifyDate, controllers,
             continueAction, logout
           };
         }
@@ -412,22 +410,23 @@
       background-color: #FFFFFF; 
       display: flex; 
       flex-direction: column; 
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center; 
       min-height: 100vh; 
-      padding: 24px 16px; 
+      padding: 32px 24px; 
     }
 
     h1 { 
-      font-size: 24px; 
+      font-size: 28px; 
       font-weight: 600; 
-      margin-bottom: 24px; 
+      margin-bottom: 32px; 
       text-align: center; 
+      color: #000000;
     }
       
     button { 
       width: 100%; 
-      padding: 14px 16px; 
+      padding: 16px 20px; 
       font-size: 16px; 
       font-weight: 500; 
       color: #FFFFFF; 
@@ -435,7 +434,8 @@
       border: 2px solid #45B0E1; 
       border-radius: 0; 
       cursor: pointer; 
-      transition: background-color 0.2s ease, border-color 0.2s ease; text-align: center; 
+      transition: background-color 0.2s ease, border-color 0.2s ease; 
+      text-align: center; 
     }
 
     button:hover { 
@@ -463,16 +463,16 @@
       
     form { 
       width: 100%; 
-      max-width: 500px; 
+      max-width: 600px; 
       display: flex; 
       flex-direction: column; 
-      gap: 20px; 
+      gap: 24px; 
     }
       
     .form-group { 
       display: flex; 
       flex-direction: column; 
-      gap: 8px; 
+      gap: 10px; 
       position: relative; 
     }
       
@@ -486,7 +486,7 @@
       width: 100%; 
       min-height: 56px; 
       padding: 16px 20px; 
-      font-size: 18px; 
+      font-size: 17px; 
       color: #000000; 
       background-color: #FFFFFF; 
       border: 2px solid #45B0E1; 
@@ -525,28 +525,28 @@
     }
       
     .meter-block.selected { 
-      margin-top: 20px; 
-      padding: 20px; 
+      margin-top: 24px; 
+      padding: 24px; 
       border: 2px solid #45B0E1; 
       background-color: #F8FDFF; 
     }
       
     .meter-block h4 { 
-      margin-bottom: 16px; 
-      font-size: 18px; 
+      margin-bottom: 20px; 
+      font-size: 20px; 
       color: #2E8BC0; 
     }
       
     .meter-details { 
       display: flex; 
       flex-direction: column; 
-      gap: 12px; 
+      gap: 16px; 
     }
       
     .detail-row { 
       display: flex; 
       flex-direction: column; 
-      gap: 4px; 
+      gap: 6px; 
     }
       
     .detail-label { 
@@ -562,11 +562,12 @@
       
     .edit-input { 
       width: 100%; 
-      min-height: 40px; 
-      padding: 8px 12px; 
+      min-height: 44px; 
+      padding: 10px 14px; 
       font-size: 16px; 
       border: 1px solid #45B0E1; 
       outline: none; 
+      background-color: #FFFFFF;
     }
       
     .edit-input:focus { 
@@ -578,7 +579,8 @@
       top: 0; left: 0; 
       width: 100%; 
       height: 100%; 
-      background-color: rgba(0, 0, 0, 0.7); z-index: 9999; 
+      background-color: rgba(0, 0, 0, 0.7); 
+      z-index: 9999; 
       display: flex; 
       align-items: center; 
       justify-content: center; 
@@ -586,36 +588,36 @@
 
     .overlay-content { 
       background: #FFFFFF; 
-      padding: 30px 40px; 
+      padding: 36px 48px; 
       border-radius: 8px; 
       text-align: center; 
       max-width: 90%; 
-      min-width: 280px; 
+      min-width: 320px; 
       border: 2px solid #45B0E1; 
     }
 
     .overlay-content .act { 
-      font-size: 22px; 
+      font-size: 24px; 
       font-weight: 600; 
-      margin-bottom: 12px; 
+      margin-bottom: 16px; 
       color: #000000; 
     }
 
     .overlay-content .datetime { 
-      font-size: 16px; 
+      font-size: 17px; 
       color: #333333; 
-      margin-bottom: 20px; 
+      margin-bottom: 24px; 
     }
 
     .overlay-content button { 
-      max-width: 200px; 
+      max-width: 220px; 
       margin: 0 auto; 
     }
 
     .checkbox-label {
       flex-direction: row;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       cursor: pointer;
       user-select: none;
       display: flex;
@@ -651,20 +653,20 @@
     .radio-group { 
       display: flex; 
       flex-direction: column; 
-      gap: 12px; 
-      padding: 16px; 
+      gap: 14px; 
+      padding: 20px; 
       border: 2px solid #45B0E1; 
-      margin-top: 16px; 
+      margin-top: 20px; 
       background-color: #FFFFFF; 
     }
 
     .radio-label { 
       display: flex; 
       align-items: center; 
-      gap: 10px; 
+      gap: 12px; 
       cursor: pointer; 
       font-size: 16px; 
-      padding: 8px; 
+      padding: 10px; 
       border-radius: 4px; 
       transition: background-color 0.2s ease; 
     }
@@ -674,21 +676,21 @@
     }
 
     .radio-label input[type="radio"] { 
-      width: 18px; 
-      height: 18px; 
+      width: 20px; 
+      height: 20px; 
       accent-color: #45B0E1; 
       cursor: pointer; 
     }
 
     .save-btn { 
-      margin-top: 12px; 
+      margin-top: 16px; 
       background-color: #2E8BC0; 
       border-color: #2E8BC0; 
     }
       
     .save-btn:hover { 
-      background-color: #2E8BC0; 
-      border-color: #2E8BC0; 
+      background-color: #1A6B96; 
+      border-color: #1A6B96; 
     }
       
     .status { 
@@ -713,12 +715,6 @@
       opacity: 0; 
       pointer-events: none; 
     }
-      
-    @media (max-width: 480px) { 
-      body { padding: 16px 12px; } 
-      h1 { font-size: 22px; margin-bottom: 20px; } 
-      button { padding: 12px 14px; } 
-    }
 
     .custom-datalist {
       position: relative;
@@ -732,12 +728,12 @@
 
     .custom-datalist-input {
       width: 100%;
-      padding-right: 75px !important; 
+      padding-right: 80px !important; 
     }
 
     .custom-datalist-arrow {
       position: absolute;
-      right: 16px;
+      right: 20px;
       top: 50%;
       transform: translateY(-50%);
       color: #45B0E1;
@@ -749,7 +745,7 @@
 
     .clear-input-btn {
       position: absolute;
-      right: 45px;
+      right: 50px;
       top: 50%;
       transform: translateY(-50%);
       color: #999999;
@@ -762,6 +758,10 @@
       touch-action: manipulation;
       user-select: none;
       z-index: 2;
+    }
+
+    .clear-input-btn:hover {
+      color: #45B0E1;
     }
 
     .custom-datalist-arrow.open {
@@ -780,7 +780,7 @@
       top: 100%;
       left: 0;
       right: 0;
-      max-height: 240px;
+      max-height: 280px;
       overflow-y: auto;
       background: #FFFFFF;
       border: 2px solid #45B0E1;
@@ -791,7 +791,7 @@
     }
 
     .custom-datalist-option {
-      padding: 14px 20px;
+      padding: 16px 24px;
       font-size: 16px;
       color: #000000;
       cursor: pointer;
@@ -825,7 +825,7 @@
     }
 
     .custom-datalist-dropdown::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
     }
 
     .custom-datalist-dropdown::-webkit-scrollbar-track {
@@ -834,16 +834,160 @@
 
     .custom-datalist-dropdown::-webkit-scrollbar-thumb {
       background: #45B0E1;
-      border-radius: 3px;
+      border-radius: 4px;
     }
 
-    @media (max-width: 480px) {
-      .custom-datalist-dropdown {
-        max-height: 200px;
+    .custom-datalist-dropdown::-webkit-scrollbar-thumb:hover {
+      background: #2E8BC0;
+    }
+
+    @media (max-width: 480px) { 
+      body { 
+        padding: 20px 16px; 
+      } 
+      
+      h1 { 
+        font-size: 24px; 
+        margin-bottom: 24px; 
+      } 
+      
+      form {
+        max-width: 100%;
+        gap: 20px;
       }
+      
+      button { 
+        padding: 14px 16px; 
+      } 
+      
+      .form-input {
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+      
+      .custom-datalist-dropdown {
+        max-height: 220px;
+      }
+      
       .custom-datalist-option {
-        padding: 12px 16px;
+        padding: 14px 18px;
         font-size: 15px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      body {
+        padding: 40px 32px;
+        justify-content: center;
+      }
+      
+      h1 {
+        font-size: 32px;
+        margin-bottom: 40px;
+      }
+      
+      form {
+        max-width: 1100px;
+        gap: 28px;
+      }
+      
+      .form-input {
+        min-height: 60px;
+        padding: 18px 24px;
+        font-size: 18px;
+      }
+      
+      button {
+        padding: 18px 24px;
+        font-size: 17px;
+      }
+      
+      .meter-block.selected {
+        padding: 28px;
+      }
+      
+      .meter-block h4 {
+        font-size: 22px;
+      }
+      
+      .custom-datalist-dropdown {
+        max-height: 320px;
+      }
+      
+      .custom-datalist-option {
+        padding: 18px 28px;
+        font-size: 17px;
+      }
+    }
+
+    @media (min-width: 1200px) {
+      form {
+        max-width: 1200px;
+      }
+      
+      .main-layout {
+        gap: 40px;
+      }
+      
+      .left-column {
+        gap: 24px;
+      }
+      
+      .form-input {
+        padding: 20px 28px;
+      }
+      
+      button {
+        padding: 20px 28px;
+      }
+      
+      .custom-datalist-dropdown {
+        max-height: 360px;
+      }
+    }
+
+    .main-layout {
+      display: flex;
+      gap: 32px;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .left-column {
+      flex: 1 1 55%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+    }
+
+    .right-column {
+      flex: 1 1 45%;
+      min-width: 300px;
+    }
+
+    .right-column .meter-block.selected {
+      margin-top: 0;
+      position: sticky;
+      top: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .main-layout {
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .left-column,
+      .right-column {
+        flex: 1 1 100%;
+        min-width: 0;
+        width: 100%;
+      }
+
+      .right-column .meter-block.selected {
+        margin-top: 24px;
+        position: static;
       }
     }
   </style>

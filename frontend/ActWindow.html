@@ -83,11 +83,7 @@
               </div>
             </div>
           </div>
-        </div>
-        <label style="visibility: collapse;" class="form-label checkbox-label" :class="{ disabled: isLoading }">
-          <input type="checkbox" id="noReadings" checked="true" v-model="showNoReadings" :disabled="isLoading" class="form-checkbox">
-          <span class="checkbox-text">Не передавали показания</span>
-        </label>    
+        </div>  
         <label class="form-label checkbox-label" :class="{ disabled: isLoading }">
           <input type="checkbox" id="onlyWithoutDate" v-model="showOnlyWithoutDate" :disabled="isLoading" class="form-checkbox">
           <span class="checkbox-text">Адреса без назначенной даты посещения</span>
