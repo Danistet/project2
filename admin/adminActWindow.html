@@ -3,14 +3,14 @@
   <head>
     <meta charset="WIN1251">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Формирование списка</title>
+    <title>Редактирование списка</title>
     <link rel="icon" href="data:,">
     <script src="./vendor/vue.global.js"></script>
     <script src="./apiadmin.js"></script>
   </head>
   <body>
     <div id="app">
-      <h1>Формирование списка</h1>
+      <h1>Редактирование списка</h1>
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="main-layout">
           <div class="left-column">
@@ -93,7 +93,7 @@
             </div>
           </div>
         </div>
-        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Продолжить</button>
+        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;">Формирование списка</button>
         <button type="button" @click="logout" class="btn-secondary">Выход</button>
       </form>
       <div class="status" id="statusDiv"></div>
@@ -342,6 +342,7 @@
           };
 
           const continueAction = () => {
+            window.location.href = 'FormListWindow.html';
           };
 
           onMounted(() => {

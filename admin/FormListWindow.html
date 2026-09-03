@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="WIN1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Формирование списка</title>
+    <link rel="icon" href="data:,">
+    <script src="./vendor/vue.global.js"></script>
+    <script src="./apiadmin.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <h1>Редактирование списка</h1>
+      <div class="top-layout">
+        <div class="left-column">
+          <h3 class="section-title">Параметры формирования</h3>
+          <div class="form-group">
+            <label for="streetInput" class="form-label">Улица</label>
+            <div class="custom-datalist" :class="{ disabled: isLoading || streets.length === 0 }">
+              <div class="custom-datalist-input-wrapper">
+                <input type="text" id="streetInput" placeholder="Введите улицу" autocomplete="off"
+                  v-model="streetSearch" class="form-input custom-datalist-input"
+                  :disabled="isLoading || streets.length === 0"
+                  @focus="isStreetOpen = true" @blur="closeStreet" @input="isStreetOpen = true">
+                <span v-if="streetSearch" class="clear-input-btn" @mousedown.prevent="clearStreet">✕</span>
+                <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+              </div>
+              <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+                <div v-for="street in filteredStreets" :key="street.id"
+                  class="custom-datalist-option"
+                  @mousedown.prevent="selectStreet(street)">{{ street.name }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="checkbox-row">
+              <label class="form-label">Диапазон домов</label>
+              <label class="checkbox-label-inline">
+                <input type="checkbox" v-model="allHouses" class="form-checkbox">
+                <span class="checkbox-text">все дома</span>
+              </label>
+            </div>
+            <div class="range-row">
+              <input type="text" v-model="houseFrom" placeholder="от" class="form-input range-input" :disabled="isLoading || allHouses">
+              <span class="range-sep">—</span>
+              <input type="text" v-model="houseTo" placeholder="до" class="form-input range-input" :disabled="isLoading || allHouses">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="checkbox-row">
+              <label class="form-label">Последняя передача показаний</label>
+              <label class="checkbox-label-inline">
+                <input type="checkbox" v-model="allTimeReadings" class="form-checkbox">
+                <span class="checkbox-text">за всё время</span>
+              </label>
+            </div>
+            <div class="range-row">
+              <input type="date" v-model="lastIndFrom" class="form-input range-input" :disabled="isLoading || allTimeReadings">
+              <span class="range-sep">—</span>
+              <input type="date" v-model="lastIndTo" class="form-input range-input" :disabled="isLoading || allTimeReadings">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Срок поверки</label>
+            <select v-model="verifyFilter" class="form-input" :disabled="isLoading">
+              <option value="">Все</option>
+              <option value="expired">С истёкшим сроком</option>
+              <option value="valid">С действующим сроком</option>
+            </select>
+          </div>
+          <button type="button" class="btn-primary" @click="buildList" :disabled="isLoading || !streetSearch">
+            {{ isLoading ? 'Загрузка...' : 'Подтвердить' }}
+          </button>
+        </div>
+        <div class="right-column">
+          <h3 class="section-title">
+            Список адресов
+            <span v-if="addressList.length" class="counter">({{ addressList.length }})</span>
+          </h3>
+          <div v-if="!listLoaded" class="empty-state">
+              
+          </div>
+          <div v-else-if="addressList.length === 0" class="empty-state">
+            По заданным параметрам адресов не найдено
+          </div>
+          <div v-else class="address-table-wrapper">
+            <table class="address-table">
+              <thead>
+                <tr>
+                  <th>Адрес</th>
+                  <th>ФИО</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="addr in addressList" :key="addr.meterId"
+                  :class="{ selected: selectedMeterId === addr.meterId }"
+                  @click="selectAddressRow(addr)">
+                  <td>{{ addr.address }}</td>
+                  <td>{{ addr.fio }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div v-if="selectedMeterId" class="details-block">
+        <h3 class="section-title">Данные объекта</h3>
+        <div v-if="detailsLoading" class="empty-state">Загрузка данных...</div>
+        <div v-else class="details-grid">
+          <div class="details-col">
+            <div class="detail-field">
+              <label class="detail-label">Лицевой счёт</label>
+              <input type="text" v-model="details.licschet" class="edit-input" readonly>
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Адрес</label>
+              <input type="text" v-model="details.address" class="edit-input" readonly>
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">ФИО</label>
+              <input type="text" v-model="details.fio" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Телефон</label>
+              <input type="text" v-model="details.clientPhone" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Почта</label>
+              <input type="text" v-model="details.clientMail" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Последнее показание</label>
+              <input type="text" v-model="details.lastPh" class="edit-input" readonly>
+            </div>
+          </div>
+          <div class="details-col">
+            <div class="detail-field">
+              <label class="detail-label">Дата проверки</label>
+              <input type="date" v-model="details.verifyDate" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Ответственный контролёр</label>
+              <select v-model="details.controllerId" class="edit-input" :disabled="saving">
+                <option :value="null">Нет</option>
+                <option v-for="c in details.controllers" :key="c.id" :value="c.id">{{ c.fio }}</option>
+              </select>
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Услуга</label>
+              <select v-model="details.serviceId" class="edit-input" :disabled="saving">
+                <option :value="null">—</option>
+                <option v-for="s in details.services" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Номер счётчика</label>
+              <input type="text" v-model="details.meterNum" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Номер пломбы</label>
+              <input type="text" v-model="details.seal" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Статус бойлера</label>
+              <input type="text" v-model="details.boilerStatus" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Дата изготовления</label>
+              <input type="date" v-model="details.manfDate" class="edit-input" :disabled="saving">
+            </div>
+            <div class="detail-field">
+              <label class="detail-label">Дата установки</label>
+              <input type="date" v-model="details.mountDate" class="edit-input" :disabled="saving">
+            </div>
+          </div>
+        </div>
+        <div class="details-actions">
+          <button type="button" class="save-btn" :disabled="saving" @click="saveDetails">
+            {{ saving ? 'Сохранение...' : 'Сохранить' }}
+          </button>
+          <p v-if="saveMessage" :class="['save-message', saveMessageType]">{{ saveMessage }}</p>
+        </div>
+      </div>
+      <button type="button" class="btn-secondary" style="margin-top: 20px;" @click="logout">Выход</button>
+      <div class="status" id="statusDiv"></div>
+    </div>
+  </body>
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+        createApp({
+            setup() {
+            const isLoading = ref(false);
+            const saving = ref(false);
+            const streets = ref([]);
+            const streetSearch = ref('');
+            const selectedStreetId = ref(null);
+            const isStreetOpen = ref(false);
+            const houseFrom = ref('');
+            const houseTo = ref('');
+            const allHouses = ref(false);
+            const lastIndFrom = ref('');
+            const lastIndTo = ref('');
+            const allTimeReadings = ref(false);
+            const verifyFilter = ref('');
+            const listLoaded = ref(false);
+            const addressList = ref([]);
+            const selectedMeterId = ref(null);
+            const detailsLoading = ref(false);
+            const details = ref({
+              meterId: null, licschet: '', address: '', verifyDate: '',
+              fio: '', clientId: null, clientPhone: '', clientMail: '',
+              controllerId: null, serviceId: null, seal: '', boilerStatus: '',
+              lastPh: '', manfDate: '', mountDate: '', meterNum: '',
+              services: [], controllers: []
+            });
+            const saveMessage = ref('');
+            const saveMessageType = ref('success');
+            watch(allHouses, (newVal) => {
+              if (!newVal) {
+                houseFrom.value = '';
+                houseTo.value = '';
+              }
+            });
+            watch(allTimeReadings, (newVal) => {
+              if (newVal) {
+                lastIndFrom.value = '';
+                lastIndTo.value = '';
+              }
+            });            
+            const filteredStreets = computed(() => {
+              if (!streetSearch.value) return streets.value;
+              const term = streetSearch.value.toLowerCase();
+              return streets.value.filter(s => s.name.toLowerCase().includes(term));
+            });
+            const loadStreets = async () => {
+              isLoading.value = true;
+              try {
+                const data = await apiRequest('/all-streets', {});
+                streets.value = Array.isArray(data) ? data : [];
+              } catch (e) {
+                console.error('Failed to load streets:', e);
+              } finally {
+                isLoading.value = false;
+              }
+            };
+            const selectStreet = (street) => {
+              streetSearch.value = street.name;
+              selectedStreetId.value = street.id;
+              isStreetOpen.value = false;
+            };
+            const closeStreet = () => {
+              isStreetOpen.value = false;
+              if (streetSearch.value && !streets.value.find(s => s.name === streetSearch.value)) {
+                selectedStreetId.value = null;
+                streetSearch.value = '';
+              }
+            };
+            const clearStreet = () => {
+              streetSearch.value = '';
+              selectedStreetId.value = null;
+              isStreetOpen.value = false;
+            };
+            const buildList = async () => {
+              if (!selectedStreetId.value) {
+                alert('Выберите улицу');
+                return;
+              }
+              isLoading.value = true;
+              listLoaded.value = false;
+              addressList.value = [];
+              selectedMeterId.value = null;
+              try {
+                const data = await apiRequest('/addresses-by-params', {
+                  streetId: selectedStreetId.value,
+                  houseFrom: houseFrom.value,
+                  houseTo: houseTo.value,
+                  lastIndDateFrom: lastIndFrom.value,
+                  lastIndDateTo: lastIndTo.value,
+                  verifyFilter: verifyFilter.value
+                });
+                addressList.value = Array.isArray(data) ? data : [];
+                listLoaded.value = true;
+              } catch (e) {
+                console.error(e);
+                alert('Ошибка загрузки списка: ' + (e.message || ''));
+              } finally {
+                isLoading.value = false;
+              }
+            };
+            const selectAddressRow = async (addr) => {
+              selectedMeterId.value = addr.meterId;
+              detailsLoading.value = true;
+              saveMessage.value = '';
+              try {
+                const data = await apiRequest('/meter-full-details', { meterId: addr.meterId });
+                details.value = {
+                  meterId: data.meterId,
+                  licschet: data.licschet || '',
+                  address: data.address || '',
+                  verifyDate: data.verifyDate || '',
+                  fio: data.fio || '',
+                  clientId: data.clientId,
+                  clientPhone: data.clientPhone || '',
+                  clientMail: data.clientMail || '',
+                  controllerId: data.controllerId,
+                  serviceId: data.serviceId,
+                  seal: data.seal || '',
+                  boilerStatus: data.boilerStatus || '',
+                  lastPh: data.lastPh || '',
+                  manfDate: data.manfDate || '',
+                  mountDate: data.mountDate || '',
+                  meterNum: data.meterNum || '',
+                  services: data.services || [],
+                  controllers: data.controllers || []
+                };
+              } catch (e) {
+                console.error(e);
+                alert('Ошибка загрузки деталей');
+              } finally {
+                detailsLoading.value = false;
+              }
+            };
+            const saveDetails = async () => {
+              if (!details.value.meterId) return;
+              saving.value = true;
+              saveMessage.value = '';
+              try {
+                await apiRequest('/update-meter-full', {
+                  meterId: details.value.meterId,
+                  meterNum: details.value.meterNum,
+                  seal: details.value.seal,
+                  manfDate: details.value.manfDate,
+                  mountDate: details.value.mountDate,
+                  verifyDate: details.value.verifyDate,
+                  controllerId: details.value.controllerId,
+                  serviceId: details.value.serviceId,
+                  fio: details.value.fio,
+                  clientPhone: details.value.clientPhone,
+                  clientMail: details.value.clientMail,
+                  boilerStatus: details.value.boilerStatus
+                });
+                saveMessage.value = 'Данные сохранены';
+                saveMessageType.value = 'success';
+                const row = addressList.value.find(a => a.meterId === details.value.meterId);
+                if (row) row.fio = details.value.fio || 'ФИО не указано';
+              } catch (e) {
+                saveMessage.value = 'Ошибка: ' + (e.message || 'Неизвестная ошибка');
+                saveMessageType.value = 'error';
+              } finally {
+                saving.value = false;
+              }
+            };
+            const logout = () => {
+              window.location.href = 'adminActWindow.html';
+            };
+            onMounted(() => {
+              loadStreets();
+            });
+            return {
+              isLoading, saving, streets, streetSearch, selectedStreetId,
+              isStreetOpen, houseFrom, houseTo, allHouses, lastIndFrom, lastIndTo, verifyFilter,
+              listLoaded, addressList, selectedMeterId, allTimeReadings,
+              detailsLoading, details, saveMessage, saveMessageType,
+              filteredStreets,
+              selectStreet, closeStreet, clearStreet,
+              buildList, selectAddressRow, saveDetails, logout
+            };
+          }
+        }).mount('#app');
+    </script>
+  <script>
+      let statusTimeout;    
+      let isInitialLoad = true;
+      function updateStatus(isOnline) {
+        var statusDiv = document.getElementById("statusDiv");
+        if (!statusDiv) return;
+        clearTimeout(statusTimeout);
+        if (isOnline) {
+          if (!isInitialLoad) {
+            statusDiv.style.backgroundColor = "#44ff00";
+            statusDiv.textContent = "Подключено";
+            statusDiv.classList.remove("status-hidden");        
+            statusTimeout = setTimeout(() => statusDiv.classList.add("status-hidden"), 5000);
+          }
+        } else {
+          statusDiv.style.backgroundColor = "#ff0007";
+          statusDiv.textContent = "Нет подключения к сети";
+          statusDiv.classList.remove("status-hidden");
+          statusTimeout = setTimeout(() => statusDiv.classList.add("status-hidden"), 5000);
+        }
+        isInitialLoad = false;
+      }   
+      updateStatus(navigator.onLine);
+      window.addEventListener("online", () => updateStatus(true));
+      window.addEventListener("offline", () => updateStatus(false));
+    </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-align: center;
+      color: #000000;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 1400px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2E8BC0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .counter {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .top-layout {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      align-items: flex-start;
+    }
+
+    .left-column {
+      flex: 0 0 420px;
+      background-color: #F8FDFF;
+      border: 2px solid #45B0E1;
+      padding: 24px;
+    }
+
+    .right-column {
+      flex: 1 1 auto;
+      min-width: 0;
+      background-color: #F8FDFF;
+      border: 2px solid #45B0E1;
+      padding: 24px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .form-label {
+      font-size: 15px;
+      font-weight: 500;
+      color: #333333;
+    }
+
+    .form-input {
+      width: 100%;
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+      color: #000000;
+      background-color: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      outline: none;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .form-input::placeholder { color: #999999; }
+    .form-input:focus { border-color: #2E8BC0; background-color: #F8FDFF; }
+    .form-input:disabled {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+    .form-input[readonly] {
+      background-color: #F5F5F5;
+      color: #555;
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .range-input {
+      min-height: 44px !important;
+      flex: 1;
+    }
+    .range-sep {
+      color: #666;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px 20px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #FFFFFF;
+      background-color: #45B0E1;
+      border: 2px solid #45B0E1;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+      text-align: center;
+    }
+    button:hover { background-color: #2E8BC0; border-color: #2E8BC0; }
+    button:active { background-color: #1A6B96; border-color: #1A6B96; }
+    button:disabled { background-color: #A0D8EF; cursor: not-allowed; }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: #45B0E1;
+      border: 2px solid #45B0E1;
+    }
+    .btn-secondary:hover { background-color: #F0F9FC; }
+
+    .save-btn {
+      max-width: 280px;
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
+    }
+    .save-btn:hover { background-color: #1A6B96; border-color: #1A6B96; }
+
+    .address-table-wrapper {
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid #D1D1D1;
+      background-color: #FFFFFF;
+    }
+    .address-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+    .address-table thead {
+      position: sticky;
+      top: 0;
+      background-color: #45B0E1;
+      color: #FFFFFF;
+      z-index: 1;
+    }
+    .address-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .address-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #F0F0F0;
+      color: #000;
+      vertical-align: top;
+    }
+    .address-table tbody tr {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    .address-table tbody tr:hover { background-color: #F0F9FC; }
+    .address-table tbody tr.selected {
+      background-color: #D1D1D1;
+      font-weight: 600;
+    }
+    .address-table tbody tr.selected td { color: #000; }
+
+    .address-table-wrapper::-webkit-scrollbar { width: 8px; }
+    .address-table-wrapper::-webkit-scrollbar-track { background: #F8FDFF; }
+    .address-table-wrapper::-webkit-scrollbar-thumb { background: #45B0E1; border-radius: 4px; }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      background-color: #FFFFFF;
+      border: 1px solid #D1D1D1;
+    }
+
+    .details-block {
+      margin-top: 24px;
+      padding: 24px;
+      background-color: #F8FDFF;
+      border: 2px solid #45B0E1;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px 32px;
+    }
+
+    .details-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .detail-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #555555;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .checkbox-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+
+      .checkbox-label-inline {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #2E8BC0;
+        font-weight: 500;
+        user-select: none;
+      }
+
+      .checkbox-label-inline .form-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: #45B0E1;
+        cursor: pointer;
+      }
+
+    .edit-input {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 12px;
+      font-size: 15px;
+      color: #000;
+      background-color: #FFFFFF;
+      border: 1px solid #45B0E1;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .edit-input:focus { border-color: #2E8BC0; }
+    .edit-input:disabled {
+      background-color: #F5F5F5;
+      color: #999;
+      cursor: not-allowed;
+    }
+    .edit-input[readonly] {
+      background-color: #F5F5F5;
+      color: #555;
+    }
+
+    .details-actions {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .save-message {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .save-message.success { color: #2E7D32; }
+    .save-message.error { color: #C62828; }
+
+    .custom-datalist { position: relative; width: 100%; }
+    .custom-datalist-input-wrapper { position: relative; width: 100%; }
+    .custom-datalist-input { padding-right: 70px !important; }
+    .custom-datalist-arrow {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #45B0E1;
+      font-size: 18px;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+      user-select: none;
+    }
+    .clear-input-btn {
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999999;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 8px;
+      line-height: 1;
+      user-select: none;
+      z-index: 2;
+    }
+    .clear-input-btn:hover { color: #45B0E1; }
+    .custom-datalist-arrow.open { transform: translateY(-50%) rotate(180deg); }
+    .custom-datalist.disabled .custom-datalist-input {
+      background-color: #F5F5F5;
+      border-color: #CCCCCC;
+      color: #999999;
+      cursor: not-allowed;
+    }
+    .custom-datalist-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      border: 2px solid #45B0E1;
+      border-top: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+    }
+    .custom-datalist-option {
+      padding: 12px 16px;
+      font-size: 15px;
+      color: #000000;
+      cursor: pointer;
+      border-bottom: 1px solid #F0F0F0;
+      transition: background-color 0.15s ease;
+      user-select: none;
+    }
+    .custom-datalist-option:last-child { border-bottom: none; }
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active {
+      background-color: #F0F9FC;
+      color: #2E8BC0;
+    }
+
+    .status {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      text-align: center;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 12px 0;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .status.status-hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1024px) {
+      .details-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .top-layout {
+        flex-direction: column;
+      }
+      .left-column, .right-column {
+        flex: 1 1 100%;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 16px 12px; }
+      h1 { font-size: 22px; }
+      .left-column, .right-column, .details-block { padding: 16px; }
+      .range-row { flex-direction: column; align-items: stretch; }
+      .range-sep { text-align: center; }
+    }
+  </style>
+</html>  

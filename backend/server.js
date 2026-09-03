@@ -26,6 +26,7 @@ const upload = multer({
   storage: storage,
   limits: {fileSize: 10 * 1024 * 1024}
 });
+
 app.use(cors());
 app.use(express.json()); 
 app.use('/frontend', express.static(frontendDir, {
@@ -39,6 +40,293 @@ app.get('/', (req, res) => {
   res.redirect('/frontend/index.html');
 });
 
+app.post('/addresses-by-params', (req, res) => {
+  const { streetId, houseFrom, houseTo, lastIndDateFrom, lastIndDateTo, verifyFilter } = req.body;
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    let query = `
+      SELECT
+        M.ID AS METER_ID,
+        M.VERIFY_DATE,
+        RS.ID AS STREET_ID,
+        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
+        B.ID AS BUILDING_ID,
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
+        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        IND.LAST_IND_DATE
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
+      INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      LEFT JOIN (
+        SELECT METER_ID, MAX(CREATEDATE) AS LAST_IND_DATE
+        FROM METERS_IND
+        WHERE (IS_DELETED = 0 OR IS_DELETED IS NULL)
+        GROUP BY METER_ID
+      ) IND ON TRIM(IND.METER_ID) = TRIM(M.METER_NUM)
+      WHERE 1=1
+    `;
+    const params = [];
+    if (streetId) {
+      query += ` AND RS.ID = ?`;
+      params.push(parseInt(streetId, 10));
+    }
+    if (houseFrom && houseFrom.trim() !== '') {
+      query += ` AND CAST(B.HOUSE AS INTEGER) >= ?`;
+      params.push(parseInt(houseFrom, 10));
+    }
+    if (houseTo && houseTo.trim() !== '') {
+      query += ` AND CAST(B.HOUSE AS INTEGER) <= ?`;
+      params.push(parseInt(houseTo, 10));
+    }
+    if (lastIndDateFrom && lastIndDateFrom.trim() !== '') {
+      query += ` AND IND.LAST_IND_DATE >= ?`;
+      params.push(lastIndDateFrom);
+    }
+    if (lastIndDateTo && lastIndDateTo.trim() !== '') {
+      query += ` AND IND.LAST_IND_DATE <= ?`;
+      params.push(lastIndDateTo);
+    }
+    if (verifyFilter === 'expired') {
+      query += ` AND M.VERIFY_DATE < CURRENT_DATE`;
+    } else if (verifyFilter === 'valid') {
+      query += ` AND M.VERIFY_DATE >= CURRENT_DATE`;
+    }
+  query += `
+      ORDER BY
+        RS.STREET_TYPE, RS.STREET,
+        CAST(B.HOUSE AS INTEGER),
+        A.APPARTS, A.LETTER
+    `;
+    db.query(query, params, (err, result) => {
+      db.detach();
+      if (err) {
+        console.error('Query error:', err);
+        return res.status(500).json({ error: 'Query failed', details: err.message });
+      }
+      res.json(result.map(r => {
+        const streetName = `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim();
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        const houseName = `${r.HOUSE || ''}${corpsPart}`.trim();
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
+        const address = `${streetName}, д. ${houseName}${appartsPart ? ', ' + appartsPart : ''}`;
+        return {
+          meterId: r.METER_ID,
+          address: address,
+          fio: r.CLIENT_NAME || 'ФИО не указано',
+          verifyDate: r.VERIFY_DATE,
+          lastIndDate: r.LAST_IND_DATE,
+          buildingId: r.BUILDING_ID,
+          streetId: r.STREET_ID
+        };
+      }));
+    });
+  });
+});
+
+app.post('/meter-full-details', (req, res) => {
+  const { meterId } = req.body || {};
+  if (!meterId) return res.status(400).json({ error: 'meterId required' });
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const query = `
+      SELECT
+        M.ID AS METER_ID, M.METER_NUM, M.LS, M.NAME AS METER_NAME, M.SEAL, M.MANFDATE, M.MOUNT_DATE, M.VERIFY_DATE, M.CONTROLER_ID, M.METER_TYPE,
+        C.ID AS CLIENT_ID, CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME, CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE, CAST(C.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
+        RS.ID AS STREET_ID, CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS, B.ID AS BUILDING_ID,
+        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS, CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
+        S.ID AS SERVICE_ID, CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+        CTRL.ID AS CONTROLLER_ID, CAST(CTRL.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
+        (SELECT FIRST 1 STATUS FROM BOILER_STATUS WHERE METER_ID = M.ID ORDER BY ID DESC) AS BOILER_STATUS,
+        IND.PH AS LAST_PH, IND.CREATEDATE AS LAST_PH_DATE
+      FROM METERS M
+      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
+      INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
+      LEFT JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
+      LEFT JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN CONTROLLERS CTRL ON M.CONTROLER_ID = CTRL.ID
+      LEFT JOIN (
+        SELECT MI1.METER_ID, MI1.PH, MI1.CREATEDATE
+        FROM METERS_IND MI1
+        INNER JOIN (SELECT METER_ID, MAX(ID) AS MAX_ID FROM METERS_IND WHERE (IS_DELETED=0 OR IS_DELETED IS NULL) GROUP BY METER_ID) MI2
+          ON MI1.ID = MI2.MAX_ID
+      ) IND ON TRIM(IND.METER_ID) = TRIM(M.METER_NUM)
+      WHERE M.ID = ?
+    `;
+    db.query(query, [meterId], (err, result) => {
+      if (err) { db.detach(); return res.status(500).json({ error: 'Query failed', details: err.message }); }
+      if (!result || result.length === 0) { db.detach(); return res.status(404).json({ error: 'Meter not found' }); }
+      const r = result[0];
+      const getRefs = (cb) => {
+        db.query(`SELECT ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME FROM SERVICES ORDER BY GROUP_NAME`, [], (sErr, services) => {
+          db.query(`SELECT ID, CAST(FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS FIO FROM CONTROLLERS ORDER BY FIO`, [], (cErr, controllers) => {
+            db.detach();
+            cb(services || [], controllers || []);
+          });
+        });
+      };
+      getRefs((services, controllers) => {
+        const streetName = `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim();
+        const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
+        const houseName = `${r.HOUSE || ''}${corpsPart}`.trim();
+        const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
+        const appartsPart = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
+        const address = `${streetName}, д. ${houseName}${appartsPart ? ', ' + appartsPart : ''}`;
+        const formatDate = (d) => {
+          if (!d) return '';
+          const date = new Date(d);
+          if (isNaN(date.getTime())) return '';
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        };
+        res.json({
+          meterId: r.METER_ID, meterNum: r.METER_NUM, licschet: r.LS, address,
+          verifyDate: formatDate(r.VERIFY_DATE), fio: r.CLIENT_NAME || '', clientId: r.CLIENT_ID,
+          clientPhone: r.CLIENT_PHONE || '', clientMail: r.CLIENT_MAIL || '',
+          controllerId: r.CONTROLLER_ID || null, serviceId: r.SERVICE_ID || null,
+          seal: r.SEAL || '', boilerStatus: r.BOILER_STATUS || '',
+          lastPh: (r.LAST_PH !== null && r.LAST_PH !== undefined) ? Number(r.LAST_PH).toLocaleString('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : '',
+          manfDate: formatDate(r.MANFDATE), mountDate: formatDate(r.MOUNT_DATE), meterName: r.METER_NAME || '',
+          services: services.map(s => ({ id: s.ID, name: s.GROUP_NAME })),
+          controllers: controllers.map(c => ({ id: c.ID, fio: c.FIO }))
+        });
+      });
+    });
+  });
+});
+
+app.post('/update-meter-full', (req, res) => {
+  const d = req.body || {};
+  if (!d.meterId) return res.status(400).json({ error: 'meterId required' });
+  firebird.attach(config, (err, db) => {
+    if (err) {
+      console.error('DB connect error:', err);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+    const metaQuery = `
+      SELECT M.ID, M.LS, A.CLIENT_ID, M.METER_NUM, M.METER_TYPE
+      FROM METERS M
+      LEFT JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+      WHERE M.ID = ?
+    `;
+    db.query(metaQuery, [d.meterId], (err, meta) => {
+      if (err) {
+        console.error('DB query error:', err);
+        db.detach();
+        return res.status(500).json({ error: 'Database query error', details: err.message });
+      }
+      const processMeter = (meterData) => {
+        const licschet = meterData.LS;
+        const clientId = meterData.CLIENT_ID;
+        const meterNum = meterData.METER_NUM;
+        const dbMeterId = meterData.ID;
+        const oldMeterType = meterData.METER_TYPE;
+        const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        let completed = 0;
+        const total = 3;
+        let hasError = false;
+        const fail = (msg, details) => {
+          if (hasError) return;
+          hasError = true;
+          db.detach();
+          res.status(500).json({ error: msg, details });
+        };
+        const done = () => {
+          completed++;
+          if (completed >= total && !hasError) {
+            db.detach();
+            res.json({ status: 'OK', message: 'Данные обновлены' });
+          }
+        };
+        db.query(`UPDATE METERS SET METER_NUM=?, SEAL=?, MANFDATE=?, MOUNT_DATE=?, VERIFY_DATE=?, CONTROLER_ID=? WHERE ID=?`,
+          [d.meterNum || meterNum, d.seal || null, d.manfDate || null, d.mountDate || null, d.verifyDate || null, d.controllerId || null, dbMeterId], (e) => {
+            if (e) return fail('Update meters error', e.message);
+            if (d.serviceId && d.serviceId !== oldMeterType) {
+              db.query(`SELECT ID FROM METER_TYPES WHERE LOW_QUALITY_GRP_TARIFF = ?`, [d.serviceId], (e2, mt) => {
+                if (e2) return fail('Meter type lookup error', e2.message);
+                if (mt && mt.length > 0) {
+                  db.query(`UPDATE METERS SET METER_TYPE=? WHERE ID=?`, [mt[0].ID, dbMeterId], (e3) => {
+                    if (e3) return fail('Meter type update error', e3.message);
+                    done();
+                  });
+                } else { done(); }
+              });
+            } else { done(); }
+          });
+        if (!clientId) {
+          done();
+        } else {
+          db.query(`UPDATE CLIENTS SET NAME=?, PHONE=?, MAIL=? WHERE ID=?`,
+            [d.fio || null, d.clientPhone || null, d.clientMail || null, clientId], (e) => {
+              if (e) return fail('Update client error', e.message);
+              done();
+            });
+        }
+        if (d.boilerStatus === undefined || d.boilerStatus === null || String(d.boilerStatus).trim() === '') {
+          done();
+        } else {
+          db.query(`INSERT INTO BOILER_STATUS (ID, STATUS, METER_ID, CREATEDATE) VALUES (GEN_ID(BOILER_STATUS_GEN, 1), ?, ?, ?)`,
+            [String(d.boilerStatus).trim(), dbMeterId, createdate], (e) => {
+              if (e) return fail('Boiler status error', e.message);
+              done();
+            });
+        }
+      };
+      if (!meta || meta.length === 0) {
+        const metaQueryNum = `
+          SELECT M.ID, M.LS, A.CLIENT_ID, M.METER_NUM, M.METER_TYPE
+          FROM METERS M
+          LEFT JOIN ABONENTS A ON M.LS = A.G_LICSCHET
+          WHERE M.METER_NUM = ?
+        `;
+        db.query(metaQueryNum, [String(d.meterId)], (err2, meta2) => {
+          if (err2 || !meta2 || meta2.length === 0) {
+            db.detach();
+            return res.status(404).json({ error: 'Meter not found', searchedValue: d.meterId });
+          }
+          processMeter(meta2[0]);
+        });
+      } else {
+        processMeter(meta[0]);
+      }
+    });
+  });
+});
+
+app.post('/all-streets', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
+    const query = `
+      SELECT RS.ID, 
+        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME
+      FROM RSTREETS RS
+      ORDER BY RS.STREET_TYPE, RS.STREET
+    `;
+    db.query(query, [], (err, result) => {
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed' });
+      res.json(result.map(r => ({
+        id: r.ID,
+        name: `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim()
+      })));
+    });
+  });
+});
 
 app.post('/auth', (req, res) => {
   const { userpswd } = req.body; 

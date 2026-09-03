@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = true;
+  const USE_LOCAL_DB = false;
   const LOCAL_MOCK_PERSIST = true;
   const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4S';
   if (!USE_LOCAL_DB) {
