@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = false;
+  const USE_LOCAL_DB = true;
   const LOCAL_MOCK_PERSIST = true;
   const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4S';
   if (!USE_LOCAL_DB) {
@@ -2271,3 +2271,152 @@ if (!document.getElementById('custom-alert-styles')) {
 window.alert = function(message) {
   showAlert(message, 'info');
 };
+
+(() => {
+  const targetPages = [
+    'checkownerwindow', 'representativewindow', 'ownerwindow', 
+    'boilerwindow', 'violationwindow', 'violationmain', 
+    'violationform', 'main.html', 'metervaluewindow'
+  ];
+  const path = window.location.pathname.toLowerCase();
+  const isTarget = targetPages.some(p => path.includes(p));
+  if (!isTarget) return;
+  if (!document.getElementById('global-info-header-styles')) {
+    const style = document.createElement('style');
+    style.id = 'global-info-header-styles';
+    style.textContent = `
+      .global-info-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: #e7e6e6;
+        border-bottom: 1px solid #cccccc;
+        padding: 8px 12px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #000000;
+        z-index: 9999;
+        box-sizing: border-box;
+        word-break: break-word;
+      }
+      .global-info-header div {
+        margin-bottom: 2px;
+      }
+      .global-info-header div:last-child { margin-bottom: 0; }
+      .global-info-header strong {
+        color: #000000;
+      }
+      body {
+        padding-top: 110px !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  const headerDiv = document.createElement('div');
+  headerDiv.id = 'global-info-header';
+  headerDiv.className = 'global-info-header';
+  headerDiv.style.display = 'none';
+  headerDiv.innerHTML = `
+    <div><strong>Адрес:</strong> <span id="info-address">-</span></div>
+    <div><strong>№ счётчика:</strong> <span id="info-meter-num">-</span></div>
+    <div><strong>Тип услуги:</strong> <span id="info-service">-</span></div>
+    <div><strong>Место установки:</strong> <span id="info-location">-</span></div>
+  `;
+  function insertHeader() {
+    const appContainer = document.getElementById('app');
+    if (!appContainer) return false;
+    const pageHeader = appContainer.querySelector('.page-header');
+    const h1 = appContainer.querySelector('h1');
+    const formContainer = appContainer.querySelector('.form-container'); // ИСПРАВЛЕНО: добавлена точка
+    if (pageHeader) {
+      pageHeader.parentNode.insertBefore(headerDiv, pageHeader);
+      return true;
+    } else if (h1) {
+      h1.parentNode.insertBefore(headerDiv, h1);
+      return true;
+    } else if (formContainer) {
+      formContainer.parentNode.insertBefore(headerDiv, formContainer);
+      return true;
+    } else {
+      appContainer.insertBefore(headerDiv, appContainer.firstChild);
+      return true;
+    }
+  }
+  function updateGlobalInfoHeader() {
+    const container = document.getElementById('global-info-header');
+    if (!container) return;
+    let address = "-";
+    let meterNum = "-";
+    let service = "-";
+    let location = "-";
+    let hasData = false;
+    try {
+      const addrData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+      if (addrData.street || addrData.house) {
+        const street = addrData.street || '';
+        const house = addrData.house ? `д. ${addrData.house}` : '';
+        const apparts = (addrData.apparts && addrData.apparts !== '-1' && addrData.apparts !== '') ? `кв. ${addrData.apparts}` : '';
+        address = [street, house, apparts].filter(Boolean).join(', ');
+        hasData = true;
+      }
+    } catch(e) {}
+    let meterData = null;
+    let targetId = null;
+    try {
+      const active = JSON.parse(sessionStorage.getItem('activeMeter') || 'null');
+      if (active && active.id) targetId = active.id;
+    } catch(e) {}
+    if (!targetId) {
+      try {
+        const selected = JSON.parse(sessionStorage.getItem('selectedMeter') || 'null');
+        if (selected && selected.id) targetId = selected.id;
+      } catch(e) {}
+    }
+    try {
+      const allMeters = JSON.parse(sessionStorage.getItem('allMeters') || '[]');
+      if (allMeters.length > 0) {
+        if (targetId) {
+          meterData = allMeters.find(m => String(m.id) === String(targetId)) || allMeters[0];
+        } else {
+          meterData = allMeters[0];
+        }
+      }
+    } catch(e) {}
+    if (meterData) {
+      meterNum = meterData.meterNum || '-';
+      service = meterData.groupName || '-';
+      location = meterData.name || '-';
+      if (meterNum !== '-' || service !== '-' || location !== '-') hasData = true;
+    } else {
+      try {
+        const mNum = JSON.parse(sessionStorage.getItem('meternum') || '{}');
+        if (mNum.meterNum) {
+          meterNum = mNum.meterNum;
+          hasData = true;
+        }
+      } catch(e) {}
+    }
+    if (hasData) {
+      document.getElementById('info-address').textContent = address;
+      document.getElementById('info-meter-num').textContent = meterNum;
+      document.getElementById('info-service').textContent = service;
+      document.getElementById('info-location').textContent = location;
+      container.style.display = 'block';
+    }
+  }
+  function tryInsertWithRetry(attempts = 0) {
+    if (attempts > 20) return;
+    if (insertHeader()) {
+      updateGlobalInfoHeader();
+    } else {
+      setTimeout(() => tryInsertWithRetry(attempts + 1), 100);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => tryInsertWithRetry());
+  } else {
+    tryInsertWithRetry();
+  }
+  window.addEventListener('storage', updateGlobalInfoHeader);
+})();

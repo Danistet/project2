@@ -51,7 +51,7 @@ createApp({
       try {         
         const result = await apiRequest('/auth', { userpswd: passwordValue });
         sessionStorage.setItem('controllerId', result.controllerId);          
-        window.location.href = 'adminActWindow.html';
+        window.location.href = 'FormListWindow.html';
       } catch (err) { 
         error.value = `Ошибка: ${err.message}`; 
       }

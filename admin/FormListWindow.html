@@ -181,193 +181,216 @@
           <p v-if="saveMessage" :class="['save-message', saveMessageType]">{{ saveMessage }}</p>
         </div>
       </div>
+      <button type="button" class="btn-primary" style="margin-top: 20px;" onclick="toreport()">Составление отчёта</button>
       <button type="button" class="btn-secondary" style="margin-top: 20px;" @click="logout">Выход</button>
       <div class="status" id="statusDiv"></div>
     </div>
   </body>
-    <script>
-        const { createApp, ref, computed, onMounted, watch } = Vue;
-        createApp({
-            setup() {
-            const isLoading = ref(false);
-            const saving = ref(false);
-            const streets = ref([]);
-            const streetSearch = ref('');
-            const selectedStreetId = ref(null);
-            const isStreetOpen = ref(false);
-            const houseFrom = ref('');
-            const houseTo = ref('');
-            const allHouses = ref(false);
-            const lastIndFrom = ref('');
-            const lastIndTo = ref('');
-            const allTimeReadings = ref(false);
-            const verifyFilter = ref('');
-            const listLoaded = ref(false);
-            const addressList = ref([]);
-            const selectedMeterId = ref(null);
-            const detailsLoading = ref(false);
-            const details = ref({
-              meterId: null, licschet: '', address: '', verifyDate: '',
-              fio: '', clientId: null, clientPhone: '', clientMail: '',
-              controllerId: null, serviceId: null, seal: '', boilerStatus: '',
-              lastPh: '', manfDate: '', mountDate: '', meterNum: '',
-              services: [], controllers: []
-            });
-            const saveMessage = ref('');
-            const saveMessageType = ref('success');
-            watch(allHouses, (newVal) => {
-              if (!newVal) {
-                houseFrom.value = '';
-                houseTo.value = '';
-              }
-            });
-            watch(allTimeReadings, (newVal) => {
-              if (newVal) {
-                lastIndFrom.value = '';
-                lastIndTo.value = '';
-              }
-            });            
-            const filteredStreets = computed(() => {
-              if (!streetSearch.value) return streets.value;
-              const term = streetSearch.value.toLowerCase();
-              return streets.value.filter(s => s.name.toLowerCase().includes(term));
-            });
-            const loadStreets = async () => {
-              isLoading.value = true;
-              try {
-                const data = await apiRequest('/all-streets', {});
-                streets.value = Array.isArray(data) ? data : [];
-              } catch (e) {
-                console.error('Failed to load streets:', e);
-              } finally {
-                isLoading.value = false;
-              }
-            };
-            const selectStreet = (street) => {
-              streetSearch.value = street.name;
-              selectedStreetId.value = street.id;
-              isStreetOpen.value = false;
-            };
-            const closeStreet = () => {
-              isStreetOpen.value = false;
-              if (streetSearch.value && !streets.value.find(s => s.name === streetSearch.value)) {
-                selectedStreetId.value = null;
-                streetSearch.value = '';
-              }
-            };
-            const clearStreet = () => {
-              streetSearch.value = '';
-              selectedStreetId.value = null;
-              isStreetOpen.value = false;
-            };
-            const buildList = async () => {
-              if (!selectedStreetId.value) {
-                alert('Выберите улицу');
-                return;
-              }
-              isLoading.value = true;
-              listLoaded.value = false;
-              addressList.value = [];
-              selectedMeterId.value = null;
-              try {
-                const data = await apiRequest('/addresses-by-params', {
-                  streetId: selectedStreetId.value,
-                  houseFrom: houseFrom.value,
-                  houseTo: houseTo.value,
-                  lastIndDateFrom: lastIndFrom.value,
-                  lastIndDateTo: lastIndTo.value,
-                  verifyFilter: verifyFilter.value
-                });
-                addressList.value = Array.isArray(data) ? data : [];
-                listLoaded.value = true;
-              } catch (e) {
-                console.error(e);
-                alert('Ошибка загрузки списка: ' + (e.message || ''));
-              } finally {
-                isLoading.value = false;
-              }
-            };
-            const selectAddressRow = async (addr) => {
-              selectedMeterId.value = addr.meterId;
-              detailsLoading.value = true;
-              saveMessage.value = '';
-              try {
-                const data = await apiRequest('/meter-full-details', { meterId: addr.meterId });
-                details.value = {
-                  meterId: data.meterId,
-                  licschet: data.licschet || '',
-                  address: data.address || '',
-                  verifyDate: data.verifyDate || '',
-                  fio: data.fio || '',
-                  clientId: data.clientId,
-                  clientPhone: data.clientPhone || '',
-                  clientMail: data.clientMail || '',
-                  controllerId: data.controllerId,
-                  serviceId: data.serviceId,
-                  seal: data.seal || '',
-                  boilerStatus: data.boilerStatus || '',
-                  lastPh: data.lastPh || '',
-                  manfDate: data.manfDate || '',
-                  mountDate: data.mountDate || '',
-                  meterNum: data.meterNum || '',
-                  services: data.services || [],
-                  controllers: data.controllers || []
-                };
-              } catch (e) {
-                console.error(e);
-                alert('Ошибка загрузки деталей');
-              } finally {
-                detailsLoading.value = false;
-              }
-            };
-            const saveDetails = async () => {
-              if (!details.value.meterId) return;
-              saving.value = true;
-              saveMessage.value = '';
-              try {
-                await apiRequest('/update-meter-full', {
-                  meterId: details.value.meterId,
-                  meterNum: details.value.meterNum,
-                  seal: details.value.seal,
-                  manfDate: details.value.manfDate,
-                  mountDate: details.value.mountDate,
-                  verifyDate: details.value.verifyDate,
-                  controllerId: details.value.controllerId,
-                  serviceId: details.value.serviceId,
-                  fio: details.value.fio,
-                  clientPhone: details.value.clientPhone,
-                  clientMail: details.value.clientMail,
-                  boilerStatus: details.value.boilerStatus
-                });
-                saveMessage.value = 'Данные сохранены';
-                saveMessageType.value = 'success';
-                const row = addressList.value.find(a => a.meterId === details.value.meterId);
-                if (row) row.fio = details.value.fio || 'ФИО не указано';
-              } catch (e) {
-                saveMessage.value = 'Ошибка: ' + (e.message || 'Неизвестная ошибка');
-                saveMessageType.value = 'error';
-              } finally {
-                saving.value = false;
-              }
-            };
-            const logout = () => {
-              window.location.href = 'adminActWindow.html';
-            };
-            onMounted(() => {
-              loadStreets();
-            });
-            return {
-              isLoading, saving, streets, streetSearch, selectedStreetId,
-              isStreetOpen, houseFrom, houseTo, allHouses, lastIndFrom, lastIndTo, verifyFilter,
-              listLoaded, addressList, selectedMeterId, allTimeReadings,
-              detailsLoading, details, saveMessage, saveMessageType,
-              filteredStreets,
-              selectStreet, closeStreet, clearStreet,
-              buildList, selectAddressRow, saveDetails, logout
-            };
+  <script>
+    function toreport() {
+      window.location.href = 'ReportWindow.html';
+    }
+  </script>
+  <script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+    createApp({
+      setup() {
+        const isLoading = ref(false);
+        const saving = ref(false);
+        const streets = ref([]);
+        const streetSearch = ref('');
+        const selectedStreetId = ref(null);
+        const isStreetOpen = ref(false);
+        const houseFrom = ref('');
+        const houseTo = ref('');
+        const allHouses = ref(false);
+        const lastIndFrom = ref('');
+        const lastIndTo = ref('');
+        const allTimeReadings = ref(false);
+        const verifyFilter = ref('');
+        const listLoaded = ref(false);
+        const addressList = ref([]);
+        const selectedMeterId = ref(null);
+        const detailsLoading = ref(false);
+        const details = ref({
+          meterId: null, licschet: '', address: '', verifyDate: '',
+          fio: '', clientId: null, clientPhone: '', clientMail: '',
+          controllerId: null, serviceId: null, seal: '', boilerStatus: '',
+          lastPh: '', manfDate: '', mountDate: '', meterNum: '',
+          services: [], controllers: []
+        });
+        const saveMessage = ref('');
+        const saveMessageType = ref('success');
+        watch(allHouses, (newVal) => {
+          if (!newVal) {
+            houseFrom.value = '';
+            houseTo.value = '';
           }
-        }).mount('#app');
-    </script>
+        });
+        watch(allTimeReadings, (newVal) => {
+          if (newVal) {
+            lastIndFrom.value = '';
+            lastIndTo.value = '';
+          }
+        });            
+        const filteredStreets = computed(() => {
+          if (!streetSearch.value) return streets.value;
+          const term = streetSearch.value.toLowerCase();
+          return streets.value.filter(s => s.name.toLowerCase().includes(term));
+        });
+        const loadStreets = async () => {
+          isLoading.value = true;
+          try {
+            const data = await apiRequest('/all-streets', {});
+            streets.value = Array.isArray(data) ? data : [];
+          } catch (e) {
+            console.error('Failed to load streets:', e);
+          } finally {
+            isLoading.value = false;
+          }
+        };
+        const selectStreet = (street) => {
+          streetSearch.value = street.name;
+          selectedStreetId.value = street.id;
+          isStreetOpen.value = false;
+        };
+        const closeStreet = () => {
+          isStreetOpen.value = false;
+          if (streetSearch.value && !streets.value.find(s => s.name === streetSearch.value)) {
+            selectedStreetId.value = null;
+            streetSearch.value = '';
+          }
+        };
+        const clearStreet = () => {
+          streetSearch.value = '';
+          selectedStreetId.value = null;
+          isStreetOpen.value = false;
+        };
+        const buildList = async () => {
+          if (!selectedStreetId.value) {
+            alert('Выберите улицу');
+            return;
+          }
+          isLoading.value = true;
+          listLoaded.value = false;
+          addressList.value = [];
+          selectedMeterId.value = null;
+          try {
+            const data = await apiRequest('/addresses-by-params', {
+              streetId: selectedStreetId.value,
+              houseFrom: houseFrom.value,
+              houseTo: houseTo.value,
+              lastIndDateFrom: lastIndFrom.value,
+              lastIndDateTo: lastIndTo.value,
+              verifyFilter: verifyFilter.value
+            });
+            addressList.value = Array.isArray(data) ? data : [];
+            listLoaded.value = true;
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка загрузки списка: ' + (e.message || ''));
+          } finally {
+            isLoading.value = false;
+          }
+        };
+        const selectAddressRow = async (addr) => {
+          selectedMeterId.value = addr.meterId;
+          detailsLoading.value = true;
+          saveMessage.value = '';
+          try {
+            const data = await apiRequest('/meter-full-details', { meterId: addr.meterId });
+            details.value = {
+              meterId: data.meterId,
+              licschet: data.licschet || '',
+              address: data.address || '',
+              verifyDate: data.verifyDate || '',
+              fio: data.fio || '',
+              clientId: data.clientId,
+              clientPhone: data.clientPhone || '',
+              clientMail: data.clientMail || '',
+              controllerId: data.controllerId,
+              serviceId: data.serviceId,
+              seal: data.seal || '',
+              boilerStatus: data.boilerStatus || '',
+              lastPh: data.lastPh || '',
+              manfDate: data.manfDate || '',
+              mountDate: data.mountDate || '',
+              meterNum: data.meterNum || '',
+              services: data.services || [],
+              controllers: data.controllers || []
+            };
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка загрузки деталей');
+          } finally {
+            detailsLoading.value = false;
+          }
+        };
+        let saveMessageTimer = null;
+        const clearSaveMessageTimer = () => {
+          if (saveMessageTimer) {
+            clearTimeout(saveMessageTimer);
+            saveMessageTimer = null;
+          }
+        };
+        const hideSaveMessage = () => {
+          saveMessage.value = '';
+          saveMessageType.value = '';
+        };
+        const saveDetails = async () => {
+        if (!details.value.meterId) return;
+          saving.value = true;
+          clearSaveMessageTimer();
+          saveMessage.value = '';
+          try {
+            await apiRequest('/update-meter-full', {
+              meterId: details.value.meterId,
+              meterNum: details.value.meterNum,
+              seal: details.value.seal,
+              manfDate: details.value.manfDate,
+              mountDate: details.value.mountDate,
+              verifyDate: details.value.verifyDate,
+              controllerId: details.value.controllerId,
+              serviceId: details.value.serviceId,
+              fio: details.value.fio,
+              clientPhone: details.value.clientPhone,
+              clientMail: details.value.clientMail,
+              boilerStatus: details.value.boilerStatus
+            });
+            saveMessage.value = 'Данные сохранены';
+            saveMessageType.value = 'success';
+            const row = addressList.value.find(a => a.meterId === details.value.meterId);
+            if (row) row.fio = details.value.fio || 'ФИО не указано';
+          } catch (e) {
+            saveMessage.value = 'Ошибка: ' + (e.message || 'Неизвестная ошибка');
+            saveMessageType.value = 'error';
+          } finally {
+            saving.value = false;
+            saveMessageTimer = setTimeout(() => {
+              hideSaveMessage();
+              saveMessageTimer = null;
+            }, 5000);
+          }
+        };
+        const logout = () => {
+          window.location.href = 'indexadmin.html';
+        };
+        onMounted(() => {
+          loadStreets();
+          clearSaveMessageTimer();
+        });
+        return {
+          isLoading, saving, streets, streetSearch, selectedStreetId,
+          isStreetOpen, houseFrom, houseTo, allHouses, lastIndFrom, lastIndTo, verifyFilter,
+          listLoaded, addressList, selectedMeterId, allTimeReadings,
+          detailsLoading, details, saveMessage, saveMessageType,
+          filteredStreets,
+          selectStreet, closeStreet, clearStreet,
+          buildList, selectAddressRow, saveDetails, logout
+        };
+      }
+    }).mount('#app');
+  </script>
   <script>
       let statusTimeout;    
       let isInitialLoad = true;
@@ -760,6 +783,13 @@
     .custom-datalist-option:active {
       background-color: #F0F9FC;
       color: #2E8BC0;
+    }
+
+    .save-message {
+      transition: opacity 0.4s ease;
+    }
+    .save-message.hidden {
+      opacity: 0;
     }
 
     .status {
