@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage: storage,
-  limits: {fileSize: 10 * 1024 * 1024}
+  limits: {fileSize: 100 * 1024 * 1024}
 });
 
 app.use(cors());
@@ -1578,6 +1578,187 @@ app.post('/controller-history', (req, res) => {
         };
       });   
       res.json(history);
+    });
+  });
+});
+
+app.post('/admin/controllers', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+    db.query(`SELECT ID, CAST(FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS FIO FROM CONTROLLERS ORDER BY FIO`, [], (e, r) => {
+      db.detach();
+      if (e) return res.status(500).json({ error: e.message });
+      res.json(r);
+    });
+  });
+});
+
+app.post('/admin/streets', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+    db.query(`SELECT ID, CAST(STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET FROM RSTREETS ORDER BY STREET_TYPE, STREET`, [], (e, r) => {
+      db.detach();
+      if (e) return res.status(500).json({ error: e.message });
+      res.json(r.map(x => ({ id: x.ID, name: `${x.STREET_TYPE || ''} ${x.STREET || ''}`.trim() })));
+    });
+  });
+});
+
+app.post('/admin/buildings-by-street', (req, res) => {
+  const { streetId } = req.body;
+  if (!streetId) return res.status(400).json({ error: 'streetId required' });
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+    db.query(`SELECT ID, CAST(HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS FROM BUILDINGS WHERE STREET_ID = ? ORDER BY HOUSE`, [streetId], (e, r) => {
+      db.detach();
+      if (e) return res.status(500).json({ error: e.message });
+      res.json(r.map(x => ({ id: x.ID, house: `${x.HOUSE || ''}${x.CORPS ? ' ' + x.CORPS : ''}`.trim() })));
+    });
+  });
+});
+
+app.post('/admin/services', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+    db.query(`SELECT ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME FROM SERVICES ORDER BY GROUP_NAME`, [], (e, r) => {
+      db.detach();
+      if (e) return res.status(500).json({ error: e.message });
+      res.json(r);
+    });
+  });
+});
+
+app.post('/admin/report', (req, res) => {
+  const f = req.body || {};
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection error' });
+    let sql = `
+      SELECT
+        a.ID AS ACT_ID, a.ACT_NO, a.ACT_DATE, a.SERVICE_ID,
+        m.ID AS METER_ID, m.METER_NUM, m.NAME AS METER_NAME, m.SEAL,
+        m.MANFDATE, m.MOUNT_DATE, m.VERIFY_DATE, m.METER_TYPE,
+        c.ID AS CLIENT_ID,
+        CAST(c.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        CAST(c.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(c.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
+        CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
+        CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(b.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+        CAST(s.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+        ind.PH AS LAST_PH, ind.CREATEDATE AS LAST_PH_DATE,
+        (SELECT FIRST 1 STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
+      FROM BUILD_MAINT_ACTS a
+      LEFT JOIN METERS_IND ind ON ind.ACT_ID = a.ID AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
+      LEFT JOIN METERS m ON m.METER_NUM = ind.METER_ID
+      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
+      LEFT JOIN CLIENTS c ON c.ID = ab.CLIENT_ID
+      LEFT JOIN BUILDINGS b ON b.ID = ab.BUILDINGS_ID
+      LEFT JOIN RSTREETS rs ON rs.ID = b.STREET_ID
+      LEFT JOIN CONTROLLERS ctrl ON ctrl.ID = m.CONTROLER_ID
+      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
+      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      WHERE 1=1
+    `;
+    const params = [];
+    if (f.dateFrom) { sql += ` AND CAST(a.ACT_DATE AS DATE) >= ?`; params.push(f.dateFrom); }
+    if (f.dateTo)   { sql += ` AND CAST(a.ACT_DATE AS DATE) <= ?`; params.push(f.dateTo); }
+    if (f.controllerId) { sql += ` AND m.CONTROLER_ID = ?`; params.push(f.controllerId); }
+    if (f.streetId)     { sql += ` AND rs.ID = ?`; params.push(f.streetId); }
+    if (f.buildingId)   { sql += ` AND b.ID = ?`; params.push(f.buildingId); }
+    if (f.serviceId)    { sql += ` AND s.ID = ?`; params.push(f.serviceId); }   
+    sql += ` ORDER BY a.ACT_DATE DESC, a.ID DESC`;
+    db.query(sql, params, (e, rows) => {
+      if (e) { 
+        db.detach(); 
+        return res.status(500).json({ error: 'Ошибка основного запроса: ' + e.message }); 
+      }
+      const meterIds = [...new Set(rows.map(r => r.METER_ID).filter(Boolean))];
+      const finish = (violationsMap, filesMap) => {
+        const result = rows.map(r => {
+          const violations = violationsMap.get(r.METER_ID) || [];
+          const damage = violations.some(v => /механическ|отверстия|трещин|прилегани/i.test(v.NAME));
+          const sealViolation = violations.some(v => /пломб/i.test(v.NAME) && !/анти/i.test(v.NAME));
+          const displayViolation = violations.some(v => /отображ/i.test(v.NAME));
+          const mpiExpired = violations.some(v => /межповероч|интервал|поверк/i.test(v.NAME));      
+          const actDateStr = r.ACT_DATE ? String(r.ACT_DATE) : '';
+          let actTime = '';
+          if (actDateStr.includes(' ')) actTime = actDateStr.split(' ')[1] || '';
+          return {
+            actNo: r.ACT_NO,
+            actDate: actDateStr.split(' ')[0],
+            actTime,
+            checkType: '',
+            controllerFio: r.CONTROLLER_FIO || '',
+            streetName: `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim(),
+            house: r.HOUSE || '',
+            apparts: r.APPARTS || '',
+            clientName: r.CLIENT_NAME || '',
+            clientPhone: r.CLIENT_PHONE || '',
+            clientMail: r.CLIENT_MAIL || '',
+            representative: '',
+            serviceName: r.SERVICE_NAME || '',
+            meterNum: r.METER_NUM || '',
+            seal: r.SEAL || '',
+            meterName: r.METER_NAME || '',
+            manfDate: r.MANFDATE || '',
+            verifyDate: r.VERIFY_DATE || '',
+            lastPh: r.LAST_PH != null ? Number(r.LAST_PH).toLocaleString('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : '',
+            damage, 
+            sealViolation, 
+            displayViolation, 
+            mpiExpired,
+            boilerStatus: r.BOILER_STATUS || '',
+            violationsText: violations.map(v => `${v.NAME}: ${v.DESCRIPTION || ''}`).join('; '),
+            filesCount: filesMap.get(r.METER_ID) || 0
+          };
+        });
+        if (f.hasViolations === 'yes') {
+          return result.filter(r => r.damage || r.sealViolation || r.displayViolation || r.mpiExpired);
+        }
+        if (f.hasViolations === 'no') {
+          return result.filter(r => !r.damage && !r.sealViolation && !r.displayViolation && !r.mpiExpired);
+        }
+        return result;
+      };
+      if (meterIds.length === 0) {
+        db.detach();
+        return res.json(finish(new Map(), new Map()));
+      }
+      const vPlaceholders = meterIds.map(() => '?').join(',');
+      db.query(`SELECT METERS_ID, CAST(NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME, CAST(DESCRIPTION AS VARCHAR(500) CHARACTER SET WIN1251) AS DESCRIPTION FROM VIOLATIONS WHERE METERS_ID IN (${vPlaceholders})`, meterIds, (ve, vrows) => {
+        if (ve) {
+          db.detach();
+          return res.status(500).json({ error: 'Ошибка запроса нарушений: ' + ve.message });
+        }
+        const vMap = new Map();
+        (vrows || []).forEach(v => {
+          if (!vMap.has(v.METERS_ID)) vMap.set(v.METERS_ID, []);
+          vMap.get(v.METERS_ID).push(v);
+        });
+        const abonentIds = [...new Set(rows.map(r => r.CLIENT_ID).filter(Boolean))];
+        if (abonentIds.length === 0) {
+          db.detach();
+          return res.json(finish(vMap, new Map()));
+        }
+        const aPlaceholders = abonentIds.map(() => '?').join(',');
+        db.query(`SELECT ABONENT_ID, COUNT(*) AS CNT FROM ABONENTS_FILES WHERE ABONENT_ID IN (${aPlaceholders}) GROUP BY ABONENT_ID`, abonentIds, (fe, frows) => {
+          db.detach();        
+          if (fe) {
+            return res.status(500).json({ error: 'Ошибка запроса файлов: ' + fe.message });
+          }
+          const fMap = new Map();
+          (frows || []).forEach(f => fMap.set(f.ABONENT_ID, Number(f.CNT) || 0));
+          const meterToAbonent = new Map();
+          rows.forEach(r => { if (r.CLIENT_ID) meterToAbonent.set(r.METER_ID, r.CLIENT_ID); });
+          const filesByMeter = new Map();
+          meterToAbonent.forEach((aid, mid) => {
+            if (fMap.has(aid)) filesByMeter.set(mid, fMap.get(aid));
+          });
+          res.json(finish(vMap, filesByMeter));
+        });
+      });
     });
   });
 });

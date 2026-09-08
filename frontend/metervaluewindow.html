@@ -60,7 +60,7 @@
     <script>
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
-      fileInput.addEventListener('change', function() {  
+      fileInput.addEventListener('change', function() {
         if (this.files.length > 5) {
           if (typeof showAlert === 'function') {
             showAlert('Можно загрузить не более 5 файлов.', 'error');
@@ -71,19 +71,35 @@
           previewContainer.innerHTML = '';
           this.classList.remove('file-selected');
           return;
-        }      
-        previewContainer.innerHTML = '';         
-        Array.from(this.files).forEach(file => {          
-          if (!file.type.startsWith('image/')) return; 
-          const reader = new FileReader();          
+        }
+        const MAX_SIZE = 100 * 1024 * 1024;
+        for (const file of this.files) {
+          if (file.size > MAX_SIZE) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            if (typeof showAlert === 'function') {
+              showAlert(`Файл "${file.name}" слишком большой (${sizeMB} МБ). Максимум: 100 МБ.`, 'error');
+            } else {
+              alert(`Файл "${file.name}" слишком большой (${sizeMB} МБ). Максимум: 100 МБ.`);
+            }
+            this.value = '';
+            previewContainer.innerHTML = '';
+            this.classList.remove('file-selected');
+            return;
+          }
+        }   
+        previewContainer.innerHTML = '';
+        Array.from(this.files).forEach(file => {
+          if (!file.type.startsWith('image/')) return;
+          const reader = new FileReader();
           reader.onload = function(event) {
             const img = document.createElement('img');
             img.src = event.target.result;
-            img.classList.add('preview-image');                        
+            img.classList.add('preview-image');
             previewContainer.appendChild(img);
-          };          
-          reader.readAsDataURL(file); 
-        });
+          };
+          reader.readAsDataURL(file);
+        });    
+        this.classList.toggle('file-selected', this.files.length > 0);
       });
     </script>
     <script>

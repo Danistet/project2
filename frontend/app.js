@@ -2,6 +2,7 @@ const DB_NAME = 'MeterOfflineStorage';
 const STORE_NAME = 'pendingReadings';
 const CONTROLLER_PACKAGE_STORE = 'controllerPackages';
 const DB_VERSION = 4;
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 function openLocalDB() {
   return new Promise((resolve, reject) => {
@@ -210,26 +211,38 @@ async function clearControllerPackage() {
   }
 }
 
-function generateFileName(meterNum, originalname) {
-  const now = new Date();
-  const dateStr = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const randomStr = Math.random().toString(36).substring(2, 8);
-  const ext = originalname.split('.').pop() || 'jpg';
-  return `METER_${meterNum}_${dateStr}_${randomStr}.${ext}`;
+function validateFileSize(file) {
+  if (file.size > MAX_FILE_SIZE) {
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    const maxMB = (MAX_FILE_SIZE / (1024 * 1024)).toFixed(0);
+    showAlert(
+      `Файл "${file.name}" слишком большой (${sizeMB} МБ). Максимальный размер: ${maxMB} МБ.`,
+      'error'
+    );
+    return false;
+  }
+  return true;
 }
 
 function base64ToBlob(base64, mimeType) {
-  const byteCharacters = atob(base64.split(',')[1]);
-  const byteArrays = [];
-  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-    const slice = byteCharacters.slice(offset, offset + 512);
-    const byteNumbers = new Array(slice.length);
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    byteArrays.push(new Uint8Array(byteNumbers));
+  try {
+    const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+    const cleaned = base64Data.replace(/[^A-Za-z0-9+/=]/g, '');   
+    const byteCharacters = atob(cleaned);
+    const byteArrays = [];    
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      byteArrays.push(new Uint8Array(byteNumbers));
+    } 
+    return new Blob(byteArrays, { type: mimeType });
+  } catch (err) {
+    console.error('Ошибка декодирования base64:', err);
+    throw new Error('Не удалось декодировать файл. Попробуйте выбрать файл заново.');
   }
-  return new Blob(byteArrays, { type: mimeType });
 }
 
 const { createApp, ref, watch, computed } = Vue;
@@ -416,17 +429,25 @@ createApp({
         let fileNamesForServer = [];
         if (files && files.length > 0) {
           for (let i = 0; i < files.length; i++) {
+            if (!validateFileSize(files[i])) {
+              fileInput.value = '';
+              return;
+            }
+          }          
+          for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileName = generateFileName(meter_id, file.name);
-            fileNamesForServer.push(fileName);
-            const fileData = await new Promise((resolve) => {
+            fileNamesForServer.push(fileName);          
+            const fileData = await new Promise((resolve, reject) => {
               const reader = new FileReader();
               reader.onloadend = () => resolve({
                 fileName,
                 fileType: file.type,
-                fileBase64: reader.result
+                fileBuffer: reader.result,
+                fileSize: file.size
               });
-              reader.readAsDataURL(file);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsArrayBuffer(file);
             });
             filesDataForStorage.push(fileData);
           }
@@ -460,7 +481,7 @@ createApp({
           }       
           if (filesDataForStorage.length > 0) {
             filesDataForStorage.forEach(f => {
-              const blob = base64ToBlob(f.fileBase64, f.fileType);
+              const blob = new Blob([f.fileBuffer], { type: f.fileType });
               formData.append('files', blob, f.fileName);
             });
           }
@@ -1171,20 +1192,29 @@ createApp({
           return;
         }
         let filesDataForStorage = [];
-        let fileNamesForServer = [];      
+        let fileNamesForServer = [];
         if (files && files.length > 0) {
+          for (let i = 0; i < files.length; i++) {
+            if (!validateFileSize(files[i])) {
+              fileInput.value = '';
+              document.getElementById('previewContainer').innerHTML = '';
+              return;
+            }
+          }          
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileName = generateFileName(meterNum, file.name);
-            fileNamesForServer.push(fileName);          
-            const fileData = await new Promise((resolve) => {
+            fileNamesForServer.push(fileName);            
+            const fileData = await new Promise((resolve, reject) => {
               const reader = new FileReader();
               reader.onloadend = () => resolve({
                 fileName,
                 fileType: file.type,
-                fileBase64: reader.result
+                fileBuffer: reader.result,
+                fileSize: file.size
               });
-              reader.readAsDataURL(file);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsArrayBuffer(file);
             });
             filesDataForStorage.push(fileData);
           }
@@ -1205,7 +1235,7 @@ createApp({
           formData.append('violations', JSON.stringify(violations));         
           if (filesDataForStorage.length > 0) {
             filesDataForStorage.forEach(f => {
-              const blob = base64ToBlob(f.fileBase64, f.fileType);
+              const blob = new Blob([f.fileBuffer], { type: f.fileType });
               formData.append('files', blob, f.fileName);
             });
           }        

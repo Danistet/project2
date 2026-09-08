@@ -2103,19 +2103,32 @@ async function syncPendingReadings() {
   for (const record of pending) {
     try {
       const formData = new FormData();
+      const appendFiles = (filesData) => {
+        if (!filesData || filesData.length === 0) return;
+        filesData.forEach(f => {
+          let blob;
+          if (f.fileBuffer && f.fileBuffer instanceof ArrayBuffer) {
+            blob = new Blob([f.fileBuffer], { type: f.fileType || 'application/octet-stream' });
+          } else if (f.fileBase64) {
+            blob = base64ToBlob(f.fileBase64, f.fileType);
+          } else {
+            return;
+          }
+          formData.append('files', blob, f.fileName);
+        });
+      };    
       if (record.isViolation) {
         formData.append('meterNum', record.meterNum);
         formData.append('licschet', record.licschet);
         formData.append('violations', record.violations);
-        if (record.filesData && record.filesData.length > 0) {
-          record.filesData.forEach(f => formData.append('files', base64ToBlob(f.fileBase64, f.fileType), f.fileName));
-        } else if (record.fileBase64) {
-          formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
-        }
-        const response = await fetch(`${API_BASE}/save-violation`, { method: 'POST', body: formData });
+        appendFiles(record.filesData);       
+        const response = await fetch(`${API_BASE}/save-violation`, { 
+          method: 'POST', 
+          body: formData 
+        });
         if (response.ok) {
           await deletePendingReading(record.id);
-          console.log(`Нарушение ID ${record.id}`);
+          console.log(`Нарушение ID ${record.id} синхронизировано`);
         }
       } else {
         formData.append('ph', record.ph);
@@ -2123,22 +2136,20 @@ async function syncPendingReadings() {
         formData.append('licschet', record.licschet);
         formData.append('abonent_name', record.abonent_name);
         formData.append('description', record.description);
-        if (record.actId) {
-          formData.append('act_id', record.actId);
-        }
-        if (record.filesData && record.filesData.length > 0) {
-          record.filesData.forEach(f => formData.append('file', base64ToBlob(f.fileBase64, f.fileType), f.fileName));          
-        } else if (record.fileBase64) { 
-          formData.append('files', base64ToBlob(record.fileBase64, record.fileType), record.fileName);
-        }
-        const response = await fetch(`${API_BASE}/PH`, { method: 'POST', body: formData });
+        if (record.actId) formData.append('act_id', record.actId);
+        if (record.controllerId) formData.append('controllerId', record.controllerId);
+        appendFiles(record.filesData);       
+        const response = await fetch(`${API_BASE}/PH`, { 
+          method: 'POST', 
+          body: formData 
+        });
         if (response.ok) {
           await deletePendingReading(record.id);
-          console.log(`Показания ID ${record.id}`);
+          console.log(`Показания ID ${record.id} синхронизированы`);
         }
       }
     } catch (err) {
-      console.error(`ошибка синхронизации ${record.id}:`, err);
+      console.error(`Ошибка синхронизации ${record.id}:`, err);
     }
   }
 }
