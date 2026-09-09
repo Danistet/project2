@@ -56,7 +56,7 @@ async function downloadAndCacheControllerData(controllerId) {
   return data;
 }
 
-async function ensureControllerPackage(controllerId, maxAgeMs = 2400000) {
+async function ensureControllerPackage(controllerId, maxAgeMs = 24000000) {
   if (!controllerId) return null;
   const existing = await getControllerPackage(controllerId);
   if (
@@ -209,6 +209,14 @@ async function clearControllerPackage() {
   } catch (err) {
     console.error('Ошибка очистки кэша контролёра:', err);
   }
+}
+
+function generateFileName(meterNum, originalname) {
+  const now = new Date();
+  const dateStr = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  const ext = originalname.split('.').pop() || 'jpg';
+  return `METER_${meterNum}_${dateStr}_${randomStr}.${ext}`;
 }
 
 function validateFileSize(file) {
@@ -526,7 +534,7 @@ createApp({
     const saveAddressAndContinue = async () => {
       const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
       const now = Date.now();
-      const EXPIRY_MS = 24000000;
+      const EXPIRY_MS = 240000000;
       if (!authData || !authData.token || (now - authData.authDate > EXPIRY_MS)) {
         error.value = 'Истёк срок сессии. Пожалуйста, войдите снова.';
         showContinue.value = true;
@@ -1351,7 +1359,7 @@ createApp({
         return false;
       }
       const now = Date.now();
-      const EXPIRY_MS = 24000000;
+      const EXPIRY_MS = 240000000;
       if (now - authData.authDate > EXPIRY_MS)
       {
         error.value = 'Истёк срок сессии';
