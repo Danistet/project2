@@ -1281,7 +1281,7 @@
         streets: LOCAL_DB.RSTREETS,
         buildings: LOCAL_DB.BUILDINGS,
         abonents: LOCAL_DB.ABONENTS,
-        meters: metersWithLastInd, // <-- Теперь с LAST_IND_DATE
+        meters: metersWithLastInd,
         clients: LOCAL_DB.CLIENTS,
         meterTypes: LOCAL_DB.METER_TYPES,
         services: LOCAL_DB.SERVICES
@@ -2339,7 +2339,7 @@ window.alert = function(message) {
     if (!appContainer) return false;
     const pageHeader = appContainer.querySelector('.page-header');
     const h1 = appContainer.querySelector('h1');
-    const formContainer = appContainer.querySelector('.form-container'); // ИСПРАВЛЕНО: добавлена точка
+    const formContainer = appContainer.querySelector('.form-container');
     if (pageHeader) {
       pageHeader.parentNode.insertBefore(headerDiv, pageHeader);
       return true;
@@ -2356,7 +2356,7 @@ window.alert = function(message) {
   }
   function updateGlobalInfoHeader() {
     const container = document.getElementById('global-info-header');
-    if (!container) return;
+    if (!container) return;    
     let address = "-";
     let meterNum = "-";
     let service = "-";
@@ -2377,7 +2377,7 @@ window.alert = function(message) {
     try {
       const active = JSON.parse(sessionStorage.getItem('activeMeter') || 'null');
       if (active && active.id) targetId = active.id;
-    } catch(e) {}
+    } catch(e) {}  
     if (!targetId) {
       try {
         const selected = JSON.parse(sessionStorage.getItem('selectedMeter') || 'null');
@@ -2414,8 +2414,30 @@ window.alert = function(message) {
       document.getElementById('info-service').textContent = service;
       document.getElementById('info-location').textContent = location;
       container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
     }
   }
+  const relevantKeys = ['userAddress', 'activeMeter', 'selectedMeter', 'allMeters', 'meternum'];
+  const originalSetItem = sessionStorage.setItem;
+  sessionStorage.setItem = function(key, value) {
+    originalSetItem.apply(this, arguments);
+    if (relevantKeys.includes(key)) {
+      setTimeout(updateGlobalInfoHeader, 0);
+    }
+  };
+  const originalRemoveItem = sessionStorage.removeItem;
+  sessionStorage.removeItem = function(key) {
+    originalRemoveItem.apply(this, arguments);
+    if (relevantKeys.includes(key)) {
+      setTimeout(updateGlobalInfoHeader, 0);
+    }
+  };
+  const originalClear = sessionStorage.clear;
+  sessionStorage.clear = function() {
+    originalClear.apply(this, arguments);
+    setTimeout(updateGlobalInfoHeader, 0);
+  };
   function tryInsertWithRetry(attempts = 0) {
     if (attempts > 20) return;
     if (insertHeader()) {
@@ -2429,5 +2451,9 @@ window.alert = function(message) {
   } else {
     tryInsertWithRetry();
   }
-  window.addEventListener('storage', updateGlobalInfoHeader);
+  window.addEventListener('storage', (e) => {
+    if (relevantKeys.includes(e.key)) {
+      updateGlobalInfoHeader();
+    }
+  });
 })();

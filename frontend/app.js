@@ -409,7 +409,7 @@ createApp({
       return str.replace('.', ',');
     };
 
-    const NewPH = async () => {
+    async function NewPH() {
       try {
         const inputEl = document.getElementById('newPH');
         const rawValue = inputEl?.value?.trim() || '';            
@@ -425,6 +425,8 @@ createApp({
         if (files && files.length > 5) {    
           showAlert('Можно выбрать не более 5 файлов.', 'error');
           fileInput.value = '';
+          const clearBtn = document.getElementById('clearFileBtn');
+          if (clearBtn) clearBtn.style.display = 'none';
           return;
         }
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
@@ -439,6 +441,8 @@ createApp({
           for (let i = 0; i < files.length; i++) {
             if (!validateFileSize(files[i])) {
               fileInput.value = '';
+              const clearBtn = document.getElementById('clearFileBtn');
+              if (clearBtn) clearBtn.style.display = 'none';
               return;
             }
           }          
@@ -514,7 +518,10 @@ createApp({
         if (fileInput) {
           fileInput.value = ''; 
           fileInput.classList.remove('file-selected');
-          document.getElementById('previewContainer').innerHTML = '';
+          const preview = document.getElementById('previewContainer');
+          if (preview) preview.innerHTML = '';
+          const clearBtn = document.getElementById('clearFileBtn');
+          if (clearBtn) clearBtn.style.display = 'none';
         }                     
         const violationsForm = document.getElementById('violationsForm');
         if (violationsForm) {          
@@ -1196,7 +1203,10 @@ createApp({
         if (files && files.length > 5) {
           showAlert('Можно выбрать не более 5 файлов.', 'info');
           fileInput.value = '';
-          document.getElementById('previewContainer').innerHTML = '';
+          const preview = document.getElementById('previewContainer');
+          if (preview) preview.innerHTML = '';
+          const clearBtn = document.getElementById('clearFileBtn');
+          if (clearBtn) clearBtn.style.display = 'none';
           return;
         }
         let filesDataForStorage = [];
@@ -1205,7 +1215,10 @@ createApp({
           for (let i = 0; i < files.length; i++) {
             if (!validateFileSize(files[i])) {
               fileInput.value = '';
-              document.getElementById('previewContainer').innerHTML = '';
+              const preview = document.getElementById('previewContainer');
+              if (preview) preview.innerHTML = '';
+              const clearBtn = document.getElementById('clearFileBtn');
+              if (clearBtn) clearBtn.style.display = 'none';
               return;
             }
           }          
@@ -1269,7 +1282,10 @@ createApp({
           fileInput.value = '';
           fileInput.classList.remove('file-selected');
         }
-        document.getElementById('previewContainer').innerHTML = '';
+        const preview = document.getElementById('previewContainer');
+        if (preview) preview.innerHTML = '';
+        const clearBtn = document.getElementById('clearFileBtn');
+        if (clearBtn) clearBtn.style.display = 'none';
       } catch (err) {
         console.error('Error submitting:', err);
         showAlert('Ошибка: ' + (err.message || 'Неизвестная ошибка'), 'error');

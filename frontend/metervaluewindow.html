@@ -42,7 +42,10 @@
           > 
           <div class="button-group">
             <label class="form-label">Прикрепить фото счетчика</label>
-            <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" multiple class="form-input" style="padding: 10px;">
+            <div class="file-input-wrapper">
+              <input type="file" name="fileInput" id="fileInput" accept="image/png, image/jpeg" multiple class="form-input" style="padding: 10px; padding-right: 40px;">
+              <span id="clearFileBtn" class="clear-file-btn" style="display: none;">✕</span>
+            </div>
             <div id="previewContainer"></div>            
           </div>          
         <div class="button-group">
@@ -60,6 +63,8 @@
     <script>
       const fileInput = document.getElementById('fileInput');
       const previewContainer = document.getElementById('previewContainer');
+      const clearFileBtn = document.getElementById('clearFileBtn');
+      
       fileInput.addEventListener('change', function() {
         if (this.files.length > 5) {
           if (typeof showAlert === 'function') {
@@ -70,6 +75,7 @@
           this.value = '';
           previewContainer.innerHTML = '';
           this.classList.remove('file-selected');
+          if (clearFileBtn) clearFileBtn.style.display = 'none';
           return;
         }
         const MAX_SIZE = 100 * 1024 * 1024;
@@ -84,6 +90,7 @@
             this.value = '';
             previewContainer.innerHTML = '';
             this.classList.remove('file-selected');
+            if (clearFileBtn) clearFileBtn.style.display = 'none';
             return;
           }
         }   
@@ -100,7 +107,16 @@
           reader.readAsDataURL(file);
         });    
         this.classList.toggle('file-selected', this.files.length > 0);
+        if (clearFileBtn) clearFileBtn.style.display = this.files.length > 0 ? 'block' : 'none';
       });
+      if (clearFileBtn) {
+        clearFileBtn.addEventListener('click', function() {
+          fileInput.value = '';
+          previewContainer.innerHTML = '';
+          fileInput.classList.remove('file-selected');
+          this.style.display = 'none';
+        });
+      }
     </script>
     <script>
       function formatWithThousands(value) {
@@ -227,86 +243,32 @@
           phElement.textContent = 'нет данных';
           window.location.href = 'ActWindow.html';
         }
-      }         
-      async function syncPendingReadings() {
-        if (!navigator.onLine) return;
-        const pending = await getPendingReadings();
-        if (pending.length === 0) return;
-        console.log(`Найдено ${pending.length} записей для фоновой синхронизации...`);
-        for (const record of pending) {
-          try {
-            if (record.isViolation) {
-              const formData = new FormData();
-              formData.append('meterNum', record.meterNum);
-              formData.append('licschet', record.licschet);
-              formData.append('violations', record.violations);
-              if (record.fileBase64) {
-                const blob = base64ToBlob(record.fileBase64, record.fileType);
-                formData.append('file', blob, record.fileName);
-              }
-              const response = await fetch(`${API_BASE}/save-violation`, {
-                method: 'POST',
-                body: formData
-              });
-              if (response.ok) {
-                await deletePendingReading(record.id);
-                console.log(`Нарушение ID ${record.id} успешно синхронизировано и удалено из IndexedDB.`);
-              } else {
-                console.warn(`Не удалось отправить нарушение ID ${record.id}. Оставлено в очереди.`);
-              }
-            } else {
-              const formData = new FormData();
-              formData.append('ph', record.ph);
-              formData.append('meter_id', record.meter_id);
-              formData.append('licschet', record.licschet);
-              formData.append('abonent_name', record.abonent_name);
-              formData.append('description', record.description);
-              if (record.controllerId) {
-                formData.append('controllerId', record.controllerId);
-              };            
-              if (record.fileBase64) {
-                const blob = base64ToBlob(record.fileBase64, record.fileType);
-                formData.append('file', blob, record.fileName);
-              };
-              if (record.fileBase64) {
-                const blob = base64ToBlob(record.fileBase64, record.fileType);
-                formData.append('file', blob, record.fileName);
-              }
-              const response = await fetch(`${API_BASE}/PH`, {
-                method: 'POST',
-                body: formData
-              });              
-              if (response.ok) {
-                await deletePendingReading(record.id);
-                console.log(`Показание ID ${record.id} успешно синхронизировано и удалено из IndexedDB.`);
-              } else {
-                console.warn(`Не удалось отправить показание ID ${record.id}. Оставлено в очереди.`);
-              }
-            }
-          } catch (err) {
-            console.error(`Критическая ошибка синхронизации записи ID ${record.id}:`, err);
-          }
-        }
-      }
-      
-      window.addEventListener('online', () => {
-        syncPendingReadings();
-      });
+      }                           
       window.addEventListener('DOMContentLoaded', () => {
         loadMeterData();
         loadPreviousPHFromAPI(); 
-        syncPendingReadings();
+        if (typeof syncPendingReadings === 'function') {
+          syncPendingReadings();
+        }
+      });
+      window.addEventListener('online', () => {
+        if (typeof syncPendingReadings === 'function') {
+          syncPendingReadings();
+        }
       });
     </script>
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         const fileInput = document.getElementById('fileInput');    
+        const clearFileBtn = document.getElementById('clearFileBtn');
         if (fileInput) {
           fileInput.addEventListener('change', function() {
             if (this.files && this.files.length > 0) {          
-              this.classList.add('file-selected');          
+              this.classList.add('file-selected');
+              if (clearFileBtn) clearFileBtn.style.display = 'block';
             } else {          
               this.classList.remove('file-selected');
+              if (clearFileBtn) clearFileBtn.style.display = 'none';
             }
           });
         }
@@ -560,9 +522,30 @@
       color: #333333;
     }
 
-    #fileInput {
+    .file-input-wrapper {
+      position: relative;
       width: 100%;
       max-width: 320px;
+    }
+
+    .clear-file-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999999;
+      font-size: 20px;
+      cursor: pointer;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .clear-file-btn:hover {
+      color: #C62828;
+    }
+
+    #fileInput {
+      width: 100%;
       min-height: 56px;
       padding: 12px 16px;
       font-size: 16px;
