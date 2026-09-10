@@ -675,7 +675,9 @@ app.post('/update-token', (req, res) => {
 });
 
 app.post('/generate-act', (req, res) => {
-  const { serviceId } = req.body || {};
+  const { serviceId, buildingId, checkTypeId, checkType } = req.body || {};
+  const normalizedCheckTypeId = Number(checkTypeId) ||
+    (String(checkType || '').toLowerCase().includes('вне') || String(checkType).toLowerCase() === 'unscheduled' ? 2 : 1);
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
@@ -721,12 +723,12 @@ app.post('/generate-act', (req, res) => {
         }
         const insertQuery = `
           INSERT INTO BUILD_MAINT_ACTS
-            (ID, ACT_NO, ACT_BDATE, ACT_EDATE, ACT_DATE, SERVICE_ID, CREATEDATE)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+            (ID, BUILDING_ID, ACT_NO, ACT_BDATE, ACT_EDATE, ACT_DATE, SERVICE_ID, CREATEDATE, CHECKTYPE_ID)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         db.query(
           insertQuery,
-          [newId, newActNo, bdateStr, edateStr, actDateStr, serviceId || null, actDateStr],
+          [newId, buildingId || null, newActNo, bdateStr, edateStr, actDateStr, serviceId || null, actDateStr, normalizedCheckTypeId],
           (err) => {
             db.detach();
             if (err) {
@@ -738,7 +740,9 @@ app.post('/generate-act', (req, res) => {
               actNo: newActNo,
               actDate: actDateStr,
               actBdate: bdateStr,
-              actEdate: edateStr
+              actEdate: edateStr,
+              buildingId: buildingId || null,
+              checkTypeId: normalizedCheckTypeId
             });
           }
         );
@@ -1683,12 +1687,9 @@ app.post('/admin/report', (req, res) => {
           const displayViolation = violations.some(v => /отображ/i.test(v.NAME));
           const mpiExpired = violations.some(v => /межповероч|интервал|поверк/i.test(v.NAME));      
           const actDateStr = r.ACT_DATE ? String(r.ACT_DATE) : '';
-          let actTime = '';
-          if (actDateStr.includes(' ')) actTime = actDateStr.split(' ')[1] || '';
           return {
             actNo: r.ACT_NO,
             actDate: actDateStr.split(' ')[0],
-            actTime,
             checkType: '',
             controllerFio: r.CONTROLLER_FIO || '',
             streetName: `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim(),

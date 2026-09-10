@@ -159,22 +159,22 @@
             <button type="submit" class="save-btn" :disabled="saving" v-if="!showContinue">
               {{ saving ? 'Сохранение...' : 'Сохранить' }}
             </button>
-          </div>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" v-model="checkType" value="planned" :disabled="isLoading" />
-              <span>Плановая</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" v-model="checkType" value="unscheduled" :disabled="isLoading" />
-              <span>Внеплановая</span>
-            </label>
-          </div>
+          </div>          
         </div>  
+        <div class="radio-group" v-if="!showContinue">
+          <label class="radio-label">
+            <input type="radio" v-model="checkType" value="Плановая" :disabled="isLoading" />
+            <span>Плановая</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" v-model="checkType" value="Внеплановая" :disabled="isLoading" />
+            <span>Внеплановая</span>
+          </label>
+        </div>
         <div v-if="showContinue" class="session-expired-block">
           <p class="error-message">{{ error }}</p>
           <button @click="cont" class="btn-primary">Продолжить</button>
-        </div>
+        </div>        
         <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;" v-if="!showContinue">Продолжить</button>
         <button type="button" @click="viewhistory" class="btn-secondary" v-if="!showContinue">история работ</button>
         <button type="button" @click="logout" class="btn-secondary" v-if="!showContinue">Выход</button>
@@ -332,7 +332,8 @@
           const showOverlay = ref(true);
           const actNo = ref('');
           const actDate = ref('');
-          const checkType = ref('planned');
+          const storedCheckType = sessionStorage.getItem('checkType') || localStorage.getItem('checkType');
+          const checkType = ref(storedCheckType || 'Плановая');
           const error = ref('');
           const isLoading = ref(false);
           const isOnline = ref(navigator.onLine);
@@ -778,6 +779,7 @@
               return;
             }
             sessionStorage.setItem('checkType', checkType.value);
+            localStorage.setItem('checkType', checkType.value);
             window.location.href = 'address.html';
           };
 

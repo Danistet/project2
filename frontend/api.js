@@ -9,7 +9,7 @@
   // false = обычный режим через сервер
   const USE_LOCAL_DB = false;
   const LOCAL_MOCK_PERSIST = true;
-  const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4S';
+  const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4';
   if (!USE_LOCAL_DB) {
     return;
   }
@@ -2200,8 +2200,43 @@ function saveActiveMeter(meter) {
     mountDate: meter.mountDate,
     verifyDate: meter.verifyDate,
     licschet: meter.licschet,
-    id: meter.id
+    id: meter.id,
+    name: meter.name,
+    groupName: meter.groupName,
+    clientName: meter.clientName
   }));
+}
+
+function syncMeterSessionData(meterId, updates) {
+  const updateMeter = (meter) => {
+    if (!meter || String(meter.id) !== String(meterId)) return meter;
+    return { ...meter, ...updates };
+  };
+
+  const activeMeter = getActiveMeter();
+  if (activeMeter && String(activeMeter.id) === String(meterId)) {
+    saveActiveMeter(updateMeter(activeMeter));
+  }
+
+  const selectedMeter = getSelectedMeter();
+  if (selectedMeter && String(selectedMeter.id) === String(meterId)) {
+    saveSelectedMeter(updateMeter(selectedMeter));
+  }
+
+  const allMeters = getAllMeters();
+  if (allMeters.length) {
+    saveAllMeters(allMeters.map(meter => updateMeter(meter)));
+  }
+
+  if (updates.meterNum !== undefined) {
+    sessionStorage.setItem('meternum', JSON.stringify({ meterNum: updates.meterNum }));
+  }
+  if (updates.mountDate !== undefined) {
+    sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: updates.mountDate }));
+  }
+  if (updates.verifyDate !== undefined) {
+    sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: updates.verifyDate }));
+  }
 }
 
 function clearActiveMeter() {
@@ -2356,7 +2391,7 @@ window.alert = function(message) {
   }
   function updateGlobalInfoHeader() {
     const container = document.getElementById('global-info-header');
-    if (!container) return;    
+    if (!container) return;      
     let address = "-";
     let meterNum = "-";
     let service = "-";
@@ -2372,39 +2407,47 @@ window.alert = function(message) {
         hasData = true;
       }
     } catch(e) {}
-    let meterData = null;
-    let targetId = null;
+    let currentMeterNum = null;
+    let currentMeterId = null;
     try {
       const active = JSON.parse(sessionStorage.getItem('activeMeter') || 'null');
-      if (active && active.id) targetId = active.id;
-    } catch(e) {}  
-    if (!targetId) {
-      try {
-        const selected = JSON.parse(sessionStorage.getItem('selectedMeter') || 'null');
-        if (selected && selected.id) targetId = selected.id;
-      } catch(e) {}
-    }
-    try {
-      const allMeters = JSON.parse(sessionStorage.getItem('allMeters') || '[]');
-      if (allMeters.length > 0) {
-        if (targetId) {
-          meterData = allMeters.find(m => String(m.id) === String(targetId)) || allMeters[0];
-        } else {
-          meterData = allMeters[0];
-        }
+      if (active) {
+        currentMeterId = active.id;
+        currentMeterNum = active.meterNum;
       }
     } catch(e) {}
-    if (meterData) {
-      meterNum = meterData.meterNum || '-';
-      service = meterData.groupName || '-';
-      location = meterData.name || '-';
-      if (meterNum !== '-' || service !== '-' || location !== '-') hasData = true;
-    } else {
+    if (!currentMeterNum) {
+      try {
+        const selected = JSON.parse(sessionStorage.getItem('selectedMeter') || 'null');
+        if (selected) {
+          currentMeterId = selected.id;
+          currentMeterNum = selected.meterNum;
+        }
+      } catch(e) {}
+    }
+    if (!currentMeterNum) {
       try {
         const mNum = JSON.parse(sessionStorage.getItem('meternum') || '{}');
         if (mNum.meterNum) {
-          meterNum = mNum.meterNum;
-          hasData = true;
+          currentMeterNum = mNum.meterNum;
+        }
+      } catch(e) {}
+    }
+    if (currentMeterNum) {
+      meterNum = currentMeterNum;
+      hasData = true;
+      try {
+        const allMeters = JSON.parse(sessionStorage.getItem('allMeters') || '[]');
+        let foundInAll = null;        
+        if (currentMeterId) {
+          foundInAll = allMeters.find(m => String(m.id) === String(currentMeterId));
+        }
+        if (!foundInAll && currentMeterNum) {
+          foundInAll = allMeters.find(m => String(m.meterNum) === String(currentMeterNum));
+        }       
+        if (foundInAll) {
+          service = foundInAll.groupName || service;
+          location = foundInAll.name || location;
         }
       } catch(e) {}
     }
@@ -2418,6 +2461,7 @@ window.alert = function(message) {
       container.style.display = 'none';
     }
   }
+  window.updateGlobalInfoHeader = updateGlobalInfoHeader;
   const relevantKeys = ['userAddress', 'activeMeter', 'selectedMeter', 'allMeters', 'meternum'];
   const originalSetItem = sessionStorage.setItem;
   sessionStorage.setItem = function(key, value) {

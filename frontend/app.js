@@ -586,6 +586,8 @@ createApp({
       try {
         let actResult;
         const isOffline = !navigator.onLine;
+        const storedCheckType = sessionStorage.getItem('checkType') || localStorage.getItem('checkType') || 'Плановая';
+        const checkTypeId = /внеплан|unscheduled/i.test(String(storedCheckType)) ? 2 : 1;
           if (isOffline) {
             const d = new Date();
             const pad = (n) => String(n).padStart(2, '0');
@@ -599,7 +601,12 @@ createApp({
               actEdate: formatDate(d)
             };
           } else {
-            actResult = await apiRequest('/generate-act', { serviceId: null });
+            actResult = await apiRequest('/generate-act', {
+              serviceId: null,
+              buildingId: selectedBuildingId.value,
+              checkTypeId,
+              checkType: storedCheckType
+            });
             await apiRequest('/update-act-building', {
               actId: actResult.actId,
               buildingId: selectedBuildingId.value
@@ -613,7 +620,17 @@ createApp({
             actDate: actResult.actDate,
             actBdate: actResult.actBdate,
             actEdate: actResult.actEdate,
-            buildingId: selectedBuildingId.value
+            buildingId: selectedBuildingId.value,
+            checkTypeId: actResult.checkTypeId || checkTypeId
+          }));
+          localStorage.setItem('currentAct', JSON.stringify({
+            actId: actResult.actId,
+            actNo: actResult.actNo,
+            actDate: actResult.actDate,
+            actBdate: actResult.actBdate,
+            actEdate: actResult.actEdate,
+            buildingId: selectedBuildingId.value,
+            checkTypeId: actResult.checkTypeId || checkTypeId
           }));
           let allMeters = [];          
           try {

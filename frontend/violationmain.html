@@ -324,15 +324,24 @@
             saving.value = true;
             error.value = '';
             try {
+              const meter = meters.value.find(item => String(item.id) === String(selectedMeterId.value));
+              const sessionUpdates = {
+                name: editData.value.name,
+                meterNum: editData.value.meterNum,
+                seal: editData.value.seal,
+                manfDate: editData.value.manfDate,
+                verifyDate: editData.value.verifyDate,
+                mountDate: meter?.mountDate
+              };
               if (!navigator.onLine) {
                 const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
-                if (activeMeter) {
-                  activeMeter.meterNum = editData.value.meterNum;
-                  activeMeter.verifyDate = editData.value.verifyDate;
+                if (typeof syncMeterSessionData === 'function') {
+                  syncMeterSessionData(selectedMeterId.value, sessionUpdates);
+                } else if (activeMeter) {
+                  Object.assign(activeMeter, sessionUpdates);
                   if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
-                  sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
-                  sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
                 }
+                meters.value = meters.value.map(item => String(item.id) === String(selectedMeterId.value) ? { ...item, ...sessionUpdates } : item);
                 if (typeof showAlert === 'function') {
                   showAlert('Интернет отсутствует. Изменения сохранены локально и будут отправлены при появлении связи.', 'success');
                 } else {
@@ -346,7 +355,7 @@
                 name: editData.value.name || null,
                 seal: editData.value.seal || null,
                 manfDate: editData.value.manfDate || null,
-                mountDate: meters.value.find(m => m.id === selectedMeterId.value)?.mountDate || null,
+                mountDate: meter?.mountDate || null,
                 verifyDate: editData.value.verifyDate || null
               });
               if (result.status === 'OK') {
@@ -356,13 +365,13 @@
                   alert('Данные успешно сохранены');
                 }
                 const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
-                if (activeMeter) {
-                  activeMeter.meterNum = editData.value.meterNum;
-                  activeMeter.verifyDate = editData.value.verifyDate;
+                if (typeof syncMeterSessionData === 'function') {
+                  syncMeterSessionData(selectedMeterId.value, sessionUpdates);
+                } else if (activeMeter) {
+                  Object.assign(activeMeter, sessionUpdates);
                   if (typeof saveActiveMeter === 'function') saveActiveMeter(activeMeter);
-                  sessionStorage.setItem('meternum', JSON.stringify({ meterNum: activeMeter.meterNum }));
-                  sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: activeMeter.verifyDate }));
                 }
+                meters.value = meters.value.map(item => String(item.id) === String(selectedMeterId.value) ? { ...item, ...sessionUpdates } : item);
               } else {
                 error.value = result.error || 'Ошибка сохранения';
               }
