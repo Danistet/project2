@@ -69,31 +69,42 @@
             error.value = 'Выберите статус бойлера';
             return;
           }
+          const meterId = getMeterId();
+          if (!meterId) {
+            error.value = 'Не удалось определить ID счётчика';
+            return;
+          }
           saving.value = true;
           try {
-            const meterId = getMeterId();
-            if (typeof getActiveMeter === 'function') {
-              const activeMeter = getActiveMeter();
-              if (activeMeter?.id) {
-                meterId = activeMeter.id;
-              }
-            }
-            await apiRequest('/save-boiler-status', {
-              status: boilerStatus.value,
-              meterId: meterId
-            });
-            sessionStorage.setItem('boilerStatus', boilerStatus.value);
+            if (navigator.onLine) {
+              await apiRequest('/save-boiler-status', {
+                status: boilerStatus.value,
+                meterId: meterId
+              });
+              console.log('Статус бойлера успешно сохранён на сервере');
+            } else {
+              throw new Error('Нет подключения к сети');
+            }  
             window.location.href = 'violationwindow.html';
           } catch (err) {
-            console.error('Error saving boiler status:', err);
-            sessionStorage.setItem('boilerStatus', boilerStatus.value);
+            if (typeof savePendingBoilerStatus === 'function') {
+              await savePendingBoilerStatus({
+                meterId: meterId,
+                status: boilerStatus.value
+              });
+            } else {
+              sessionStorage.setItem('pendingBoilerStatus', JSON.stringify({
+                meterId: meterId,
+                status: boilerStatus.value
+              }));
+            }
             if (typeof showAlert === 'function') {
               showAlert(
-                'Не удалось сохранить статус бойлера на сервере. Значение сохранено локально.',
-                'error'
+                'Нет подключения к сети. Статус бойлера сохранён локально.',
+                'info'
               );
-            }
-            window.location.href = 'violationwindow.html';
+            }  
+           window.location.href = 'violationwindow.html';
           } finally {
             saving.value = false;
           }
@@ -137,6 +148,16 @@
         };
       }
     }).mount('#app');
+    window.addEventListener('online', () => {
+      if (typeof syncPendingBoilerStatuses === 'function') {
+        syncPendingBoilerStatuses();
+      }
+    });
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof syncPendingBoilerStatuses === 'function') {
+        syncPendingBoilerStatuses();
+      }
+    });    
   </script>
   <script>
     let statusTimeout;    

@@ -72,7 +72,7 @@ async function ensureControllerPackage(controllerId, maxAgeMs = 24000000) {
   try {
     return await downloadAndCacheControllerData(controllerId);
   } catch (err) {
-    console.warn('Не удалось обновить офлайн-пакет контролёра:', err);
+    showAlert(`Не удалось обновить офлайн-пакет контролёра:`, 'error');
     return existing;
   }
 }
@@ -146,8 +146,8 @@ async function updateLocalMeterCache(meterId, verifyDate, controllerId) {
       }
       await saveControllerPackage(currentControllerId, pkg);
     }
-  } catch (e) {
-    console.warn('Не удалось обновить локальный кэш счётчика:', e);
+  } catch (err) {
+    showAlert(`Не удалось обновить локальный кэш счётчика:`, 'error');
   }
 }
 
@@ -155,7 +155,6 @@ async function syncPendingVerifyUpdates() {
   if (!navigator.onLine) return;
   const updates = await getPendingVerifyUpdates();
   if (updates.length === 0) return;
-  console.log(`Найдено ${updates.length} отложенных обновлений даты проверки`);
   for (const upd of updates) {
     try {
       await updateVerifyDate(upd.meterId, upd.verifyDate);
@@ -167,9 +166,68 @@ async function syncPendingVerifyUpdates() {
       }
       await updateLocalMeterCache(upd.meterId, upd.verifyDate, upd.controllerId);
       await deletePendingVerifyUpdate(upd.id);
-      console.log(`Обновление даты проверки ID ${upd.id} синхронизировано`);
     } catch (err) {
-      console.error(`Ошибка синхронизации обновления ID ${upd.id}:`, err);
+      showAlert(`Ошибка синхронизации обновления ID ${upd.id}:`, 'error');
+    }
+  }
+}
+
+async function savePendingBoilerStatus(statusData) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.add({
+      type: 'boilerStatus',
+      meterId: statusData.meterId,
+      status: statusData.status,
+      timestamp: Date.now()
+    });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function getPendingBoilerStatuses() {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const all = request.result || [];
+      resolve(all.filter(r => r.type === 'boilerStatus'));
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deletePendingBoilerStatus(id) {
+  const db = await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function syncPendingBoilerStatuses() {
+  if (!navigator.onLine) return;
+  const updates = await getPendingBoilerStatuses();
+  if (updates.length === 0) return;
+  for (const upd of updates) {
+    try {
+      await apiRequest('/save-boiler-status', {
+        meterId: upd.meterId,
+        status: upd.status
+      });
+      await deletePendingBoilerStatus(upd.id);
+    } catch (err) {
+      showAlert(`Ошибка синхронизации статуса бойлера ID ${upd.id}:`, 'error');
     }
   }
 }
@@ -207,7 +265,7 @@ async function clearControllerPackage() {
       request.onerror = () => reject(request.error);
     });
   } catch (err) {
-    console.error('Ошибка очистки кэша контролёра:', err);
+    showAlert('Ошибка очистки кэша контролёра:', 'error');
   }
 }
 
@@ -248,7 +306,7 @@ function base64ToBlob(base64, mimeType) {
     } 
     return new Blob(byteArrays, { type: mimeType });
   } catch (err) {
-    console.error('Ошибка декодирования base64:', err);
+    showAlert(`Ошибка декодирования base64:`, 'error');
     throw new Error('Не удалось декодировать файл. Попробуйте выбрать файл заново.');
   }
 }
@@ -1304,7 +1362,6 @@ createApp({
         const clearBtn = document.getElementById('clearFileBtn');
         if (clearBtn) clearBtn.style.display = 'none';
       } catch (err) {
-        console.error('Error submitting:', err);
         showAlert('Ошибка: ' + (err.message || 'Неизвестная ошибка'), 'error');
       } finally {
         isLoading.value = false;
@@ -1361,12 +1418,11 @@ createApp({
         sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: result.mountDate }));
         sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: result.verifyDate }));          
         if (navigator.onLine && result.controllerId) {
-          ensureControllerPackage(result.controllerId).catch(err => console.warn('Ошибка сохранения офлайн-пакета:', err));
+          ensureControllerPackage(result.controllerId).catch(err => showAlert(`Ошибка сохранения офлайн-пакета:`, 'error'));
         }          
         window.location.href = 'ActWindow.html';
       } catch (err) { 
-        error.value = `Ошибка: ${err.message}`; 
-        console.error(err); 
+        showAlert(`error:`, 'error'); 
       }
     };
 
