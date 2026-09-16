@@ -46,6 +46,14 @@
             error.value = 'Введите имя';
             return;
           }
+          const activeMeter = JSON.parse(sessionStorage.getItem('activeMeter') || '{}');
+          const selectedMeter = JSON.parse(sessionStorage.getItem('selectedMeter') || '{}');
+          const userAddress = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
+          const g_licschet = activeMeter.licschet || selectedMeter.licschet || sessionStorage.getItem('g_licschet') || '';
+          const street = userAddress.street || activeMeter.street || selectedMeter.street || '';
+          const house = userAddress.house || activeMeter.house || selectedMeter.house || '';
+          const streetId = userAddress.streetId || activeMeter.streetId || selectedMeter.streetId || null;
+          const buildingId = userAddress.buildingId || activeMeter.buildingId || selectedMeter.buildingId || null;
           try {
             if (!navigator.onLine) {
               throw new Error('Нет подключения к сети');
@@ -53,7 +61,12 @@
             const result = await apiRequest('/add-representative', {
               name: name.value.trim(),
               phone: phone.value.trim() || null,
-              mail: mail.value.trim() || null
+              mail: mail.value.trim() || null,
+              g_licschet: g_licschet,
+              street: street,
+              house: house,
+              streetId: streetId,
+              buildingId: buildingId
             });
             if (result.status === 'OK') {
               sessionStorage.setItem('representative', JSON.stringify({
@@ -74,7 +87,8 @@
                 await savePendingRepresentative({
                   name: name.value.trim(),
                   phone: phone.value.trim() || null,
-                  mail: mail.value.trim() || null
+                  mail: mail.value.trim() || null,
+                  g_licschet: g_licschet
                 });
               }
               sessionStorage.setItem('representative', JSON.stringify({
@@ -82,8 +96,7 @@
                 name: name.value.trim(),
                 phone: phone.value.trim(),
                 mail: mail.value.trim()
-              }));
-              
+              }));              
               if (typeof showAlert === 'function') {
                 showAlert(
                   'Нет подключения к сети. Данные сохранены локально.',
@@ -174,6 +187,11 @@
           name: data.name,
           phone: data.phone,
           mail: data.mail,
+          g_licschet: data.g_licschet,
+          street: data.street,
+          house: data.house,
+          streetId: data.streetId,
+          buildingId: data.buildingId,
           timestamp: Date.now()
         });
         request.onsuccess = () => resolve(request.result);
@@ -217,7 +235,8 @@
           await apiRequest('/add-representative', {
             name: upd.name,
             phone: upd.phone,
-            mail: upd.mail
+            mail: upd.mail,
+            g_licschet: upd.g_licschet
           });
           await deletePendingRepresentative(upd.id);
         } catch (err) {

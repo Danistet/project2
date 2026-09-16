@@ -8,7 +8,7 @@ const cors = require('cors');
 const config = require('./config');
 const { error } = require('console');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const uploadDir = path.join(__dirname, 'images');
 const frontendDir = path.join(__dirname, '..', 'frontend');
 if (!fs.existsSync(uploadDir)) {
@@ -524,44 +524,69 @@ app.post('/update-verify-date', (req, res) => {
 });
 
 app.post('/add-representative', (req, res) => {
-  const {name, phone, mail} = req.body;
-  if(!name || !name.trim()) {
-    return res.status(400).json({ error: 'Missing Name'});
+  const { name, phone, mail, g_licschet } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Не указано имя представителя' });
+  }
+  if (!g_licschet || !String(g_licschet).trim()) {
+    return res.status(400).json({ error: 'Не указан лицевой счет' });
   }
   const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const safeLicschet = String(g_licschet).trim();
   firebird.attach(config, (err, db) => {
-    if(err){
+    if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }
-    const insertQuery = `
-      INSERT INTO CLIENTS (ID, NAME, PHONE, MAIL, IMPORT, CREATEDATE)
-      VALUES (GEN_ID(CLIENTS_GEN, 1), ?,?,?,1,?)
-      RETURNING ID
-    `;
-    db.query(insertQuery, [
-      name.trim(),
-      phone && phone.trim() ? phone.trim() : null,
-      mail && mail.trim() ? mail.trim() : null,
-      createdate
-    ], (err, result) =>{
-      db.detach();
+    const findAbonentQuery = `SELECT ID FROM ABONENTS WHERE G_LICSCHET = ?`;  
+    db.query(findAbonentQuery, [safeLicschet], (err, abonentResult) => {
       if (err) {
-        console.error('Insert error', err);
-        return res.status(500).json({
-          error: 'unable to save data',
-          details: err.message
+        db.detach();
+        console.error('Find abonent error:', err);
+        return res.status(500).json({ error: 'Database query error', details: err.message });
+      }
+      if (!abonentResult || abonentResult.length === 0) {
+        db.detach();
+        return res.status(404).json({ 
+          error: 'Владелец лицевого счета не найден. Невозможно добавить представителя без существующей записи владельца.' 
         });
       }
-      const newId = result && result[0] ? result[0].ID : null;
-      res.json({
-        status:  'OK',
-        message: 'Data saved',
-        id: newId
-      });
+      const abonentId = abonentResult[0].ID;
+      insertRepresentative(db, name, phone, mail, createdate, abonentId, res);
     });
   });
 });
+
+function insertRepresentative(db, name, phone, mail, createdate, abonentId, res) {
+  const insertQuery = `
+    INSERT INTO CLIENTS (ID, NAME, PHONE, MAIL, IMPORT, CREATEDATE, ABONENT_ID)
+    VALUES (GEN_ID(CLIENTS_GEN, 1), ?, ?, ?, 1, ?, ?)
+    RETURNING ID
+  `;
+  db.query(insertQuery, [
+    name.trim(),
+    phone && phone.trim() ? phone.trim() : null,
+    mail && mail.trim() ? mail.trim() : null,
+    createdate,
+    abonentId
+  ], (err, result) => {
+    db.detach();
+    if (err) {
+      console.error('Insert representative error:', err);
+      return res.status(500).json({
+        error: 'Не удалось сохранить данные представителя',
+        details: err.message
+      });
+    }   
+    const newId = result && result[0] ? result[0].ID : null;
+    res.json({
+      status: 'OK',
+      message: 'Данные успешно сохранены',
+      id: newId
+    });
+  });
+}
 
 app.post('/get-owner-data', (req, res) => {
   const { g_licschet } =req.body;

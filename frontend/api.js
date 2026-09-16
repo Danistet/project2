@@ -7,7 +7,7 @@
 (() => {
   // true = работаем из локальных переменных
   // false = обычный режим через сервер
-  const USE_LOCAL_DB = false;
+  const USE_LOCAL_DB = true;
   const LOCAL_MOCK_PERSIST = true;
   const LOCAL_DB_KEY = 'LOCAL_MOCK_DB_V4';
   if (!USE_LOCAL_DB) {
@@ -1996,6 +1996,18 @@
 const API_BASE = window.location.hostname === 'localhost' 
   ? 'http://localhost:3000' 
   : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
+
+
+//   const REMOTE_SERVER_IP = '37.195.66.20'; 
+// const PORT = '3000';
+// let API_BASE;
+// if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+//   API_BASE = `http://localhost:${PORT}`;
+// } else if (window.location.origin && window.location.origin !== 'null' && window.location.origin !== 'file://') {
+//   API_BASE = window.location.origin;
+// } else {
+//   API_BASE = `http://${REMOTE_SERVER_IP}:${PORT}`;
+// }
 
 async function apiRequest(endpoint, data = {}, method = 'POST') { 
   try {
