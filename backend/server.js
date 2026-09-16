@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const uploadDir = path.join(__dirname, 'images');
 const frontendDir = path.join(__dirname, '..', 'frontend');
+const adminDir = path.join(__dirname, '..', 'admin');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {recursive: true});
 }
@@ -30,6 +31,13 @@ const upload = multer({
 app.use(cors());
 app.use(express.json()); 
 app.use('/frontend', express.static(frontendDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+  }
+}));
+app.use('/admin', express.static(adminDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

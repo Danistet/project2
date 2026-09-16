@@ -1,7 +1,18 @@
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3000' 
-  : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
+//const API_BASE = window.location.hostname === 'localhost' 
+  //? 'http://localhost:3000' 
+  //: (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
 
+
+  const REMOTE_SERVER_IP = '37.195.66.20'; 
+  const PORT = '3000';
+  let API_BASE;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    API_BASE = `http://localhost:${PORT}`;
+  } else if (window.location.origin && window.location.origin !== 'null' && window.location.origin !== 'file://') {
+    API_BASE = window.location.origin;
+  } else {
+    API_BASE = `http://${REMOTE_SERVER_IP}:${PORT}`;
+  }
 async function apiRequest(endpoint, data = {}, method = 'POST') { 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {

@@ -5,8 +5,9 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
-    "obfuscate-web": "javascript-obfuscator ./web-source/app.js --output ./android/app/src/main/assets/app.js --compact true --control-flow-flattening true --string-array true",
-    "build-android": "npm run obfuscate-web && cd android && ./gradlew assembleRelease"
+    "obfuscate-web": "node obfuscate.js",
+    "build-android": "npm run obfuscate-web && cd frontend\\MeterWebViewApp && cmd /c \"gradlew.bat assembleRelease\"",
+    "build-android:clean": "npm run obfuscate-web && cd frontend\\MeterWebViewApp && cmd /c \"gradlew.bat clean assembleRelease\""
   },
   "dependencies": {
     "body-parser": "^1.20.0",
