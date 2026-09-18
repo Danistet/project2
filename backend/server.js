@@ -5,6 +5,7 @@ const fs = require('fs');
 const firebird = require('node-firebird');
 const crypto = require('crypto');
 const cors = require('cors');
+const iconv = require('iconv-lite');
 const config = require('./config');
 const { error } = require('console');
 const app = express();
@@ -12,6 +13,18 @@ const PORT = process.env.PORT || 3000;
 const uploadDir = path.join(__dirname, 'images');
 const frontendDir = path.join(__dirname, '..', 'frontend');
 const adminDir = path.join(__dirname, '..', 'admin');
+
+function normalizeViolationText(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  if (!/[РС][\u0080-\uFFFF]/.test(text)) return text;
+  try {
+    const repaired = iconv.decode(iconv.encode(text, 'win1251'), 'utf8');
+    return repaired.includes('\uFFFD') ? text : repaired;
+  } catch (_) {
+    return text;
+  }
+}
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {recursive: true});
 }
@@ -331,7 +344,7 @@ app.post('/auth', (req, res) => {
         const minute = 24000000;       
         const finishResponse = (token, authDate, meterNum, mountDate, verifyDate, controllerId) => {
           db.detach();
-          res.json({ 
+          res.json({
             status: 'OK', 
             token, 
             authDate,
@@ -1661,6 +1674,137 @@ app.post('/admin/services', (req, res) => {
       db.detach();
       if (e) return res.status(500).json({ error: e.message });
       res.json(r);
+    });
+  });
+});
+
+app.post('/admin/acts', (req, res) => {
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+    const sql = `
+      SELECT FIRST 100
+        a.ID AS ACT_ID, a.ACT_NO, a.CREATEDATE,
+        CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(b.HOUSE AS VARCHAR(20) CHARACTER SET WIN1251) AS HOUSE
+      FROM BUILD_MAINT_ACTS a
+      LEFT JOIN BUILDINGS b ON b.ID = a.BUILDING_ID
+      LEFT JOIN RSTREETS rs ON rs.ID = b.STREET_ID
+      ORDER BY a.CREATEDATE DESC, a.ID DESC
+    `;
+    db.query(sql, [], (e, rows) => {
+      db.detach();
+      if (e) return res.status(500).json({ error: e.message });
+      res.json((rows || []).map(r => ({
+        id: r.ACT_ID,
+        actNo: r.ACT_NO,
+        createdate: r.CREATEDATE,
+        streetName: `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim(),
+        house: r.HOUSE || '',
+        apparts: r.APPARTS || '',
+        address: `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}, д. ${r.HOUSE || ''}`.trim()
+      })));
+    });
+  });
+});
+
+app.post('/admin/report-act', (req, res) => {
+  const actId = Number(req.body && (req.body.actId ?? req.body.id));
+  if (!Number.isInteger(actId) || actId <= 0) {
+    return res.status(400).json({ error: 'actId required' });
+  }
+  firebird.attach(config, (err, db) => {
+    if (err) return res.status(500).json({ error: 'DB connection error' });
+    const sql = `
+      SELECT FIRST 1
+        a.ID AS ACT_ID, a.ACT_NO, a.CREATEDATE,
+        CAST(ct.NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS CHECK_TYPE,
+        CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
+        CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+        CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+        CAST(b.HOUSE AS VARCHAR(20) CHARACTER SET WIN1251) AS HOUSE,
+        CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+        CAST(owner.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+        CAST(owner.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(owner.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
+        CAST(rep.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS REPRESENTATIVE,
+        CAST(s.SHORT_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+        m.ID AS METER_ID, m.METER_NUM, mi.METER_NUM AS IND_METER_NUM, m.SEAL, m.NAME AS METER_NAME,
+        m.MANFDATE, m.VERIFY_DATE, mi.PH,
+        (SELECT FIRST 1 bs.STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
+      FROM BUILD_MAINT_ACTS a
+      LEFT JOIN CHECKTYPE ct ON ct.ID = a.CHECKTYPE_ID
+      LEFT JOIN METERS_IND mi ON mi.ACT_ID = a.ID AND (mi.IS_DELETED = 0 OR mi.IS_DELETED IS NULL)
+      LEFT JOIN METERS m ON m.ID = mi.METER_ID
+      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
+      LEFT JOIN CLIENTS owner ON owner.ID = ab.CLIENT_ID
+      LEFT JOIN CLIENTS rep ON rep.ABONENT_ID = owner.ID
+      LEFT JOIN BUILDINGS b ON b.ID = a.BUILDING_ID
+      LEFT JOIN RSTREETS rs ON rs.ID = b.STREET_ID
+      LEFT JOIN CONTROLLERS ctrl ON ctrl.ID = m.CONTROLER_ID
+      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
+      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      WHERE a.ID = ?
+      ORDER BY mi.ID DESC
+    `;
+    db.query(sql, [actId], (e, rows) => {
+      if (e) {
+        db.detach();
+        return res.status(500).json({ error: 'Ошибка запроса акта: ' + e.message });
+      }
+      if (!rows || rows.length === 0) {
+        db.detach();
+        return res.status(404).json({ error: 'Акт не найден' });
+      }
+      const row = rows[0];
+      const meterNum = row.METER_NUM || row.IND_METER_NUM || '';
+      db.query(
+        `SELECT CAST(NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME,
+          CAST(DESCRIPTION AS VARCHAR(500) CHARACTER SET WIN1251) AS DESCRIPTION,
+          CREATEDATE
+           FROM VIOLATIONS
+          WHERE METERS_ID = ? AND CREATEDATE <= ?
+          ORDER BY CREATEDATE DESC, ID DESC`,
+        [row.METER_ID, row.CREATEDATE],
+        (ve, violations) => {
+          db.detach();
+          if (ve) return res.status(500).json({ error: 'Ошибка запроса нарушений: ' + ve.message });
+          const date = row.CREATEDATE ? new Date(row.CREATEDATE) : null;
+          const formatDate = value => {
+            if (!value) return '';
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return String(value).split(' ')[0];
+            return `${String(parsed.getDate()).padStart(2, '0')}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${parsed.getFullYear()}`;
+          };
+          const violationText = (violations || []).map(v => {
+            const name = normalizeViolationText(v.NAME);
+            const description = normalizeViolationText(v.DESCRIPTION);
+            return `${name}: ${description}`.trim();
+          }).join('\n');
+          res.json({
+            actNo: row.ACT_NO || '',
+            actDate: formatDate(date),
+            checkType: row.CHECK_TYPE || '',
+            controllerFio: row.CONTROLLER_FIO || '',
+            streetName: `${row.STREET_TYPE || ''} ${row.STREET_NAME || ''}`.trim(),
+            house: row.HOUSE || '',
+            apparts: row.APPARTS || '',
+            clientName: row.CLIENT_NAME || '',
+            clientPhone: row.CLIENT_PHONE || '',
+            clientMail: row.CLIENT_MAIL || '',
+            representative: row.REPRESENTATIVE || '',
+            serviceName: row.SERVICE_NAME || '',
+            meterNum,
+            seal: row.SEAL || '',
+            meterName: row.METER_NAME || '',
+            manfDate: formatDate(row.MANFDATE),
+            verifyDate: formatDate(row.VERIFY_DATE),
+            lastPh: row.PH === null || row.PH === undefined ? '' : String(row.PH),
+            boilerStatus: row.BOILER_STATUS || '',
+            violationsText: violationText || 'Нарушения отсутствуют'
+          });
+        }
+      );
     });
   });
 });

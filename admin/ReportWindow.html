@@ -7,7 +7,7 @@
         <link rel="icon" href="data:,">
         <script src="./vendor/vue.global.js"></script>
         <script src="./apiadmin.js"></script>
-        <script src="./vendor/xlsx.full.min.js"></script>
+        <script src="./vendor/exceljs.min.js"></script>
     </head>
     <body>
         <div id="app" class="page-wrapper">
@@ -17,109 +17,71 @@
             </header>
             <main class="content-card">
                 <section class="filters-section">
-                <h3 class="section-title">Параметры отбора</h3>
+                <h3 class="section-title">Форма акта</h3>
                 <div class="filters-grid">
-                    <div class="filter-group">
-                    <label class="form-label">Период с</label>
-                    <input type="date" v-model="filters.dateFrom" class="form-input">
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Период по</label>
-                    <input type="date" v-model="filters.dateTo" class="form-input">
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Контролёр</label>
-                    <select v-model="filters.controllerId" class="form-input">
-                        <option :value="null">Все</option>
-                        <option v-for="c in controllers" :key="c.ID" :value="c.ID">{{ c.FIO }}</option>
-                    </select>
-                    </div>
-                    <div class="filter-group">
+                <div class="filter-group">
                     <label class="form-label">Улица</label>
-                    <select v-model="filters.streetId" class="form-input" @change="onStreetChange">
-                        <option :value="null">Все</option>
-                        <option v-for="s in streets" :key="s.id" :value="s.id">{{ s.name }}</option>
-                    </select>
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Дом</label>
-                    <select v-model="filters.buildingId" class="form-input" :disabled="!filters.streetId">
-                        <option :value="null">Все</option>
-                        <option v-for="b in filteredBuildings" :key="b.id" :value="b.id">{{ b.house }}</option>
-                    </select>
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Тип проверки</label>
-                    <select v-model="filters.checkType" class="form-input">
-                        <option value="">Все</option>
-                        <option value="planned">Плановая</option>
-                        <option value="unscheduled">Внеплановая</option>
-                    </select>
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Нарушения</label>
-                    <select v-model="filters.hasViolations" class="form-input">
-                        <option value="">Все</option>
-                        <option value="yes">С нарушениями</option>
-                        <option value="no">Без нарушений</option>
-                    </select>
-                    </div>
-                    <div class="filter-group">
-                    <label class="form-label">Услуга</label>
-                    <select v-model="filters.serviceId" class="form-input">
-                        <option :value="null">Все</option>
-                        <option v-for="s in services" :key="s.ID" :value="s.ID">{{ s.GROUP_NAME }}</option>
-                    </select>
-                    </div>
+                    <input v-model.trim="streetSearch" class="form-input" placeholder="Введите улицу">
                 </div>
+                <div class="filter-group">
+                    <label class="form-label">Дом от</label>
+                    <input v-model.trim="houseFrom" class="form-input" inputmode="numeric" placeholder="Все дома">
+                </div>
+                <div class="filter-group">
+                    <label class="form-label">Дом до</label>
+                    <input v-model.trim="houseTo" class="form-input" inputmode="numeric" placeholder="Все дома">
+                </div>
+                <div class="filter-group">
+                    <label class="form-label">Сортировка адресов</label>
+                    <select v-model="sortBy" class="form-input">
+                        <option value="address">Улица, дом, квартира</option>
+                        <option value="house">Дом, квартира</option>
+                        <option value="date">Дата акта</option>
+                    </select>
+                </div>
+                <div class="filter-group act-select-group">
+                    <label class="form-label">Акт</label>
+                    <select v-model="selectedActId" class="form-input">
+                        <option :value="null">Выберите акт</option>
+                        <option v-for="act in filteredActs" :key="act.id" :value="act.id">
+                            № {{ act.actNo }} от {{ formatDate(act.createdate) }} - {{ act.address }}
+                        </option>
+                    </select>
+                </div>
+                </div>
+                <p class="selection-count" v-if="acts.length">Найдено актов: {{ filteredActs.length }}</p>
                 <div class="button-group" style="margin-top: 16px;">
-                    <button @click="loadReport" :disabled="isLoading" class="btn-primary">
-                    {{ isLoading ? 'Загрузка...' : 'Сформировать отчёт' }}
+                    <button @click="loadReport" :disabled="isLoading || !selectedActId" class="btn-primary">
+                    {{ isLoading ? 'Загрузка...' : 'Сформировать форму' }}
                     </button>
-                    <button @click="resetFilters" class="btn-secondary">Сбросить фильтры</button>
                 </div>
                 </section>
-                <section class="columns-section" v-if="reportData.length > 0">
-                <h3 class="section-title">Колонки для экспорта</h3>
-                <div class="columns-toolbar">
-                    <button @click="selectAllColumns(true)" class="btn-mini">Выбрать все</button>
-                    <button @click="selectAllColumns(false)" class="btn-mini">Снять все</button>
-                    <span class="columns-count">Выбрано: {{ selectedColumnsCount }} / {{ availableColumns.length }}</span>
-                </div>
-                <div class="columns-grid">
-                    <label v-for="col in availableColumns" :key="col.key" class="column-checkbox">
-                    <input type="checkbox" v-model="col.selected">
-                    <span>{{ col.label }}</span>
-                    </label>
-                </div>
-                </section>
-                <section class="results-section" v-if="reportData.length > 0">
+                <section class="results-section" v-if="reportData">
                 <div class="results-header">
-                    <h3 class="section-title">Результаты ({{ reportData.length }})</h3>
+                    <h3 class="section-title">Данные акта</h3>
                     <div class="export-buttons">
                     <button @click="exportToExcel" class="btn-success">Экспорт в Excel</button>
-                    <button @click="exportToCSV" class="btn-info">Экспорт в CSV</button>
                     </div>
                 </div>
                 <div class="table-wrapper">
                     <table class="report-table">
                     <thead>
                         <tr>
-                        <th v-for="col in visibleColumns" :key="col.key">{{ col.label }}</th>
+                        <th>Показатель</th>
+                        <th>Значение</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(row, idx) in reportData" :key="idx">
-                        <td v-for="col in visibleColumns" :key="col.key">
-                            {{ formatCellValue(row[col.key], col.key) }}
-                        </td>
+                        <tr v-for="field in formFields" :key="field.key">
+                        <td>{{ field.label }}</td>
+                        <td class="value-cell">{{ formatCellValue(reportData[field.key], field.key) }}</td>
                         </tr>
                     </tbody>
                     </table>
                 </div>
                 </section>
                 <section v-else-if="!isLoading" class="empty-state">
-                <p>Задайте параметры и нажмите «Сформировать отчёт»</p>
+                <p>Выберите один акт и нажмите «Сформировать форму»</p>
                 </section>
                 <div v-if="isLoading" class="loading-overlay">
                 <div class="spinner"></div>
@@ -142,137 +104,82 @@
         setup() {
             const error = ref('');
             const isLoading = ref(false);
-            const controllers = ref([]);
-            const streets = ref([]);
-            const buildings = ref([]);
-            const services = ref([]);
-            const reportData = ref([]);        
-            const filters = ref({
-                dateFrom: null,
-                dateTo: null,
-                controllerId: null,
-                streetId: null,
-                buildingId: null,
-                checkType: '',
-                hasViolations: '',
-                serviceId: null
-            });
-            const availableColumns = ref([
-                { key: 'actNo', label: '№ акта', selected: true },
-                { key: 'actDate', label: 'Дата акта', selected: true },
-                { key: 'actTime', label: 'Время', selected: false },
-                { key: 'checkType', label: 'Тип проверки', selected: true },
-                { key: 'controllerFio', label: 'ФИО контролёра', selected: true },
-                { key: 'streetName', label: 'Улица', selected: true },
-                { key: 'house', label: 'Дом', selected: true },
-                { key: 'apparts', label: 'Квартира', selected: true },
-                { key: 'clientName', label: 'ФИО владельца', selected: true },
-                { key: 'clientPhone', label: 'Телефон', selected: false },
-                { key: 'clientMail', label: 'Email', selected: false },
-                { key: 'representative', label: 'Представитель', selected: false },
-                { key: 'serviceName', label: 'Услуга', selected: true },
-                { key: 'meterNum', label: '№ прибора', selected: true },
-                { key: 'seal', label: '№ пломбы', selected: true },
-                { key: 'meterName', label: 'Место установки', selected: true },
-                { key: 'manfDate', label: 'Дата изготовления', selected: false },
-                { key: 'verifyDate', label: 'Дата поверки', selected: true },
-                { key: 'lastPh', label: 'Контрольные показания', selected: true },
-                { key: 'damage', label: 'Мех. повреждения', selected: true },
-                { key: 'sealViolation', label: 'Нарушение пломб', selected: true },
-                { key: 'displayViolation', label: 'Не отображает', selected: true },
-                { key: 'mpiExpired', label: 'Истечение МПИ', selected: true },
-                { key: 'boilerStatus', label: 'Статус бойлера', selected: false },
-                { key: 'violationsText', label: 'Описание нарушений', selected: false },
-                { key: 'filesCount', label: 'Кол-во фото', selected: false }
-            ]);
-            const selectedColumnsCount = computed(() => 
-                availableColumns.value.filter(c => c.selected).length
-            );          
-            const visibleColumns = computed(() => 
-                availableColumns.value.filter(c => c.selected)
-            );
-            const filteredBuildings = computed(() => {
-                if (!filters.value.streetId) return [];
-                return buildings.value.filter(b => b.streetId === filters.value.streetId);
-            });
-            const selectAllColumns = (val) => {
-                availableColumns.value.forEach(c => c.selected = val);
-            };
-            const onStreetChange = () => {
-                filters.value.buildingId = null;
-                loadBuildingsForStreet(filters.value.streetId);
-            };
-            const resetFilters = () => {
-                filters.value = {
-                    dateFrom: null, dateTo: null, controllerId: null,
-                    streetId: null, buildingId: null, checkType: '',
-                    hasViolations: '', serviceId: null
-                };
-                reportData.value = [];
-            };
-            const loadReferences = async () => {
+            const acts = ref([]);
+            const selectedActId = ref(null);
+            const reportData = ref(null);
+            const streetSearch = ref('');
+            const houseFrom = ref('');
+            const houseTo = ref('');
+            const sortBy = ref('address');
+            const formFields = [
+                { key: 'actNo', label: '№ акта' },
+                { key: 'actDate', label: 'Дата акта' },
+                { key: 'checkType', label: 'Тип проверки' },
+                { key: 'controllerFio', label: 'ФИО контролёра' },
+                { key: 'streetName', label: 'Улица' },
+                { key: 'house', label: 'Дом' },
+                { key: 'apparts', label: 'Квартира' },
+                { key: 'clientName', label: 'ФИО владельца' },
+                { key: 'clientPhone', label: 'Телефон' },
+                { key: 'clientMail', label: 'Email' },
+                { key: 'representative', label: 'Представитель' },
+                { key: 'serviceName', label: 'Услуга' },
+                { key: 'meterNum', label: '№ прибора' },
+                { key: 'seal', label: '№ пломбы' },
+                { key: 'meterName', label: 'Место установки' },
+                { key: 'manfDate', label: 'Дата изготовления' },
+                { key: 'verifyDate', label: 'Дата поверки' },
+                { key: 'lastPh', label: 'Контрольные показания' },
+                { key: 'boilerStatus', label: 'Статус бойлера' },
+                { key: 'violationsText', label: 'Описание нарушений' }
+            ];
+            const loadActs = async () => {
                 try {
-                    const [ctrl, str, svc] = await Promise.all([
-                        apiRequest('/admin/controllers', {}),
-                        apiRequest('/admin/streets', {}),
-                        apiRequest('/admin/services', {})
-                    ]);
-                    controllers.value = ctrl || [];
-                    streets.value = str || [];
-                    services.value = svc || [];
+                    acts.value = await apiRequest('/admin/acts', {}) || [];
                 } catch (e) {
-                    console.error('Ошибка загрузки справочников:', e);
-                    error.value = 'Не удалось загрузить справочники. Проверьте консоль (F12).';
-                }
-            };
-            const loadBuildingsForStreet = async (streetId) => {
-                if (!streetId) { 
-                    buildings.value = []; 
-                    return; 
-                }
-                try {
-                    const data = await apiRequest('/admin/buildings-by-street', { streetId });
-                    buildings.value = (data || []).map(b => ({ ...b, streetId }));
-                } catch (e) {
-                    console.error('Ошибка загрузки домов:', e);
-                    buildings.value = [];
+                    error.value = 'Не удалось загрузить список актов: ' + (e.message || 'неизвестная ошибка');
                 }
             };
             const loadReport = async () => {
                 error.value = '';
                 isLoading.value = true;
                 try {
-                    const data = await apiRequest('/admin/report', {
-                        dateFrom: filters.value.dateFrom,
-                        dateTo: filters.value.dateTo,
-                        controllerId: filters.value.controllerId,
-                        streetId: filters.value.streetId,
-                        buildingId: filters.value.buildingId,
-                        checkType: filters.value.checkType,
-                        hasViolations: filters.value.hasViolations,
-                        serviceId: filters.value.serviceId
-                    });
-                    reportData.value = data || [];
+                    reportData.value = await apiRequest('/admin/report-act', { actId: selectedActId.value });
                 } catch (e) {
-                    error.value = 'Ошибка формирования отчёта: ' + (e.message || 'неизвестная ошибка');
-                    console.error(e);
-                    reportData.value = [];
+                    error.value = 'Ошибка формирования формы: ' + (e.message || 'неизвестная ошибка');
+                    reportData.value = null;
                 } finally {
                     isLoading.value = false;
                 }
             };
+            const houseNumber = value => {
+                const match = String(value || '').match(/\d+/);
+                return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+            };
+            const filteredActs = computed(() => {
+                const search = streetSearch.value.toLowerCase();
+                const from = houseFrom.value === '' ? null : Number(houseFrom.value);
+                const to = houseTo.value === '' ? null : Number(houseTo.value);
+                return acts.value
+                    .filter(act => !search || String(act.streetName || '').toLowerCase().includes(search))
+                    .filter(act => from === null || houseNumber(act.house) >= from)
+                    .filter(act => to === null || houseNumber(act.house) <= to)
+                    .sort((left, right) => {
+                        if (sortBy.value === 'date') {
+                            return new Date(right.createdate || 0) - new Date(left.createdate || 0);
+                        }
+                        if (sortBy.value === 'house') {
+                            return houseNumber(left.house) - houseNumber(right.house) ||
+                                String(left.apparts || '').localeCompare(String(right.apparts || ''), 'ru');
+                        }
+                        return String(left.streetName || '').localeCompare(String(right.streetName || ''), 'ru') ||
+                            houseNumber(left.house) - houseNumber(right.house) ||
+                            String(left.apparts || '').localeCompare(String(right.apparts || ''), 'ru');
+                    });
+            });
             const formatCellValue = (val, key) => {
                 if (val === null || val === undefined || val === '') return '—';
-                if (key === 'actDate' || key === 'manfDate' || key === 'verifyDate') {
-                    return formatDate(val);
-                }
-                if (key === 'checkType') {
-                    return val === 'planned' ? 'Плановая' : val === 'unscheduled' ? 'Внеплановая' : val;
-                }
-                if (key === 'damage' || key === 'sealViolation' || key === 'displayViolation' || key === 'mpiExpired') {
-                    return val ? 'Да' : 'Нет';
-                }
-                return String(val);
+                return key === 'violationsText' ? String(val).replace(/\n/g, '; ') : String(val);
             };
             const formatDate = (d) => {
                 if (!d) return '';
@@ -282,56 +189,109 @@
                 return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
             };
             const buildExportData = () => {
-                const cols = visibleColumns.value;
-                const rows = reportData.value.map(row => {
-                    const obj = {};
-                    cols.forEach(c => {
-                        obj[c.label] = formatCellValue(row[c.key], c.key);
-                    });
-                    return obj;
-                });
-                return { cols, rows };
+                return formFields.map(field => ({
+                    'Показатель': field.label,
+                    'Значение': formatCellValue(reportData.value[field.key], field.key)
+                }));
             };
-            const exportToExcel = () => {
-                const { rows } = buildExportData();
-                if (rows.length === 0) return;
-                const ws = XLSX.utils.json_to_sheet(rows);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Отчёт');
-                const fileName = `Отчёт_проверки_${new Date().toISOString().slice(0,10)}.xlsx`;
-                XLSX.writeFile(wb, fileName);
-            };
-            const exportToCSV = () => {
-                const { cols, rows } = buildExportData();
-                if (rows.length === 0) return;
-                const escape = (v) => {
-                    const s = String(v ?? '');
-                    if (s.includes(';') || s.includes('"') || s.includes('\n')) {
-                        return '"' + s.replace(/"/g, '""') + '"';
+            const exportToExcel = async () => {
+                if (!reportData.value) return;
+                const value = key => formatCellValue(reportData.value[key], key);
+                const rows = [
+                    { cells: ['АКТ ПРОВЕРКИ'], merge: true, isSection: true, height: 28 },
+                    { cells: ['№ акта', value('actNo')] },
+                    { cells: ['Дата акта', value('actDate')] },
+                    { cells: [], height: 8 },
+                    { cells: ['Составил контролер', value('controllerFio')] },
+                    { cells: ['Тип проверки', value('checkType')] },
+                    { cells: ['ФИО владельца', value('clientName')] },
+                    { cells: ['Телефон', value('clientPhone')] },
+                    { cells: ['Email', value('clientMail')] },
+                    { cells: ['Представитель', value('representative')] },
+                    { cells: ['Адрес', `${value('streetName')}, д. ${value('house')}, кв. ${value('apparts')}`] },
+                    { cells: [], height: 8 },
+                    { cells: ['Сведения о приборе учета'], merge: true, isSection: true, height: 28 },
+                    { cells: ['Услуга', value('serviceName')] },
+                    { cells: ['№ прибора', value('meterNum')] },
+                    { cells: ['№ пломбы', value('seal')] },
+                    { cells: ['Место установки', value('meterName')] },
+                    { cells: ['Дата изготовления', value('manfDate')] },
+                    { cells: ['Дата поверки', value('verifyDate')] },
+                    { cells: ['Контрольные показания', value('lastPh')] },
+                    { cells: ['Статус бойлера', value('boilerStatus')] },
+                    { cells: [], height: 8 },
+                    { cells: ['Описание нарушений', value('violationsText')], height: 45 },
+                    { cells: [], height: 8 },
+                    {
+                        cells: [
+                            'Для информации:',
+                            'Снятые контрольные показания используются для расчетов только при отсутствии нарушений. При выявлении нарушений прибор учета может быть снят с регистрации в соответствии с действующими правилами.'
+                        ],
+                        isSection: true,
+                        autoHeight: true,
+                        height: 48
                     }
-                    return s;
+                ];
+                const workbook = new ExcelJS.Workbook();
+                const sheet = workbook.addWorksheet('Отчёт');
+                sheet.columns = [
+                    { width: 32 },
+                    { width: 75 }
+                ];
+                const thinBorder = {
+                    top:    { style: 'thin', color: { argb: 'FF808080' } },
+                    bottom: { style: 'thin', color: { argb: 'FF808080' } },
+                    left:   { style: 'thin', color: { argb: 'FF808080' } },
+                    right:  { style: 'thin', color: { argb: 'FF808080' } }
                 };
-                const header = cols.map(c => escape(c.label)).join(';');
-                const body = rows.map(r => cols.map(c => escape(r[c.label])).join(';'));
-                const csv = '\uFEFF' + [header, ...body].join('\n');
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                rows.forEach((rowDef, idx) => {
+                    const rowNum = idx + 1;
+                    const row = sheet.getRow(rowNum);
+                    if (rowDef.height) row.height = rowDef.height;
+                    const isSection = !!rowDef.isSection;
+                    const fill = isSection
+                        ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1D1D1' } }
+                        : undefined;
+                    rowDef.cells.forEach((cellValue, colIdx) => {
+                        const cell = row.getCell(colIdx + 1);
+                        cell.value = cellValue;
+                        cell.border = thinBorder;
+                        cell.alignment = { vertical: 'top', wrapText: true };
+                        cell.font = { bold: isSection || colIdx === 0 };
+                        if (fill) cell.fill = fill;
+                    });
+                    if (rowDef.merge) {
+                        sheet.mergeCells(rowNum, 1, rowNum, 2);
+                    }
+                    if (rowDef.autoHeight) {
+                        const text = rowDef.cells[1] || '';
+                        const charsPerLine = Math.floor(75 / 1.8);
+                        const lines = Math.ceil(text.length / charsPerLine) || 1;
+                        row.height = Math.max(rowDef.height || 20, lines * 15 + 10);
+                    }
+                    row.commit();
+                });
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `Отчёт_проверки_${new Date().toISOString().slice(0,10)}.csv`;
+                a.download = `Акт_${reportData.value.actNo || selectedActId.value}.xlsx`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             };
             onMounted(async () => {
-                await loadReferences();
+                await loadActs();
             });
             return {
-                error, isLoading, controllers, streets, buildings, services,
-                filters, availableColumns, reportData,
-                selectedColumnsCount, visibleColumns, filteredBuildings,
-                selectAllColumns, onStreetChange, resetFilters,
+                error, isLoading, acts, filteredActs, selectedActId, reportData, formFields,
+                streetSearch, houseFrom, houseTo, sortBy,
                 loadReport, formatCellValue,
-                exportToExcel, exportToCSV
+                formatDate, exportToExcel
             };
         }
     }).mount('#app');
@@ -384,6 +344,14 @@
         display: flex; 
         flex-direction: column; 
         gap: 8px; 
+    }
+    .act-select-group {
+        grid-column: 1 / -1;
+    }
+    .selection-count {
+        margin-top: 10px;
+        color: #666666;
+        font-size: 14px;
     }
     .form-label {
         font-size: 15px;
@@ -567,6 +535,9 @@
         font-weight: 600;
         font-size: 14px;
         border-right: 1px solid rgba(255,255,255,0.2);
+    }
+    .report-table .value-cell {
+        white-space: pre-line;
     }
     .report-table th:last-child { border-right: none; }
     .report-table td {
