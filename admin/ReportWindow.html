@@ -21,15 +21,37 @@
                 <div class="filters-grid">
                 <div class="filter-group">
                     <label class="form-label">Улица</label>
-                    <input v-model.trim="streetSearch" class="form-input" placeholder="Введите улицу">
+                    <div class="custom-datalist" :class="{ disabled: isLoading || !streetOptions.length }">
+                        <div class="custom-datalist-input-wrapper">
+                            <input v-model="streetSearch" class="form-input custom-datalist-input"
+                                placeholder="Введите улицу" autocomplete="off"
+                                :disabled="isLoading || !streetOptions.length"
+                                @focus="isStreetOpen = true" @blur="closeStreet" @input="isStreetOpen = true">
+                            <span v-if="streetSearch" class="clear-input-btn" @mousedown.prevent="clearStreet">✕</span>
+                            <span class="custom-datalist-arrow" :class="{ open: isStreetOpen }">▼</span>
+                        </div>
+                        <div v-if="isStreetOpen && filteredStreets.length" class="custom-datalist-dropdown">
+                            <div v-for="street in filteredStreets" :key="street" class="custom-datalist-option"
+                                @mousedown.prevent="selectStreet(street)">{{ street }}</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
-                    <label class="form-label">Дом от</label>
-                    <input v-model.trim="houseFrom" class="form-input" inputmode="numeric" placeholder="Все дома">
-                </div>
-                <div class="filter-group">
-                    <label class="form-label">Дом до</label>
-                    <input v-model.trim="houseTo" class="form-input" inputmode="numeric" placeholder="Все дома">
+                    <label class="form-label">Дом</label>
+                    <div class="custom-datalist" :class="{ disabled: isLoading || !streetSearch }">
+                        <div class="custom-datalist-input-wrapper">
+                            <input v-model="houseSearch" class="form-input custom-datalist-input"
+                                placeholder="Выберите дом" autocomplete="off"
+                                :disabled="isLoading || !streetSearch"
+                                @focus="isHouseOpen = true" @blur="closeHouse" @input="isHouseOpen = true">
+                            <span v-if="houseSearch" class="clear-input-btn" @mousedown.prevent="clearHouse">✕</span>
+                            <span class="custom-datalist-arrow" :class="{ open: isHouseOpen }">▼</span>
+                        </div>
+                        <div v-if="isHouseOpen && filteredHouses.length" class="custom-datalist-dropdown">
+                            <div v-for="house in filteredHouses" :key="house" class="custom-datalist-option"
+                                @mousedown.prevent="selectHouse(house)">{{ house }}</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label class="form-label">Сортировка адресов</label>
@@ -108,8 +130,9 @@
             const selectedActId = ref(null);
             const reportData = ref(null);
             const streetSearch = ref('');
-            const houseFrom = ref('');
-            const houseTo = ref('');
+            const houseSearch = ref('');
+            const isStreetOpen = ref(false);
+            const isHouseOpen = ref(false);
             const sortBy = ref('address');
             const formFields = [
                 { key: 'actNo', label: '№ акта' },
@@ -156,14 +179,52 @@
                 const match = String(value || '').match(/\d+/);
                 return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
             };
+            const streetOptions = computed(() => [...new Set(acts.value.map(act => act.streetName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')));
+            const filteredStreets = computed(() => {
+                const search = streetSearch.value.toLowerCase();
+                return streetOptions.value.filter(street => !search || street.toLowerCase().includes(search));
+            });
+            const filteredHouses = computed(() => {
+                const houses = acts.value
+                    .filter(act => !streetSearch.value || act.streetName === streetSearch.value)
+                    .map(act => act.house)
+                    .filter(Boolean);
+                return [...new Set(houses)].sort((a, b) => houseNumber(a) - houseNumber(b));
+            });
+            const selectStreet = street => {
+                streetSearch.value = street;
+                houseSearch.value = '';
+                isStreetOpen.value = false;
+            };
+            const closeStreet = () => {
+                isStreetOpen.value = false;
+                if (streetSearch.value && !streetOptions.value.includes(streetSearch.value)) {
+                    streetSearch.value = '';
+                    houseSearch.value = '';
+                }
+            };
+            const clearStreet = () => {
+                streetSearch.value = '';
+                houseSearch.value = '';
+                isStreetOpen.value = false;
+            };
+            const selectHouse = house => {
+                houseSearch.value = house;
+                isHouseOpen.value = false;
+            };
+            const closeHouse = () => {
+                isHouseOpen.value = false;
+                if (houseSearch.value && !filteredHouses.value.includes(houseSearch.value)) houseSearch.value = '';
+            };
+            const clearHouse = () => {
+                houseSearch.value = '';
+                isHouseOpen.value = false;
+            };
             const filteredActs = computed(() => {
                 const search = streetSearch.value.toLowerCase();
-                const from = houseFrom.value === '' ? null : Number(houseFrom.value);
-                const to = houseTo.value === '' ? null : Number(houseTo.value);
                 return acts.value
                     .filter(act => !search || String(act.streetName || '').toLowerCase().includes(search))
-                    .filter(act => from === null || houseNumber(act.house) >= from)
-                    .filter(act => to === null || houseNumber(act.house) <= to)
+                    .filter(act => !houseSearch.value || String(act.house || '') === houseSearch.value)
                     .sort((left, right) => {
                         if (sortBy.value === 'date') {
                             return new Date(right.createdate || 0) - new Date(left.createdate || 0);
@@ -289,7 +350,9 @@
             });
             return {
                 error, isLoading, acts, filteredActs, selectedActId, reportData, formFields,
-                streetSearch, houseFrom, houseTo, sortBy,
+                streetSearch, houseSearch, sortBy, streetOptions, filteredStreets, filteredHouses,
+                isStreetOpen, isHouseOpen, selectStreet, closeStreet, clearStreet,
+                selectHouse, closeHouse, clearHouse,
                 loadReport, formatCellValue,
                 formatDate, exportToExcel
             };
@@ -344,6 +407,55 @@
         display: flex; 
         flex-direction: column; 
         gap: 8px; 
+    }
+    .custom-datalist { position: relative; width: 100%; }
+    .custom-datalist-input-wrapper { position: relative; width: 100%; }
+    .custom-datalist-input { padding-right: 70px !important; }
+    .custom-datalist-arrow {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        color: #45B0E1;
+        pointer-events: none;
+        transform: translateY(-50%);
+        transition: transform 0.2s ease;
+    }
+    .custom-datalist-arrow.open { transform: translateY(-50%) rotate(180deg); }
+    .custom-datalist.disabled .custom-datalist-input {
+        background-color: #F5F5F5;
+        border-color: #CCCCCC;
+        color: #999999;
+        cursor: not-allowed;
+    }
+    .custom-datalist-dropdown {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 2px);
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 20;
+        background: #FFFFFF;
+        border: 2px solid #45B0E1;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+    .custom-datalist-option {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #E5E5E5;
+    }
+    .custom-datalist-option:last-child { border-bottom: none; }
+    .custom-datalist-option:hover,
+    .custom-datalist-option:active { background-color: #F0F9FC; }
+    .clear-input-btn {
+        position: absolute;
+        right: 38px;
+        top: 50%;
+        z-index: 1;
+        color: #2E8BC0;
+        cursor: pointer;
+        transform: translateY(-50%);
+        user-select: none;
     }
     .act-select-group {
         grid-column: 1 / -1;

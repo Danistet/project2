@@ -1320,6 +1320,11 @@ app.get('/PH/last', (req, res) => {
 
 app.post('/save-violation', upload.array('files', 5), (req, res) => {
   const { meterNum, licschet, violations } = req.body;
+  const actIdRaw = req.body.act_id ?? req.body.actId ?? null;
+  const actId = actIdRaw === null || actIdRaw === '' ? null : parseInt(actIdRaw, 10);
+  if (actIdRaw !== null && actIdRaw !== '' && isNaN(actId)) {
+    return res.status(400).json({ error: 'Invalid act_id' });
+  }
   if (!meterNum) return res.status(400).json({ error: 'meternum required' });
   let parsedviolations = [];
   try { parsedviolations = violations ? JSON.parse(violations) : []; } 
@@ -1327,7 +1332,7 @@ app.post('/save-violation', upload.array('files', 5), (req, res) => {
   if (parsedviolations.length === 0) return res.status(400).json({ error: 'no violation' });
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'Database connection failed' });
-    const meterQuery = `SELECT ID, LS FROM METERS WHERE METER_NUM = ?`;
+    const meterQuery = `SELECT ID, LS, METER_NUM FROM METERS WHERE METER_NUM = ?`;
     db.query(meterQuery, [meterNum], (err, meterResult) => {
       if (err || !meterResult || meterResult.length === 0) {
         db.detach();
@@ -1337,7 +1342,29 @@ app.post('/save-violation', upload.array('files', 5), (req, res) => {
       const dbLicschet = licschet || meterResult[0].LS;
       const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
       const abonentQuery = `SELECT A.ID AS ABONENT_ID, C.NAME AS CLIENT_NAME FROM ABONENTS A LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID WHERE A.G_LICSCHET = ?`;
-      db.query(abonentQuery, [dbLicschet], (err, abonentResult) => {
+      const ensureActMeter = (callback) => {
+        if (!actId) return callback();
+        db.query(
+          `SELECT FIRST 1 ID FROM METERS_IND WHERE ACT_ID = ? AND METER_ID = ? AND (IS_DELETED = 0 OR IS_DELETED IS NULL)`,
+          [actId, meterId],
+          (checkError, existing) => {
+            if (checkError) return callback(checkError);
+            if (existing && existing.length > 0) return callback();
+            db.query(
+              `INSERT INTO METERS_IND (ID, PH, METER_ID, METER_NUM, CREATEDATE, ACT_ID, CONTROLLER_ID)
+               VALUES (GEN_ID(METERS_IND_GEN, 1), NULL, ?, ?, ?, ?, ?)`,
+              [meterId, meterResult[0].METER_NUM, createdate, actId, req.body.controllerId || null],
+              callback
+            );
+          }
+        );
+      };
+      ensureActMeter((actError) => {
+        if (actError) {
+          db.detach();
+          return res.status(500).json({ error: 'error linking violation to act', details: actError.message });
+        }
+        db.query(abonentQuery, [dbLicschet], (err, abonentResult) => {
         if (err) {
           db.detach();
           return res.status(500).json({ error: 'error finding abonent' });
@@ -1385,6 +1412,7 @@ app.post('/save-violation', upload.array('files', 5), (req, res) => {
               }
             }
           });
+        });
         });
       });
     });
@@ -1684,6 +1712,8 @@ app.post('/admin/acts', (req, res) => {
     const sql = `
       SELECT FIRST 100
         a.ID AS ACT_ID, a.ACT_NO, a.CREATEDATE,
+        (SELECT MIN(a2.CREATEDATE) FROM BUILD_MAINT_ACTS a2
+          WHERE a2.BUILDING_ID = a.BUILDING_ID AND a2.CREATEDATE > a.CREATEDATE) AS NEXT_ACT_DATE,
         CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
         CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
         CAST(b.HOUSE AS VARCHAR(20) CHARACTER SET WIN1251) AS HOUSE
@@ -1735,7 +1765,17 @@ app.post('/admin/report-act', (req, res) => {
       FROM BUILD_MAINT_ACTS a
       LEFT JOIN CHECKTYPE ct ON ct.ID = a.CHECKTYPE_ID
       LEFT JOIN METERS_IND mi ON mi.ACT_ID = a.ID AND (mi.IS_DELETED = 0 OR mi.IS_DELETED IS NULL)
-      LEFT JOIN METERS m ON m.ID = mi.METER_ID
+      LEFT JOIN METERS m ON m.ID = mi.METER_ID OR EXISTS (
+        SELECT 1 FROM VIOLATIONS v0
+         WHERE v0.METERS_ID = m.ID
+           AND v0.CREATEDATE >= a.CREATEDATE
+           AND (
+             NOT EXISTS (SELECT 1 FROM BUILD_MAINT_ACTS a3
+               WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
+             OR v0.CREATEDATE < (SELECT MIN(a3.CREATEDATE) FROM BUILD_MAINT_ACTS a3
+               WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
+           )
+      )
       LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
       LEFT JOIN CLIENTS owner ON owner.ID = ab.CLIENT_ID
       LEFT JOIN CLIENTS rep ON rep.ABONENT_ID = owner.ID
@@ -1763,9 +1803,9 @@ app.post('/admin/report-act', (req, res) => {
           CAST(DESCRIPTION AS VARCHAR(500) CHARACTER SET WIN1251) AS DESCRIPTION,
           CREATEDATE
            FROM VIOLATIONS
-          WHERE METERS_ID = ? AND CREATEDATE <= ?
+          WHERE METERS_ID = ? AND CREATEDATE < ?
           ORDER BY CREATEDATE DESC, ID DESC`,
-        [row.METER_ID, row.CREATEDATE],
+        [row.METER_ID, row.NEXT_ACT_DATE || new Date()],
         (ve, violations) => {
           db.detach();
           if (ve) return res.status(500).json({ error: 'Ошибка запроса нарушений: ' + ve.message });

@@ -1251,6 +1251,8 @@ createApp({
         const meterNum = meterData.meterNum; 
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
         const licschet = addressData.g_licschet || '';
+        const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
+        const actId = currentAct?.actId || null;
         if (!meterNum) {
           showAlert('Не найден серийный номер счётчика', 'error');
           return;
@@ -1319,6 +1321,7 @@ createApp({
           meterNum,
           licschet,
           violations: JSON.stringify(violations),
+          actId,
           fileNames: fileNamesForServer,
           filesData: filesDataForStorage,
           isViolation: true 
@@ -1329,6 +1332,9 @@ createApp({
           formData.append('meterNum', meterNum);
           formData.append('licschet', licschet);
           formData.append('violations', JSON.stringify(violations));         
+          if (actId) {
+            formData.append('act_id', actId);
+          }
           if (filesDataForStorage.length > 0) {
             filesDataForStorage.forEach(f => {
               const blob = new Blob([f.fileBuffer], { type: f.fileType });
