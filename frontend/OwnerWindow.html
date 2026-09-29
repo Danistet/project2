@@ -39,18 +39,24 @@
         const error = ref('');
         const g_licschet = ref(null);
         const clientId = ref(null);
-        onMounted(async () => {                
-          checkSession();
+        onMounted(async () => {          
+          if (!checkSession()) return;
           if (showContinue.value) return;
           const userAddress = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
           const licschetData = JSON.parse(sessionStorage.getItem('licschet') || '{}');
           g_licschet.value = userAddress.g_licschet || licschetData.g_licschet;             
-          if (!g_licschet.value) {
-            error.value = 'no licschet';
+          const activeMeter = JSON.parse(sessionStorage.getItem('activeMeter') || 'null');
+          const selectedMeter = JSON.parse(sessionStorage.getItem('selectedMeter') || 'null');
+          const meterId = activeMeter?.id || selectedMeter?.id || userAddress.selectedMeterId;
+          if (!g_licschet.value && !meterId) {
+            error.value = 'Не удалось определить лицевой счёт или счётчик';
             return;
           }             
           try {
-            const result = await apiRequest('/get-owner-data', { g_licschet: g_licschet.value });
+            const result = await apiRequest('/get-owner-data', {
+              g_licschet: g_licschet.value,
+              meterId
+            });
             if (result.found) {
               ownerName.value = result.ownerName || '';
               phone.value = result.phone || '';

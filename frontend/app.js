@@ -745,15 +745,14 @@ createApp({
                 JSON.parse(sessionStorage.getItem('authData') || '{}').controllerId
               );
               if (pkg) {
-                const meterRow = pkg.meters?.find(m => m.ID === firstMeter.id);
-                if (meterRow?.METER_TYPE) {
-                  const meterType = pkg.meterTypes?.find(t => t.ID === meterRow.METER_TYPE);
-                  if (meterType?.LOW_QUALITY_GRP_TARIFF) {
-                    await apiRequest('/update-act-service', {
-                      actId: actResult.actId,
-                      serviceId: meterType.LOW_QUALITY_GRP_TARIFF
-                    });
-                  }
+                const buildingMeter = pkg.buildingsMeters?.find(
+                  row => String(row.METER_ID) === String(firstMeter.id)
+                );
+                if (buildingMeter?.GROUP_ID) {
+                  await apiRequest('/update-act-service', {
+                    actId: actResult.actId,
+                    serviceId: buildingMeter.GROUP_ID
+                  });
                 }
               }
             } catch (e) {
@@ -802,7 +801,9 @@ createApp({
         const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
         if (!abonent) return;        
         const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
-        const building = pkg.buildings?.find(b => b.ID === abonent.BUILDINGS_ID);
+        const building = pkg.buildings?.find(
+          b => b.ID === (abonent.BUILDING_ID ?? abonent.BUILDINGS_ID)
+        );
         if (!building) return;        
         const street = pkg.streets?.find(s => s.ID === building.STREET_ID);
         if (!street) return;        
@@ -912,7 +913,9 @@ createApp({
         if (!navigator.onLine) {
           const pkg = controllerId ? await getControllerPackage(controllerId) : null;
           if (pkg && pkg.abonents) {
-            abonentsList = pkg.abonents.filter(a => String(a.BUILDINGS_ID) === String(buildingId));
+            abonentsList = pkg.abonents.filter(a =>
+              String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingId)
+            );
           }
         } else {
           try {
@@ -943,7 +946,9 @@ createApp({
             console.warn('API failed, fallback to offline:', err);
             const pkg = controllerId ? await getControllerPackage(controllerId) : null;
             if (pkg && pkg.abonents) {
-              abonentsList = pkg.abonents.filter(a => String(a.BUILDINGS_ID) === String(buildingId));
+              abonentsList = pkg.abonents.filter(a =>
+                String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingId)
+              );
             }
           }
         }
@@ -1405,7 +1410,7 @@ createApp({
             return;
           }
         }          
-        const result = await apiRequest('/auth', { userpswd: passwordValue, meternum: meternum.value });
+        const result = await apiRequest('/auth', { userpswd: passwordValue });
         const authPayLoad = {
           token: result.token,
           authDate: result.authDate,
@@ -1427,8 +1432,9 @@ createApp({
           ensureControllerPackage(result.controllerId).catch(err => showAlert(`Ошибка сохранения офлайн-пакета:`, 'error'));
         }          
         window.location.href = 'ActWindow.html';
-      } catch (err) { 
-        showAlert(`error:`, 'error'); 
+      } catch (err) {
+        console.error('Ошибка авторизации:', err);
+        showAlert(`Ошибка авторизации: ${err?.message || 'Неизвестная ошибка'}`, 'error');
       }
     };
 
@@ -1472,15 +1478,27 @@ createApp({
     };
 
     function mapOfflineMeter(pkg, meterRow) {
-      const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meterRow.LS)) || null;
+      const byLs = pkg.abonents?.find(
+        a => String(a.G_LICSCHET) === String(meterRow.LS)
+      ) || null;
+      const buildingMeter = pkg.buildingsMeters?.find(
+        row => String(row.METER_ID) === String(meterRow.ID)
+      );
+      const buildingAbonents = buildingMeter
+        ? pkg.abonents?.filter(a =>
+          String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingMeter.BUILDING_ID)
+        ) || []
+        : [];
+      const abonent = byLs || (
+        buildingMeter?.APPARTS !== null && buildingMeter?.APPARTS !== undefined && String(buildingMeter.APPARTS).trim() !== ''
+          ? buildingAbonents.find(a => String(a.APPARTS ?? '').trim() === String(buildingMeter.APPARTS).trim())
+          : buildingAbonents[0]
+      ) || null;
       const client = abonent
-        ? pkg.clients?.find(c => c.ID === abonent.CLIENT_ID)
+        ? pkg.clients?.find(c => String(c.ID) === String(abonent.CLIENT_ID))
         : null;
-      const meterType = meterRow.METER_TYPE
-        ? pkg.meterTypes?.find(t => t.ID === meterRow.METER_TYPE)
-        : null;
-      const service = meterType
-        ? pkg.services?.find(s => s.ID === meterType.LOW_QUALITY_GRP_TARIFF)
+      const service = buildingMeter
+        ? pkg.services?.find(s => String(s.ID) === String(buildingMeter.GROUP_ID))
         : null;
       return {
         found: true,
@@ -1492,7 +1510,7 @@ createApp({
         mountDate: meterRow.MOUNT_DATE,
         verifyDate: meterRow.VERIFY_DATE,
         licschet: meterRow.LS,
-        groupName: service?.GROUP_NAME || null,
+        groupName: service?.GROUP_NAME || service?.NAME || service?.SHORT_NAME || null,
         clientName: client?.NAME || null,
         apparts: abonent?.APPARTS || null 
       };
@@ -1517,11 +1535,22 @@ createApp({
       if (!auth?.controllerId) return [];
       const pkg = await getControllerPackage(auth.controllerId);
       if (!pkg || !Array.isArray(pkg.meters) || !Array.isArray(pkg.abonents)) return [];
-      const buildingAbonents = pkg.abonents.filter(a => String(a.BUILDINGS_ID) === String(buildingId));
+      const buildingAbonents = pkg.abonents.filter(a =>
+        String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingId)
+      );
       const licschets = buildingAbonents.map(a => String(a.G_LICSCHET));
-      return pkg.meters
+      const metersByLicschet = pkg.meters
         .filter(m => licschets.includes(String(m.LS)))
         .map(m => mapOfflineMeter(pkg, m));
+      const meterIds = new Set(metersByLicschet.map(m => String(m.id)));
+      const buildingMeterRows = (pkg.buildingsMeters || []).filter(row =>
+        String(row.BUILDING_ID) === String(buildingId)
+      );
+      const metersByBuildingLink = buildingMeterRows
+        .map(row => pkg.meters.find(m => String(m.ID) === String(row.METER_ID)))
+        .filter(m => m && !meterIds.has(String(m.ID)))
+        .map(m => mapOfflineMeter(pkg, m));
+      return [...metersByLicschet, ...metersByBuildingLink];
     } 
 
     onMounted(() => {
