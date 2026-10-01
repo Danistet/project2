@@ -40,11 +40,11 @@
                 v-for="meter in meters" 
                 :key="meter.id" 
                 class="meter-block"
-                :class="{ selected: selectedMeterId === meter.id }"
-                :style="{ opacity: selectedMeterId && selectedMeterId !== meter.id ? '0.5' : '1' }"
+                :class="{ selected: selectedMeterId === meter.id, dimmed: selectedMeterId && selectedMeterId !== meter.id }"
               >
-                <h4>{{ meter.clientName || 'Не указано' }}</h4>              
-                <div class="meter-details">
+                <div class="meter-content">
+                  <h4>{{ meter.clientName || 'Не указано' }}</h4>
+                  <div class="meter-details">
                   <div class="detail-row">
                     <span class="detail-label">Лицевой счёт:</span>
                     <span class="detail-value">{{ meter.licschet || 'Не указан' }}</span>
@@ -96,7 +96,8 @@
                       <span class="detail-value">{{ formatDate(meter.verifyDate) }}</span>
                     </div>
                   </template>
-                </div>              
+                  </div>
+                </div>
                 <button 
                   v-if="selectedMeterId !== meter.id" 
                   @click="selectMeter(meter)" 
@@ -114,7 +115,7 @@
             <div id="actionButtons" class="action-buttons" v-if="selectedMeterId && !showContinue">
               <button @click="info" id="infbt" class="btn-primary">Передать нарушения</button>
             </div>          
-            <button @click="logout" id="changebutton" class="btn-secondary" v-if="!showContinue">Сменить адрес</button>
+            <button @click="logout" id="changebutton" class="btn-primary" v-if="!showContinue">Сменить адрес</button>
           </section>
         </template>
       </main>
@@ -589,7 +590,15 @@
       border: 2px solid #45B0E1;
       padding: 16px;
       background-color: #FFFFFF;
-      transition: border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .meter-content {
+      transition: opacity 0.2s ease;
+    }
+
+    .meter-block.dimmed .meter-content {
+      opacity: 0.5;
     }
 
     .meter-block.selected {
@@ -643,8 +652,8 @@
       padding: 12px 16px;
       font-size: 16px;
       font-weight: 600;
-      color: #45B0E1;
-      background-color: #FFFFFF;
+      color: #FFFFFF;
+      background-color: #45B0E1;
       border: 2px solid #45B0E1;
       border-radius: 0;
       cursor: pointer;
@@ -653,11 +662,13 @@
     }
 
     .select-btn:hover {
-      background-color: #F0F9FC;
+      background-color: #2E8BC0;
+      border-color: #2E8BC0;
     }
 
     .select-btn:active {
-      background-color: #E0F4FA;
+      background-color: #1A6B96;
+      border-color: #1A6B96;
     }
 
     .select-btn:disabled {

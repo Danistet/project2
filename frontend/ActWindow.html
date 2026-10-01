@@ -12,6 +12,11 @@
     <div id="app">
       <h1>Формирование списка</h1>
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
+        <div class="top-actions" v-if="!showContinue">
+          <button type="button" @click="logout" class="btn-secondary">Выход</button>
+          <button type="button" @click="viewAddresses" class="btn-secondary">Список адресов</button>
+          <button type="button" @click="viewhistory" class="btn-secondary">История работ</button>
+        </div>
         <div class="form-group">
           <label class="form-label checkbox-label" :class="{ disabled: !isOnline || isLoading }">
             <input type="checkbox" :disabled="!isOnline || isLoading" id="allmeters" v-model="showAllAddresses" class="form-checkbox">
@@ -89,12 +94,12 @@
           <span class="checkbox-text">Адреса без назначенной даты посещения</span>
         </label>
         <div class="form-group">
-          <label for="listInput" class="form-label">Список адресов</label>
+          <label for="listInput" class="form-label">Список квартир</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
             <div class="custom-datalist-input-wrapper">
               <input
                 type="text" id="listInput"
-                placeholder="Выберите адрес из списка"
+                placeholder="Выберите квартиру из списка"
                 autocomplete="off"
                 v-model="selectedAddressText" 
                 class="form-input custom-datalist-input" 
@@ -126,7 +131,7 @@
           <h4>Выбранный объект</h4>
           <div class="meter-details">
             <div class="detail-row">
-              <span class="detail-label">Адрес:</span>
+              <span class="detail-label">Квартира:</span>
               <span class="detail-value">{{ selectedAddress.displayText }}</span>
             </div>
             <div class="detail-row">
@@ -175,9 +180,7 @@
           <p class="error-message">{{ error }}</p>
           <button @click="cont" class="btn-primary">Продолжить</button>
         </div>        
-        <button type="button" @click="continueAction" class="btn-primary" style="margin-top: 10px;" v-if="!showContinue">Продолжить</button>
-        <button type="button" @click="viewhistory" class="btn-secondary" v-if="!showContinue">история работ</button>
-        <button type="button" @click="logout" class="btn-secondary" v-if="!showContinue">Выход</button>
+        <button type="button" @click="continueAction" class="btn-primary continue-button" v-if="!showContinue">Продолжить</button>
       </form>
       <div class="status" id="statusDiv"></div>
     </div>
@@ -792,6 +795,10 @@
             window.location.href = 'historywindow.html';
           };
 
+          const viewAddresses = () => {
+            window.location.href = 'addresslist.html';
+          };
+
           const handleOnline = async () => {
             updateOnlineStatus();
             if (typeof syncPendingVerifyUpdates === 'function') {
@@ -948,6 +955,23 @@
       display: flex; 
       flex-direction: column; 
       gap: 20px; 
+    }
+
+    .top-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .top-actions button {
+      min-height: 48px;
+      padding: 8px 6px;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .continue-button {
+      margin-top: 8px;
     }
       
     .form-group { 
