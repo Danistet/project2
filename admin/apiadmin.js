@@ -3,30 +3,30 @@
 //   : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
 
 
-  const REMOTE_SERVER_IP = '37.195.66.20'; 
-  const PORT = '3000';
-  let API_BASE;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    API_BASE = `http://localhost:${PORT}`;
-  } else if (window.location.origin && window.location.origin !== 'null' && window.location.origin !== 'file://') {
-    API_BASE = window.location.origin;
-  } else {
-    API_BASE = `http://${REMOTE_SERVER_IP}:${PORT}`;
-  }
+const REMOTE_SERVER_IP = '37.195.66.20';
+const PORT = '3000'; 
+let API_BASE;
+
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  API_BASE = `http://localhost:${PORT}`;
+} else {
+  API_BASE = `http://${window.location.hostname}:${PORT}`;
+}
+
 async function apiRequest(endpoint, data = {}, method = 'POST') { 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: method,
       headers: { 'Content-Type': 'application/json' },
       body: method !== 'GET' ? JSON.stringify(data) : undefined
-    });      
+    });    
     const text = await response.text();
     let result;
     try {
       result = JSON.parse(text);
     } catch (e) {
-      throw new Error(`Сервер вернул HTML вместо JSON (Статус: ${response.status}). URL: ${endpoint}`);
-    }  
+      throw new Error(`Сервер вернул HTML вместо JSON (Статус: ${response.status}). Ожидаемый URL: ${API_BASE}${endpoint}`);
+    }    
     if (!response.ok) {
       const err = new Error(result.error || `Ошибка сервера: ${response.status}`);
       err.status = response.status;
@@ -36,7 +36,11 @@ async function apiRequest(endpoint, data = {}, method = 'POST') {
     }
     return result;
   } catch (error) {
-    console.error(`API request failed (${endpoint}):`, error);
+    if (error && error.status) {
+      console.error(`API request failed (${endpoint}): status=${error.status}`, error.body || error.message);
+    } else {
+      console.error(`API request failed (${endpoint}):`, error);
+    }
     throw error;
   }
 }

@@ -334,6 +334,16 @@
                 mountDate: meter?.mountDate
               };
               if (!navigator.onLine) {
+                if (typeof savePendingMeterUpdate !== 'function') {
+                  throw new Error('Офлайн-очередь изменений недоступна');
+                }
+                await savePendingMeterUpdate({
+                  meterId: selectedMeterId.value,
+                  updates: sessionUpdates
+                });
+                if (typeof updateCachedMeterPackage === 'function') {
+                  await updateCachedMeterPackage(selectedMeterId.value, sessionUpdates);
+                }
                 const activeMeter = typeof getActiveMeter === 'function' ? getActiveMeter() : null;
                 if (typeof syncMeterSessionData === 'function') {
                   syncMeterSessionData(selectedMeterId.value, sessionUpdates);
@@ -483,7 +493,11 @@
         isInitialLoad = false;
       }   
       updateStatus(navigator.onLine);
-      window.addEventListener("online", () => updateStatus(true));
+      if (navigator.onLine && typeof syncPendingReadings === 'function') syncPendingReadings();
+      window.addEventListener("online", () => {
+        updateStatus(true);
+        if (typeof syncPendingReadings === 'function') syncPendingReadings();
+      });
       window.addEventListener("offline", () => updateStatus(false));
     </script>
   </body>

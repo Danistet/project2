@@ -137,7 +137,7 @@ app.post('/meter-full-details', (req, res) => {
         RS.ID AS STREET_ID, CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
         CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS, B.ID AS BUILDING_ID,
         CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS, CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
-        S.ID AS SERVICE_ID, CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+        S.GROUP_ID AS SERVICE_ID, CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
         CTRL.ID AS CONTROLLER_ID, CAST(CTRL.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
         (SELECT FIRST 1 STATUS FROM BOILER_STATUS WHERE METER_ID = M.ID ORDER BY ID DESC) AS BOILER_STATUS,
         IND.PH AS LAST_PH, IND.CREATEDATE AS LAST_PH_DATE
@@ -146,8 +146,8 @@ app.post('/meter-full-details', (req, res) => {
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
-      LEFT JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      LEFT JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN BUILDINGS_METERS bm ON bm.METER_ID = M.ID
+      LEFT JOIN SERVICES S ON S.GROUP_ID = bm.GROUP_ID
       LEFT JOIN CONTROLLERS CTRL ON M.CONTROLER_ID = CTRL.ID
       LEFT JOIN (
         SELECT MI1.METER_NUM, MI1.PH, MI1.CREATEDATE
@@ -162,7 +162,7 @@ app.post('/meter-full-details', (req, res) => {
       if (!result || result.length === 0) { db.detach(); return res.status(404).json({ error: 'Meter not found' }); }
       const r = result[0];
       const getRefs = (cb) => {
-        db.query(`SELECT ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME FROM SERVICES ORDER BY GROUP_NAME`, [], (sErr, services) => {
+        db.query(`SELECT DISTINCT GROUP_ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME FROM SERVICES ORDER BY GROUP_NAME`, [], (sErr, services) => {
           db.query(`SELECT ID, CAST(FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS FIO FROM CONTROLLERS ORDER BY FIO`, [], (cErr, controllers) => {
             db.detach();
             cb(services || [], controllers || []);
@@ -190,7 +190,7 @@ app.post('/meter-full-details', (req, res) => {
           seal: r.SEAL || '', boilerStatus: r.BOILER_STATUS || '',
           lastPh: (r.LAST_PH !== null && r.LAST_PH !== undefined) ? Number(r.LAST_PH).toLocaleString('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : '',
           manfDate: formatDate(r.MANFDATE), mountDate: formatDate(r.MOUNT_DATE), meterName: r.METER_NAME || '',
-          services: services.map(s => ({ id: s.ID, name: s.GROUP_NAME })),
+          services: services.map(s => ({ id: s.GROUP_ID, name: s.GROUP_NAME })),
           controllers: controllers.map(c => ({ id: c.ID, fio: c.FIO }))
         });
       });
@@ -219,11 +219,9 @@ app.post('/update-meter-full', (req, res) => {
         return res.status(500).json({ error: 'Database query error', details: err.message });
       }
       const processMeter = (meterData) => {
-        const licschet = meterData.LS;
         const clientId = meterData.CLIENT_ID;
         const meterNum = meterData.METER_NUM;
         const dbMeterId = meterData.ID;
-        const oldMeterType = meterData.METER_TYPE;
         const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
         let completed = 0;
         const total = 3;
@@ -242,37 +240,57 @@ app.post('/update-meter-full', (req, res) => {
           }
         };
         db.query(`UPDATE METERS SET METER_NUM=?, SEAL=?, MANFDATE=?, MOUNT_DATE=?, VERIFY_DATE=?, CONTROLER_ID=? WHERE ID=?`,
-          [d.meterNum || meterNum, d.seal || null, d.manfDate || null, d.mountDate || null, d.verifyDate || null, d.controllerId || null, dbMeterId], (e) => {
+          [d.meterNum || meterNum, d.seal || null, d.manfDate || null, d.mountDate || null, d.verifyDate || null, d.controllerId || null, dbMeterId],
+          (e) => {
             if (e) return fail('Update meters error', e.message);
-            if (d.serviceId && d.serviceId !== oldMeterType) {
-              db.query(`SELECT ID FROM METER_TYPES WHERE LOW_QUALITY_GRP_TARIFF = ?`, [d.serviceId], (e2, mt) => {
-                if (e2) return fail('Meter type lookup error', e2.message);
-                if (mt && mt.length > 0) {
-                  db.query(`UPDATE METERS SET METER_TYPE=? WHERE ID=?`, [mt[0].ID, dbMeterId], (e3) => {
-                    if (e3) return fail('Meter type update error', e3.message);
-                    done();
-                  });
-                } else { done(); }
-              });
-            } else { done(); }
-          });
+            done();
+          }
+        );
         if (!clientId) {
           done();
         } else {
           db.query(`UPDATE CLIENTS SET NAME=?, PHONE=?, MAIL=? WHERE ID=?`,
-            [d.fio || null, d.clientPhone || null, d.clientMail || null, clientId], (e) => {
+            [d.fio || null, d.clientPhone || null, d.clientMail || null, clientId],
+            (e) => {
               if (e) return fail('Update client error', e.message);
               done();
-            });
+            }
+          );
         }
-        if (d.boilerStatus === undefined || d.boilerStatus === null || String(d.boilerStatus).trim() === '') {
-          done();
+        if (d.serviceId) {
+          db.query(`SELECT ID FROM BUILDINGS_METERS WHERE METER_ID = ?`, [dbMeterId], (eCheck, bm) => {
+            if (eCheck) return fail('Buildings meters check error', eCheck.message);
+            if (bm && bm.length > 0) {
+              db.query(`UPDATE BUILDINGS_METERS SET GROUP_ID = ? WHERE METER_ID = ?`, [d.serviceId, dbMeterId], (eUpd) => {
+                if (eUpd) return fail('Buildings meters update error', eUpd.message);
+                checkBoilerAndFinish();
+              });
+            } else {
+              db.query(`INSERT INTO BUILDINGS_METERS (ID, BUILDING_ID, GROUP_ID, METER_ID, CREATEDATE, APPARTS)
+                        VALUES (GEN_ID(BUILDINGS_METERS_GEN, 1), NULL, ?, ?, ?, NULL)`,
+                [d.serviceId, dbMeterId, createdate],
+                (eIns) => {
+                  if (eIns) return fail('Buildings meters insert error', eIns.message);
+                  checkBoilerAndFinish();
+                }
+              );
+            }
+          });
         } else {
-          db.query(`INSERT INTO BOILER_STATUS (ID, STATUS, METER_ID, CREATEDATE) VALUES (GEN_ID(BOILER_STATUS_GEN, 1), ?, ?, ?)`,
-            [String(d.boilerStatus).trim(), dbMeterId, createdate], (e) => {
-              if (e) return fail('Boiler status error', e.message);
-              done();
-            });
+          checkBoilerAndFinish();
+        }
+        function checkBoilerAndFinish() {
+          if (d.boilerStatus === undefined || d.boilerStatus === null || String(d.boilerStatus).trim() === '') {
+            done();
+          } else {
+            db.query(`INSERT INTO BOILER_STATUS (ID, STATUS, METER_ID, CREATEDATE) VALUES (GEN_ID(BOILER_STATUS_GEN, 1), ?, ?, ?)`,
+              [String(d.boilerStatus).trim(), dbMeterId, createdate],
+              (e) => {
+                if (e) return fail('Boiler status error', e.message);
+                done();
+              }
+            );
+          }
         }
       };
       if (!meta || meta.length === 0) {
@@ -919,45 +937,47 @@ app.post('/buildings', (req, res) => {
 });
 
 app.post('/apparts', (req, res) => {
-  const buildingId = req.query.buildingId;
-  const controllerId = req.query.controllerId;
+  const buildingId = req.body.buildingId || req.query.buildingId;
+  const rawControllerId = req.body.controllerId || req.query.controllerId;
+  const controllerId = rawControllerId ? parseInt(rawControllerId, 10) : 0;
   if (!buildingId) return res.status(400).json({ error: 'buildingId required' });
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'DB connection failed' });    
+    if (err) return res.status(500).json({ error: 'DB connection failed' });
     const query = `
-      SELECT 
-        A.ID, 
-        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
-        A.G_LICSCHET,
-        (SELECT FIRST 1 M.CONTROLER_ID FROM METERS M WHERE M.LS = A.G_LICSCHET) AS CONTROLER_ID
+      SELECT
+      A.ID,
+      CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+      CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER,
+      A.G_LICSCHET,
+      (SELECT FIRST 1 M.CONTROLER_ID FROM METERS M WHERE M.LS = A.G_LICSCHET) AS CONTROLER_ID
       FROM ABONENTS A
       WHERE A.BUILDINGS_ID = ?
       AND (
-        NOT EXISTS (
-          SELECT 1 FROM METERS M WHERE M.LS = A.G_LICSCHET
-        )
+        NOT EXISTS (SELECT 1 FROM METERS M WHERE M.LS = A.G_LICSCHET)
         OR
         EXISTS (
-          SELECT 1 
+          SELECT 1
           FROM METERS M
-          INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-          INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+          INNER JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+          INNER JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
           INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
           WHERE M.LS = A.G_LICSCHET
-            AND RS.ID = 1
-            AND S.GROUP_ID IN (537, 555, 597)
-            AND M.CONTROLER_ID = CAST(? AS INTEGER)
+          AND RS.ID = 1
+          AND S.GROUP_ID IN (537, 555, 597)
+          AND M.CONTROLER_ID = CAST(? AS INTEGER)
         )
       )
       ORDER BY CONTROLER_ID DESC NULLS LAST, A.APPARTS, A.LETTER
-    `; 
+    `;
     db.query(query, [buildingId, controllerId], (err, result) => {
       db.detach();
-      if (err) return res.status(500).json({ error: 'Query failed' });     
+      if (err) {
+        console.error('Apparts query error:', err);
+        return res.status(500).json({ error: 'Query failed', details: err.message });
+      }
       res.json(result.map(r => {
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
-        if (r.APPARTS == null) {
+        if (r.APPARTS == null || String(r.APPARTS).trim() === '') {
           return {
             id: r.ID,
             house: `${letterPart}`.trim(),
@@ -996,8 +1016,8 @@ app.post('/meter-by-licschet', (req, res) => {
         CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
-      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+      LEFT JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
@@ -1054,26 +1074,19 @@ app.post('/meters-by-licschet', (req, res) => {
       return res.status(500).json({ error: 'DB connect error:', err});
     }
     const query = `
-      SELECT 
-        M.METER_NUM, 
-        M.MOUNT_DATE, 
-        M.VERIFY_DATE, 
-        M.LS, 
-        M.ID,
-        M.NAME,
-        M.SEAL,
-        M.MANFDATE,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
-        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
+      SELECT
+      M.METER_NUM, M.MOUNT_DATE, M.VERIFY_DATE, M.LS, M.ID, M.NAME, M.SEAL, M.MANFDATE,
+      CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
-      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+      LEFT JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE M.LS = ?
-        AND RS.ID = 1
-        AND S.GROUP_ID IN (537, 555, 597)
+      AND RS.ID = 1
+      AND S.GROUP_ID IN (537, 555, 597)
       ORDER BY M.MOUNT_DATE DESC
     `;
     db.query(query, [g_licschet], (err, result) =>{
@@ -1110,7 +1123,7 @@ app.post('/meter-by-building', (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }    
     const query = `
-      SELECT 
+      SELECT FIRST 1
         M.METER_NUM, 
         M.MOUNT_DATE, 
         M.VERIFY_DATE, 
@@ -1122,8 +1135,8 @@ app.post('/meter-by-building', (req, res) => {
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
-      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+      LEFT JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
       INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
@@ -1131,7 +1144,6 @@ app.post('/meter-by-building', (req, res) => {
         AND S.GROUP_ID IN (537, 555, 597)
         AND (A.APPARTS IS NULL OR TRIM(A.APPARTS) = '')
       ORDER BY M.MOUNT_DATE DESC
-      ROWS 1
     `;
     const buildingIdNum = parseInt(buildingId, 10);
     if (isNaN(buildingIdNum)) {
@@ -1142,7 +1154,7 @@ app.post('/meter-by-building', (req, res) => {
       db.detach();
       if (err) {
         console.error('Query error:', err);
-        return res.status(500).json({ error: 'Query failed' });
+        return res.status(500).json({ error: 'Query failed', details: err.message });
       }
       if (!result || result.length === 0) {
         return res.json({
@@ -1176,47 +1188,41 @@ app.post('/meter-by-building', (req, res) => {
 app.post('/meters-by-building', (req, res) => {
   const { buildingId } = req.body;
   if (!buildingId) {
-    return res.status(400).json({error: 'buildingId required'});
-  }
+    return res.status(400).json({ error: 'buildingId required' });
+  }  
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection failed' });
     }
     const query = `
-      SELECT 
-        M.METER_NUM, 
-        M.MOUNT_DATE, 
-        M.VERIFY_DATE, 
-        M.LS, 
-        M.ID,
-        M.NAME,
-        M.SEAL,
-        M.MANFDATE,
-        CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
-        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
-      FROM METERS M
-      INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
-      INNER JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      INNER JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
-      INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
-      LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
-      WHERE A.BUILDINGS_ID = CAST(? AS INTEGER)
-        AND RS.ID = 1
-        AND S.GROUP_ID IN (537, 555, 597)
-      ORDER BY M.MOUNT_DATE DESC
+      SELECT
+      m.METER_NUM, m.MOUNT_DATE, m.VERIFY_DATE, m.LS, m.ID, m.NAME, m.SEAL, m.MANFDATE,
+      CAST(COALESCE(a.APPARTS, bm.APPARTS) AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
+      CAST(s.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME,
+      CAST(c.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME
+      FROM METERS m
+      INNER JOIN ABONENTS a ON m.LS = a.G_LICSCHET
+      LEFT JOIN BUILDINGS_METERS bm ON bm.METER_ID = m.ID
+      LEFT JOIN SERVICES s ON s.GROUP_ID = bm.GROUP_ID
+      LEFT JOIN CLIENTS c ON c.ID = a.CLIENT_ID
+      INNER JOIN RMETER_STATUS rs ON m.STATUS = rs.ID
+      WHERE a.BUILDINGS_ID = CAST(? AS INTEGER)
+      AND rs.ID = 1
+      ORDER BY m.MOUNT_DATE DESC
     `;
     const buildingIdNum = parseInt(buildingId, 10);
     if (isNaN(buildingIdNum)) {
       db.detach();
       return res.status(400).json({ error: 'Invalid buildingId' });
-    }
+    }  
     db.query(query, [buildingIdNum], (err, result) => {
       db.detach();
       if (err) {
-        console.error('Query error:', err);
-        return res.status(500).json({ error: 'Query failed' });
+        console.error('Query error in /meters-by-building:', err);
+        return res.status(500).json({ error: 'Query failed', details: err.message });
+      }
+      if (result && result.length > 0) {
       }
       res.json(result.map(r => ({
         found: true,
@@ -1545,53 +1551,90 @@ app.post('/controller-offline-package', (req, res) => {
   const { controllerId } = req.body;
   if (!controllerId) return res.status(400).json({ error: 'controllerId required' });
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'Database connection failed' });    
+    if (err) return res.status(500).json({ error: 'Database connection failed' });
     const query = `
-      SELECT M.ID AS METER_ID, M.CONTROLER_ID, M.VERIFY_DATE, M.LS, M.METER_NUM, M.NAME AS METER_NAME, M.SEAL, M.MANFDATE, M.MOUNT_DATE, M.METER_TYPE,
-        A.APPARTS, A.LETTER, A.BUILDINGS_ID, A.G_LICSCHET, A.CLIENT_ID,
-        CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME, CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
-        CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME, RS.ID AS STREET_ID,
-        CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS, B.ID AS BUILDING_ID,
-        IND.LAST_IND_DATE, MT.ID AS METER_TYPE_ID, CAST(MT.NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS METER_TYPE_NAME, MT.LOW_QUALITY_GRP_TARIFF AS SERVICE_ID, CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_GROUP_NAME
+      SELECT
+      M.ID AS METER_ID, M.CONTROLER_ID, M.VERIFY_DATE, M.LS, M.METER_NUM,
+      M.NAME AS METER_NAME, M.SEAL, M.MANFDATE, M.MOUNT_DATE,
+      A.APPARTS, A.LETTER, A.BUILDINGS_ID, A.G_LICSCHET, A.CLIENT_ID,
+      CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+      CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+      CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+      CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME, RS.ID AS STREET_ID,
+      CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+      CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS, B.ID AS BUILDING_ID,
+      IND.LAST_IND_DATE,
+      BM.GROUP_ID AS SERVICE_ID,
+      CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_GROUP_NAME
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
-      LEFT JOIN (SELECT METER_NUM, MAX(CREATEDATE) AS LAST_IND_DATE FROM METERS_IND GROUP BY METER_NUM) IND ON TRIM(IND.METER_NUM) = TRIM(M.METER_NUM)
-      LEFT JOIN METER_TYPES MT ON M.METER_TYPE = MT.ID
-      LEFT JOIN SERVICES S ON MT.LOW_QUALITY_GRP_TARIFF = S.ID
+      LEFT JOIN (SELECT METER_NUM, MAX(CREATEDATE) AS LAST_IND_DATE FROM METERS_IND WHERE (IS_DELETED = 0 OR IS_DELETED IS NULL) GROUP BY METER_NUM) IND ON TRIM(IND.METER_NUM) = TRIM(M.METER_NUM)
+      LEFT JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+      LEFT JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
       WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
-    `;    
+    `; 
     const ctrlIdNum = parseInt(controllerId, 10);
-    if (isNaN(ctrlIdNum)) { db.detach(); return res.status(400).json({ error: 'Invalid controllerId' }); }        
+    if (isNaN(ctrlIdNum)) { db.detach(); return res.status(400).json({ error: 'Invalid controllerId' }); }  
     db.query(query, [ctrlIdNum], (err, result) => {
-      if (err) { db.detach(); return res.status(500).json({ error: 'Failed to build controller offline package: ' + err.message }); }
-      db.detach();            
-      const packageData = { meters: [], abonents: [], clients: [], buildings: [], streets: [], meterTypes: [], services: [] };
-      const streetMap = new Map(), buildingMap = new Map(), clientMap = new Map(), abonentMap = new Map(), meterTypeMap = new Map(), serviceMap = new Map();      
+      if (err) {
+        db.detach();
+        return res.status(500).json({ error: 'Failed to build controller offline package: ' + err.message });
+      }
+      const packageData = { meters: [], abonents: [], clients: [], buildings: [], streets: [], services: [], buildingsMeters: [] };
+      const streetMap = new Map(), buildingMap = new Map(), clientMap = new Map(), abonentMap = new Map(), serviceMap = new Map();   
       result.forEach(r => {
         if (r.STREET_ID && !streetMap.has(r.STREET_ID)) streetMap.set(r.STREET_ID, { ID: r.STREET_ID, STREET_TYPE: r.STREET_TYPE, STREET: r.STREET_NAME });
         if (r.BUILDING_ID && !buildingMap.has(r.BUILDING_ID)) buildingMap.set(r.BUILDING_ID, { ID: r.BUILDING_ID, HOUSE: r.HOUSE, CORPS: r.CORPS, STREET_ID: r.STREET_ID });
         if (r.CLIENT_ID && !clientMap.has(r.CLIENT_ID)) clientMap.set(r.CLIENT_ID, { ID: r.CLIENT_ID, NAME: r.CLIENT_NAME, PHONE: r.CLIENT_PHONE });
         if (r.G_LICSCHET && !abonentMap.has(r.G_LICSCHET)) abonentMap.set(r.G_LICSCHET, { G_LICSCHET: r.G_LICSCHET, CLIENT_ID: r.CLIENT_ID, BUILDINGS_ID: r.BUILDING_ID, APPARTS: r.APPARTS, LETTER: r.LETTER });
-        if (r.METER_TYPE_ID && !meterTypeMap.has(r.METER_TYPE_ID)) meterTypeMap.set(r.METER_TYPE_ID, { ID: r.METER_TYPE_ID, NAME: r.METER_TYPE_NAME, LOW_QUALITY_GRP_TARIFF: r.SERVICE_ID });
-        if (r.SERVICE_ID && !serviceMap.has(r.SERVICE_ID)) serviceMap.set(r.SERVICE_ID, { ID: r.SERVICE_ID, GROUP_NAME: r.SERVICE_GROUP_NAME });                
+        if (r.SERVICE_ID && !serviceMap.has(r.SERVICE_ID)) {
+          serviceMap.set(r.SERVICE_ID, { ID: r.SERVICE_ID, GROUP_NAME: r.SERVICE_GROUP_NAME });
+        }     
         let lastIndDate = null;
         if (r.LAST_IND_DATE) {
           const dateStr = String(r.LAST_IND_DATE).trim();
           let d = dateStr.includes('.') ? new Date(dateStr.split('.').reverse().join('-')) : new Date(dateStr);
           if (d && !isNaN(d.getTime())) lastIndDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        }
-        packageData.meters.push({ ID: r.METER_ID, CONTROLER_ID: r.CONTROLER_ID, VERIFY_DATE: r.VERIFY_DATE, LS: r.LS, METER_NUM: r.METER_NUM, NAME: r.METER_NAME, SEAL: r.SEAL, MANFDATE: r.MANFDATE, MOUNT_DATE: r.MOUNT_DATE, METER_TYPE: r.METER_TYPE, LAST_IND_DATE: lastIndDate });
-      });      
+        }    
+        packageData.meters.push({
+          ID: r.METER_ID, CONTROLER_ID: r.CONTROLER_ID, VERIFY_DATE: r.VERIFY_DATE, LS: r.LS,
+          METER_NUM: r.METER_NUM, NAME: r.METER_NAME, SEAL: r.SEAL, MANFDATE: r.MANFDATE,
+          MOUNT_DATE: r.MOUNT_DATE, SERVICE_ID: r.SERVICE_ID, LAST_IND_DATE: lastIndDate
+        });
+      });   
       packageData.streets = Array.from(streetMap.values());
       packageData.buildings = Array.from(buildingMap.values());
       packageData.clients = Array.from(clientMap.values());
       packageData.abonents = Array.from(abonentMap.values());
-      packageData.meterTypes = Array.from(meterTypeMap.values());
-      packageData.services = Array.from(serviceMap.values());      
-      res.json(packageData);
+      packageData.services = Array.from(serviceMap.values());
+      const bmQuery = `
+        SELECT ID, BUILDING_ID, GROUP_ID, METER_ID, APPARTS
+        FROM BUILDINGS_METERS
+        WHERE BUILDING_ID IN (
+          SELECT DISTINCT A.BUILDINGS_ID 
+          FROM ABONENTS A 
+          INNER JOIN METERS M ON M.LS = A.G_LICSCHET 
+          WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
+        )
+      `;      
+      db.query(bmQuery, [ctrlIdNum], (bmErr, bmResult) => {
+        if (bmErr) {
+          console.error('Buildings meters query error:', bmErr);
+        } else {
+          packageData.buildingsMeters = (bmResult || []).map(r => ({
+            ID: r.ID,
+            BUILDING_ID: r.BUILDING_ID,
+            GROUP_ID: r.GROUP_ID,
+            METER_ID: r.METER_ID,
+            APPARTS: r.APPARTS
+          }));
+        }
+        db.detach();
+        res.json(packageData);
+      });
     });
   });
 });
@@ -1601,7 +1644,7 @@ app.post('/controller-history', (req, res) => {
   const ctrlIdNum = parseInt(controllerId, 10);  
   if (isNaN(ctrlIdNum)) return res.status(400).json({ error: 'Invalid controllerId' });  
   firebird.attach(config, (err, db) => {
-    if (err) return res.status(500).json({ error: 'Database connection failed' });  
+    if (err) return res.status(500).json({ error: 'Database connection failed' });     
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const isoDate = thirtyDaysAgo.toISOString().split('T')[0];     
@@ -1620,31 +1663,31 @@ app.post('/controller-history', (req, res) => {
       LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
       LEFT JOIN BUILDINGS b ON b.ID = ab.BUILDINGS_ID
       LEFT JOIN RSTREETS st ON st.ID = b.STREET_ID
-      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
-      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      LEFT JOIN BUILDINGS_METERS bm ON bm.METER_ID = m.ID
+      LEFT JOIN SERVICES s ON s.GROUP_ID = bm.GROUP_ID
       WHERE ind.CONTROLLER_ID = ? 
         AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
         AND CAST(a.ACT_DATE AS DATE) >= CAST(? AS DATE)
       ORDER BY a.ACT_DATE DESC, ind.ID DESC
-    `;        
+    `;
     db.query(query, [ctrlIdNum, isoDate], (err, result) => {
-      db.detach();         
-      if (err) return res.status(500).json({ error: 'Query failed', details: err.message });              
+      db.detach();
+      if (err) return res.status(500).json({ error: 'Query failed', details: err.message });
       const history = result.map(r => {
         const streetName = `${r.STREET_TYPE || ''} ${r.STREET_NAME || ''}`.trim();
         const corpsPart = r.CORPS ? ` ${r.CORPS}` : '';
         const houseName = `${r.HOUSE || ''}${corpsPart}`.trim();
         const letterPart = r.LETTER ? ` ${r.LETTER}` : '';
-        const appartsName = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();            
+        const appartsName = r.APPARTS ? `кв. ${r.APPARTS}${letterPart}` : letterPart.trim();
         let addressStr = 'адрес не найден';
-        if (streetName && houseName) addressStr = `${streetName}, д. ${houseName}${appartsName ? ', ' + appartsName : ''}`;        
+        if (streetName && houseName) addressStr = `${streetName}, д. ${houseName}${appartsName ? ', ' + appartsName : ''}`;   
         const formatDate = (dateVal) => {
           if (!dateVal) return null;
           const d = new Date(dateVal);
           if (isNaN(d.getTime())) return dateVal;
           const pad = (n) => String(n).padStart(2, '0');
           return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
-        };            
+        };      
         return {
           actNo: r.ACT_NO,
           actDate: formatDate(r.ACT_DATE),
@@ -1654,7 +1697,7 @@ app.post('/controller-history', (req, res) => {
           serviceName: r.SERVICE_NAME || 'Не указана',
           address: addressStr
         };
-      });   
+      });
       res.json(history);
     });
   });
@@ -1698,11 +1741,17 @@ app.post('/admin/buildings-by-street', (req, res) => {
 app.post('/admin/services', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'DB error' });
-    db.query(`SELECT ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME FROM SERVICES ORDER BY GROUP_NAME`, [], (e, r) => {
-      db.detach();
-      if (e) return res.status(500).json({ error: e.message });
-      res.json(r);
-    });
+    db.query(
+      `SELECT DISTINCT GROUP_ID, CAST(GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS GROUP_NAME 
+       FROM SERVICES 
+       ORDER BY GROUP_NAME`, 
+      [], 
+      (e, r) => {
+        db.detach();
+        if (e) return res.status(500).json({ error: e.message });
+        res.json(r.map(row => ({ ID: row.GROUP_ID, GROUP_NAME: row.GROUP_NAME })));
+      }
+    );
   });
 });
 
@@ -1747,43 +1796,44 @@ app.post('/admin/report-act', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB connection error' });
     const sql = `
       SELECT FIRST 1
-        a.ID AS ACT_ID, a.ACT_NO, a.CREATEDATE,
-        CAST(ct.NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS CHECK_TYPE,
-        CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
-        CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
-        CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
-        CAST(b.HOUSE AS VARCHAR(20) CHARACTER SET WIN1251) AS HOUSE,
-        CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(owner.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
-        CAST(owner.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
-        CAST(owner.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
-        CAST(rep.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS REPRESENTATIVE,
-        CAST(s.SHORT_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
-        m.ID AS METER_ID, m.METER_NUM, mi.METER_NUM AS IND_METER_NUM, m.SEAL, m.NAME AS METER_NAME,
-        m.MANFDATE, m.VERIFY_DATE, mi.PH,
-        (SELECT FIRST 1 bs.STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
+      a.ID AS ACT_ID, a.ACT_NO, a.CREATEDATE,
+      (SELECT MIN(a2.CREATEDATE) FROM BUILD_MAINT_ACTS a2
+      WHERE a2.BUILDING_ID = a.BUILDING_ID AND a2.CREATEDATE > a.CREATEDATE) AS NEXT_ACT_DATE,
+      CAST(ct.NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS CHECK_TYPE,
+      CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
+      CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+      CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+      CAST(b.HOUSE AS VARCHAR(20) CHARACTER SET WIN1251) AS HOUSE,
+      COALESCE(CAST(bm.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251), CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251)) AS APPARTS,
+      CAST(owner.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+      CAST(owner.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+      CAST(owner.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
+      CAST(rep.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS REPRESENTATIVE,
+      CAST(s.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+      m.ID AS METER_ID, m.METER_NUM, mi.METER_NUM AS IND_METER_NUM, m.SEAL, m.NAME AS METER_NAME,
+      m.MANFDATE, m.VERIFY_DATE, mi.PH,
+      (SELECT FIRST 1 bs.STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
       FROM BUILD_MAINT_ACTS a
       LEFT JOIN CHECKTYPE ct ON ct.ID = a.CHECKTYPE_ID
       LEFT JOIN METERS_IND mi ON mi.ACT_ID = a.ID AND (mi.IS_DELETED = 0 OR mi.IS_DELETED IS NULL)
       LEFT JOIN METERS m ON m.ID = mi.METER_ID OR EXISTS (
         SELECT 1 FROM VIOLATIONS v0
-         WHERE v0.METERS_ID = m.ID
-           AND v0.CREATEDATE >= a.CREATEDATE
-           AND (
-             NOT EXISTS (SELECT 1 FROM BUILD_MAINT_ACTS a3
-               WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
-             OR v0.CREATEDATE < (SELECT MIN(a3.CREATEDATE) FROM BUILD_MAINT_ACTS a3
-               WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
-           )
+        WHERE v0.METERS_ID = m.ID
+        AND v0.CREATEDATE >= a.CREATEDATE
+        AND (
+          NOT EXISTS (SELECT 1 FROM BUILD_MAINT_ACTS a3 WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
+          OR v0.CREATEDATE < (SELECT MIN(a3.CREATEDATE) FROM BUILD_MAINT_ACTS a3 WHERE a3.BUILDING_ID = a.BUILDING_ID AND a3.CREATEDATE > a.CREATEDATE)
+        )
       )
-      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
+      LEFT JOIN BUILDINGS_METERS bm ON bm.METER_ID = m.ID
+      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS 
+        OR (bm.BUILDING_ID = ab.BUILDINGS_ID AND COALESCE(bm.APPARTS, '') = COALESCE(ab.APPARTS, ''))
       LEFT JOIN CLIENTS owner ON owner.ID = ab.CLIENT_ID
       LEFT JOIN CLIENTS rep ON rep.ABONENT_ID = owner.ID
-      LEFT JOIN BUILDINGS b ON b.ID = a.BUILDING_ID
+      LEFT JOIN BUILDINGS b ON b.ID = COALESCE(bm.BUILDING_ID, a.BUILDING_ID)
       LEFT JOIN RSTREETS rs ON rs.ID = b.STREET_ID
       LEFT JOIN CONTROLLERS ctrl ON ctrl.ID = m.CONTROLER_ID
-      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
-      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      LEFT JOIN SERVICES s ON s.GROUP_ID = bm.GROUP_ID
       WHERE a.ID = ?
       ORDER BY mi.ID DESC
     `;
@@ -1797,12 +1847,16 @@ app.post('/admin/report-act', (req, res) => {
         return res.status(404).json({ error: 'Акт не найден' });
       }
       const row = rows[0];
+      if (!row) {
+        db.detach();
+        return res.status(404).json({ error: 'Данные акта не найдены' });
+      }
       const meterNum = row.METER_NUM || row.IND_METER_NUM || '';
       db.query(
-        `SELECT CAST(NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME,
+          `SELECT CAST(NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS NAME,
           CAST(DESCRIPTION AS VARCHAR(500) CHARACTER SET WIN1251) AS DESCRIPTION,
           CREATEDATE
-           FROM VIOLATIONS
+          FROM VIOLATIONS
           WHERE METERS_ID = ? AND CREATEDATE < ?
           ORDER BY CREATEDATE DESC, ID DESC`,
         [row.METER_ID, row.NEXT_ACT_DATE || new Date()],
@@ -1855,31 +1909,32 @@ app.post('/admin/report', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB connection error' });
     let sql = `
       SELECT
-        a.ID AS ACT_ID, a.ACT_NO, a.ACT_DATE, a.SERVICE_ID,
-        m.ID AS METER_ID, m.METER_NUM, m.NAME AS METER_NAME, m.SEAL,
-        m.MANFDATE, m.MOUNT_DATE, m.VERIFY_DATE, m.METER_TYPE,
-        c.ID AS CLIENT_ID,
-        CAST(c.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
-        CAST(c.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
-        CAST(c.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
-        CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
-        CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
-        CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
-        CAST(b.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
-        CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(s.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
-        ind.PH AS LAST_PH, ind.CREATEDATE AS LAST_PH_DATE,
-        (SELECT FIRST 1 STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
+      a.ID AS ACT_ID, a.ACT_NO, a.ACT_DATE, a.SERVICE_ID,
+      m.ID AS METER_ID, m.METER_NUM, m.NAME AS METER_NAME, m.SEAL,
+      m.MANFDATE, m.MOUNT_DATE, m.VERIFY_DATE,
+      c.ID AS CLIENT_ID,
+      CAST(c.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME,
+      CAST(c.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+      CAST(c.MAIL AS VARCHAR(100) CHARACTER SET WIN1251) AS CLIENT_MAIL,
+      CAST(ctrl.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
+      CAST(rs.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME,
+      CAST(rs.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE,
+      CAST(b.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE,
+      COALESCE(CAST(bm.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251), CAST(ab.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251)) AS APPARTS,
+      CAST(s.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251) AS SERVICE_NAME,
+      ind.PH AS LAST_PH, ind.CREATEDATE AS LAST_PH_DATE,
+      (SELECT FIRST 1 STATUS FROM BOILER_STATUS bs WHERE bs.METER_ID = m.ID ORDER BY bs.ID DESC) AS BOILER_STATUS
       FROM BUILD_MAINT_ACTS a
       LEFT JOIN METERS_IND ind ON ind.ACT_ID = a.ID AND (ind.IS_DELETED = 0 OR ind.IS_DELETED IS NULL)
-      LEFT JOIN METERS m ON m.METER_NUM = ind.METER_ID
-      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS
+      LEFT JOIN METERS m ON m.ID = ind.METER_ID
+      LEFT JOIN BUILDINGS_METERS bm ON bm.METER_ID = m.ID
+      LEFT JOIN ABONENTS ab ON ab.G_LICSCHET = m.LS 
+        OR (bm.BUILDING_ID = ab.BUILDINGS_ID AND COALESCE(bm.APPARTS, '') = COALESCE(ab.APPARTS, ''))
       LEFT JOIN CLIENTS c ON c.ID = ab.CLIENT_ID
-      LEFT JOIN BUILDINGS b ON b.ID = ab.BUILDINGS_ID
+      LEFT JOIN BUILDINGS b ON b.ID = COALESCE(bm.BUILDING_ID, ab.BUILDINGS_ID)
       LEFT JOIN RSTREETS rs ON rs.ID = b.STREET_ID
       LEFT JOIN CONTROLLERS ctrl ON ctrl.ID = m.CONTROLER_ID
-      LEFT JOIN METER_TYPES mt ON mt.ID = m.METER_TYPE
-      LEFT JOIN SERVICES s ON s.ID = mt.LOW_QUALITY_GRP_TARIFF
+      LEFT JOIN SERVICES s ON s.GROUP_ID = bm.GROUP_ID
       WHERE 1=1
     `;
     const params = [];
@@ -1888,7 +1943,7 @@ app.post('/admin/report', (req, res) => {
     if (f.controllerId) { sql += ` AND m.CONTROLER_ID = ?`; params.push(f.controllerId); }
     if (f.streetId)     { sql += ` AND rs.ID = ?`; params.push(f.streetId); }
     if (f.buildingId)   { sql += ` AND b.ID = ?`; params.push(f.buildingId); }
-    if (f.serviceId)    { sql += ` AND s.ID = ?`; params.push(f.serviceId); }   
+    if (f.serviceId) { sql += ` AND s.GROUP_ID = ?`; params.push(f.serviceId); }  
     sql += ` ORDER BY a.ACT_DATE DESC, a.ID DESC`;
     db.query(sql, params, (e, rows) => {
       if (e) { 

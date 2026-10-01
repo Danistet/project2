@@ -30,9 +30,9 @@ async function saveControllerPackage(controllerId, packageData) {
     const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readwrite');
     const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
     const request = store.put({
-      controllerId,
-      savedAt: Date.now(),
-      ...packageData
+      ...packageData,
+      controllerId: Number.isFinite(Number(controllerId)) ? Number(controllerId) : controllerId,
+      savedAt: Date.now()
     });
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -45,7 +45,12 @@ async function getControllerPackage(controllerId) {
     const transaction = db.transaction([CONTROLLER_PACKAGE_STORE], 'readonly');
     const store = transaction.objectStore(CONTROLLER_PACKAGE_STORE);
     const request = store.get(Number(controllerId));
-    request.onsuccess = () => resolve(request.result || null);
+    request.onsuccess = (event) => {
+      if (event.target.result) return resolve(event.target.result);
+      const legacyRequest = store.get(String(controllerId));
+      legacyRequest.onsuccess = (legacyEvent) => resolve(legacyEvent.target.result || null);
+      legacyRequest.onerror = () => reject(legacyRequest.error);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -130,7 +135,7 @@ async function deletePendingVerifyUpdate(id) {
   });
 }
 
-async function updateLocalMeterCache(meterId, verifyDate, controllerId) {
+async function updateLocalMeterCache(meterId, verifyDate, controllerId, meterUpdates = {}) {
   try {
     const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
     const currentControllerId =
@@ -144,6 +149,19 @@ async function updateLocalMeterCache(meterId, verifyDate, controllerId) {
       if (controllerId !== undefined && controllerId !== null) {
         meter.CONTROLER_ID = controllerId;
       }
+      const fieldMap = {
+        meterNum: 'METER_NUM',
+        name: 'NAME',
+        seal: 'SEAL',
+        manfDate: 'MANFDATE',
+        mountDate: 'MOUNT_DATE',
+        verifyDate: 'VERIFY_DATE'
+      };
+      Object.keys(fieldMap).forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(meterUpdates, key)) {
+          meter[fieldMap[key]] = meterUpdates[key];
+        }
+      });
       await saveControllerPackage(currentControllerId, pkg);
     }
   } catch (err) {
@@ -490,7 +508,8 @@ createApp({
         const addressData = JSON.parse(sessionStorage.getItem('userAddress') || '{}');
         const licschet = addressData.g_licschet || meterData.licschet || '';    
         const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
-        const actId = currentAct?.actId || null;
+        const savedAct = JSON.parse(localStorage.getItem('currentAct') || '{}');
+        const actId = currentAct?.actId || savedAct?.actId || null;
         const authDataSession = JSON.parse(sessionStorage.getItem('authData') || '{}');
         const currentControllerId = sessionStorage.getItem('controllerId') || authDataSession.controllerId;
         let filesDataForStorage = [];
@@ -535,36 +554,15 @@ createApp({
           actId,
           controllerId: currentControllerId
         };         
-        const recordId = await saveReadingLocally(payload);         
-        if (navigator.onLine) {          
-          const formData = new FormData();
-          formData.append('ph', payload.ph); 
-          formData.append('meter_id', payload.meter_id);
-          formData.append('licschet', payload.licschet); 
-          formData.append('abonent_name', payload.abonent_name);
-          formData.append('description', payload.description);
-          if (payload.controllerId) {
-            formData.append('controllerId', payload.controllerId);
-          } 
-          if (payload.actId) {
-            formData.append('act_id', payload.actId);
-          }       
-          if (filesDataForStorage.length > 0) {
-            filesDataForStorage.forEach(f => {
-              const blob = new Blob([f.fileBuffer], { type: f.fileType });
-              formData.append('files', blob, f.fileName);
-            });
+        const recordId = await saveReadingLocally(payload);
+        if (navigator.onLine) {
+          await syncPendingReadings();
+          const stillPending = (await getPendingReadings()).some(record => record.id === recordId);
+          if (stillPending) {
+            showAlert('Не удалось отправить показания. Они сохранены и будут отправлены при появлении связи.', 'info');
+          } else {
+            showAlert('Показания и фото успешно переданы на сервер!', 'success');
           }
-          const response = await fetch(`${API_BASE}/PH`, {
-            method: 'POST',
-            body: formData
-          });                 
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || `HTTP error, status: ${response.status}`);                  
-          if (recordId) {
-            await deletePendingReading(recordId);
-          }
-          showAlert(result.message || 'Показания и фото успешно переданы на сервер!', 'success');
           startCooldown();
         } else {          
           showAlert('Интернет отсутствует. Показания сохранены локально.', 'info');   
@@ -762,6 +760,16 @@ createApp({
           const g_licschet = allMeters[0]?.licschet || null;          
           if (allMeters.length === 1) {
             saveMeterDataToSession(allMeters[0]);
+            if (allMeters[0].groupId) {
+              try {
+                await apiRequest('/update-act-service', {
+                  actId: actResult.actId,
+                  serviceId: allMeters[0].groupId
+                });
+              } catch (e) {
+                console.warn('Не удалось обновить SERVICE_ID акта:', e);
+              }
+            }
           } else {
             clearMeterDataToSession();
           }          
@@ -792,12 +800,14 @@ createApp({
     };
 
     async function getOfflineControllerAddresses(controllerId) {
+      const activeControllerId = Number(controllerId);
+      if (!Number.isFinite(activeControllerId)) return [];
       if (typeof getControllerPackage !== 'function') return [];
       const pkg = await getControllerPackage(controllerId);
       if (!pkg || !Array.isArray(pkg.meters)) return [];      
       const rows = [];
       pkg.meters.forEach(meter => {
-        if (String(meter.CONTROLER_ID) !== String(controllerId)) return;        
+        if (Number(meter.CONTROLER_ID) !== activeControllerId) return;
         const abonent = pkg.abonents?.find(a => String(a.G_LICSCHET) === String(meter.LS));
         if (!abonent) return;        
         const client = pkg.clients?.find(c => c.ID === abonent.CLIENT_ID);
@@ -903,25 +913,32 @@ createApp({
 
     const loadApparts = async (buildingId) => {
       if (!buildingId) {
-        apparts.value = []; currentBuildingLicschet.value = null; return;
+        apparts.value = []; 
+        currentBuildingLicschet.value = null; 
+        return;
       }
       isLoading.value = true;
       try {
         const authData = JSON.parse(sessionStorage.getItem('authData') || '{}');
-        const controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+        let controllerId = sessionStorage.getItem('controllerId') || authData.controllerId;
+        controllerId = controllerId ? parseInt(controllerId, 10) : 0;
         let abonentsList = [];
         if (!navigator.onLine) {
           const pkg = controllerId ? await getControllerPackage(controllerId) : null;
           if (pkg && pkg.abonents) {
             abonentsList = pkg.abonents.filter(a =>
-              String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingId)
+              String(a.BUILDINGS_ID) === String(buildingId)
             );
           }
         } else {
           try {
-            const result = await apiRequest(`/apparts?buildingId=${buildingId}&controllerId=${controllerId}`);
+            const result = await apiRequest('/apparts', { buildingId, controllerId });          
+            if (!Array.isArray(result)) {
+              console.error('Неожиданный ответ от /apparts:', result);
+              throw new Error('Invalid response format');
+            }
             const emptyAppart = result.find(appr => (!appr.house || appr.house.trim() === '') && appr.g_licschet);
-            currentBuildingLicschet.value = emptyAppart?.g_licschet || null;
+            currentBuildingLicschet.value = emptyAppart?.g_licschet || null;         
             apparts.value = result
               .filter(appr => appr.house && appr.house.trim() !== '')
               .map(appr => {
@@ -947,11 +964,11 @@ createApp({
             const pkg = controllerId ? await getControllerPackage(controllerId) : null;
             if (pkg && pkg.abonents) {
               abonentsList = pkg.abonents.filter(a =>
-                String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingId)
+                String(a.BUILDINGS_ID) === String(buildingId)
               );
             }
           }
-        }
+        }        
         if (abonentsList.length > 0) {
           const result = abonentsList.map(a => {
             const letterPart = a.LETTER ? ` ${a.LETTER}` : '';
@@ -1237,7 +1254,7 @@ createApp({
       }
     };
 
-    const selectMeter = (meter) => {
+    const selectMeter = async (meter) => {
       selectedMeter.value = meter;
       saveSelectedMeter(meter);
       saveMeterDataToSession(meter);
@@ -1246,6 +1263,20 @@ createApp({
       addressData.selectedMeterId = meter.id;
       addressData.selectMeterNum = meter.meterNum;
       sessionStorage.setItem('userAddress', JSON.stringify(addressData));
+      if (meter.groupId) {
+        try {
+          const currentAct = JSON.parse(sessionStorage.getItem('currentAct') || '{}');
+          if (currentAct?.actId) {
+            await apiRequest('/update-act-service', {
+              actId: currentAct.actId,
+              serviceId: meter.groupId
+            });
+            console.log(`SERVICE_ID акта ${currentAct.actId} обновлён на ${meter.groupId}`);
+          }
+        } catch (err) {
+          console.warn('Не удалось обновить SERVICE_ID акта:', err);
+        }
+      }
     };
 
     const submitViolationReport = async () => {
@@ -1402,7 +1433,7 @@ createApp({
               window.location.href = 'ActWindow.html';
               return;
             } else {
-              error.value = 'Неверный пароль (офлайн-режим)';
+              error.value = 'Неверный пароль';
               return;
             }
           } else {
@@ -1484,6 +1515,7 @@ createApp({
       const buildingMeter = pkg.buildingsMeters?.find(
         row => String(row.METER_ID) === String(meterRow.ID)
       );
+      const serviceId = buildingMeter?.GROUP_ID ?? meterRow.SERVICE_ID;
       const buildingAbonents = buildingMeter
         ? pkg.abonents?.filter(a =>
           String(a.BUILDING_ID ?? a.BUILDINGS_ID) === String(buildingMeter.BUILDING_ID)
@@ -1497,8 +1529,8 @@ createApp({
       const client = abonent
         ? pkg.clients?.find(c => String(c.ID) === String(abonent.CLIENT_ID))
         : null;
-      const service = buildingMeter
-        ? pkg.services?.find(s => String(s.ID) === String(buildingMeter.GROUP_ID))
+      const service = serviceId !== null && serviceId !== undefined
+        ? pkg.services?.find(s => String(s.ID) === String(serviceId))
         : null;
       return {
         found: true,
@@ -1510,6 +1542,7 @@ createApp({
         mountDate: meterRow.MOUNT_DATE,
         verifyDate: meterRow.VERIFY_DATE,
         licschet: meterRow.LS,
+        groupId: serviceId || null,
         groupName: service?.GROUP_NAME || service?.NAME || service?.SHORT_NAME || null,
         clientName: client?.NAME || null,
         apparts: abonent?.APPARTS || null 

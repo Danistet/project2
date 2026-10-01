@@ -2,7 +2,7 @@
 //   ? 'http://localhost:3000' 
 //   : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
 
-const REMOTE_SERVER_IP = '37.195.66.20'; //Ввод адреса удаленного сервера.
+const REMOTE_SERVER_IP = '37.195.66.20';
 const PORT = '3000';
 let API_BASE;
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -113,63 +113,87 @@ async function clearSessionAndLogout() {
   window.location.href = 'index.html';
 }
 
+let pendingReadingsSyncPromise = null;
+let pendingReadingsSyncRequested = false;
+
 async function syncPendingReadings() {
   if (!navigator.onLine) return;
-  if (typeof getPendingReadings !== 'function') return;
-  const pending = await getPendingReadings();
-  if (pending.length === 0) return;
-  console.log(`Найдено ${pending.length} записей`);
-  for (const record of pending) {
-    try {
-      const formData = new FormData();
-      const appendFiles = (filesData) => {
-        if (!filesData || filesData.length === 0) return;
-        filesData.forEach(f => {
-          let blob;
-          if (f.fileBuffer && f.fileBuffer instanceof ArrayBuffer) {
-            blob = new Blob([f.fileBuffer], { type: f.fileType || 'application/octet-stream' });
-          } else if (f.fileBase64) {
-            blob = base64ToBlob(f.fileBase64, f.fileType);
+  if (pendingReadingsSyncPromise) {
+    pendingReadingsSyncRequested = true;
+    return pendingReadingsSyncPromise.then(() =>
+      pendingReadingsSyncRequested ? syncPendingReadings() : undefined
+    );
+  }
+
+  pendingReadingsSyncPromise = (async () => {
+    do {
+      pendingReadingsSyncRequested = false;
+      if (typeof syncPendingMeterUpdates === 'function') await syncPendingMeterUpdates();
+      if (typeof syncPendingVerifyUpdates === 'function') await syncPendingVerifyUpdates();
+      if (typeof syncPendingBoilerStatuses === 'function') await syncPendingBoilerStatuses();
+      if (typeof getPendingReadings !== 'function') return;
+
+      const pending = (await getPendingReadings()).filter(record =>
+        !record.type || record.type === 'reading'
+      );
+      for (const record of pending) {
+        try {
+          const formData = new FormData();
+          const appendFiles = (filesData) => {
+            if (!filesData || filesData.length === 0) return;
+            filesData.forEach(f => {
+              let blob;
+              if (f.fileBuffer && f.fileBuffer instanceof ArrayBuffer) {
+                blob = new Blob([f.fileBuffer], { type: f.fileType || 'application/octet-stream' });
+              } else if (f.fileBase64) {
+                blob = base64ToBlob(f.fileBase64, f.fileType);
+              } else {
+                return;
+              }
+              formData.append('files', blob, f.fileName);
+            });
+          };
+          if (record.isViolation) {
+            formData.append('meterNum', record.meterNum);
+            formData.append('licschet', record.licschet);
+            formData.append('violations', record.violations);
+            if (record.actId !== null && record.actId !== undefined && String(record.actId).trim() !== '') {
+              formData.append('act_id', record.actId);
+            }
+            appendFiles(record.filesData);
+            const response = await fetch(`${API_BASE}/save-violation`, {
+              method: 'POST',
+              body: formData
+            });
+            if (response.ok) await deletePendingReading(record.id);
           } else {
-            return;
+            formData.append('ph', record.ph);
+            formData.append('meter_id', record.meter_id);
+            formData.append('licschet', record.licschet);
+            formData.append('abonent_name', record.abonent_name);
+            formData.append('description', record.description);
+            if (record.actId !== null && record.actId !== undefined && String(record.actId).trim() !== '') {
+              formData.append('act_id', record.actId);
+            }
+            if (record.controllerId) formData.append('controllerId', record.controllerId);
+            appendFiles(record.filesData);
+            const response = await fetch(`${API_BASE}/PH`, {
+              method: 'POST',
+              body: formData
+            });
+            if (response.ok) await deletePendingReading(record.id);
           }
-          formData.append('files', blob, f.fileName);
-        });
-      };    
-      if (record.isViolation) {
-        formData.append('meterNum', record.meterNum);
-        formData.append('licschet', record.licschet);
-        formData.append('violations', record.violations);
-        appendFiles(record.filesData);       
-        const response = await fetch(`${API_BASE}/save-violation`, { 
-          method: 'POST', 
-          body: formData 
-        });
-        if (response.ok) {
-          await deletePendingReading(record.id);
-          console.log(`Нарушение ID ${record.id} синхронизировано`);
-        }
-      } else {
-        formData.append('ph', record.ph);
-        formData.append('meter_id', record.meter_id);
-        formData.append('licschet', record.licschet);
-        formData.append('abonent_name', record.abonent_name);
-        formData.append('description', record.description);
-        if (record.actId) formData.append('act_id', record.actId);
-        if (record.controllerId) formData.append('controllerId', record.controllerId);
-        appendFiles(record.filesData);       
-        const response = await fetch(`${API_BASE}/PH`, { 
-          method: 'POST', 
-          body: formData 
-        });
-        if (response.ok) {
-          await deletePendingReading(record.id);
-          console.log(`Показания ID ${record.id} синхронизированы`);
+        } catch (err) {
+          console.error(`Ошибка синхронизации ${record.id}:`, err);
         }
       }
-    } catch (err) {
-      console.error(`Ошибка синхронизации ${record.id}:`, err);
-    }
+    } while (pendingReadingsSyncRequested && navigator.onLine);
+  })();
+
+  try {
+    await pendingReadingsSyncPromise;
+  } finally {
+    pendingReadingsSyncPromise = null;
   }
 }
 
@@ -255,6 +279,112 @@ function syncMeterSessionData(meterId, updates) {
   }
   if (updates.verifyDate !== undefined) {
     sessionStorage.setItem('verifydate', JSON.stringify({ verifyDate: updates.verifyDate }));
+  }
+}
+
+function openPendingUpdatesDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('MeterOfflineStorage', 4);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('pendingReadings')) {
+        db.createObjectStore('pendingReadings', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('controllerPackages')) {
+        db.createObjectStore('controllerPackages', { keyPath: 'controllerId' });
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+async function savePendingMeterUpdate(updateData) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['pendingReadings'], 'readwrite');
+    const request = transaction.objectStore('pendingReadings').add({
+      type: 'meterUpdate',
+      meterId: updateData.meterId,
+      updates: updateData.updates,
+      timestamp: Date.now()
+    });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getPendingMeterUpdates() {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(['pendingReadings'], 'readonly').objectStore('pendingReadings').getAll();
+    request.onsuccess = () => resolve((request.result || []).filter(record => record.type === 'meterUpdate'));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deletePendingMeterUpdate(id) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(['pendingReadings'], 'readwrite').objectStore('pendingReadings').delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function updateCachedMeterPackage(meterId, updates) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['controllerPackages'], 'readwrite');
+    const store = transaction.objectStore('controllerPackages');
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const fieldMap = {
+        meterNum: 'METER_NUM',
+        name: 'NAME',
+        seal: 'SEAL',
+        manfDate: 'MANFDATE',
+        mountDate: 'MOUNT_DATE',
+        verifyDate: 'VERIFY_DATE'
+      };
+      (request.result || []).forEach(pkg => {
+        const meter = pkg.meters?.find(item => String(item.ID) === String(meterId));
+        if (!meter) return;
+        Object.keys(fieldMap).forEach(key => {
+          if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            meter[fieldMap[key]] = updates[key];
+          }
+        });
+        pkg.savedAt = Date.now();
+        store.put(pkg);
+      });
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+async function syncPendingMeterUpdates() {
+  if (!navigator.onLine) return;
+  const updates = await getPendingMeterUpdates();
+  for (const update of updates) {
+    try {
+      await apiRequest('/update-meter', {
+        meterId: update.meterId,
+        meterNum: update.updates.meterNum || null,
+        name: update.updates.name || null,
+        seal: update.updates.seal || null,
+        manfDate: update.updates.manfDate || null,
+        mountDate: update.updates.mountDate || null,
+        verifyDate: update.updates.verifyDate || null
+      });
+      await updateCachedMeterPackage(update.meterId, update.updates);
+      await deletePendingMeterUpdate(update.id);
+    } catch (err) {
+      console.error(`Ошибка синхронизации обновления счётчика ID ${update.id}:`, err);
+    }
   }
 }
 
