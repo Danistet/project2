@@ -207,7 +207,8 @@ app.post('/update-meter-full', (req, res) => {
       return res.status(500).json({ error: 'Database connection failed' });
     }
     const metaQuery = `
-      SELECT M.ID, M.LS, A.CLIENT_ID, M.METER_NUM, M.METER_TYPE
+            SELECT M.ID, M.LS, A.CLIENT_ID, A.BUILDINGS_ID AS ABONENT_BUILDING_ID,
+              A.APPARTS AS ABONENT_APPARTS, M.METER_NUM, M.METER_TYPE
       FROM METERS M
       LEFT JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       WHERE M.ID = ?
@@ -222,6 +223,8 @@ app.post('/update-meter-full', (req, res) => {
         const clientId = meterData.CLIENT_ID;
         const meterNum = meterData.METER_NUM;
         const dbMeterId = meterData.ID;
+        const buildingId = meterData.ABONENT_BUILDING_ID;
+        const apparts = meterData.ABONENT_APPARTS;
         const createdate = new Date().toISOString().replace('T', ' ').slice(0, 19);
         let completed = 0;
         const total = 3;
@@ -266,9 +269,12 @@ app.post('/update-meter-full', (req, res) => {
                 checkBoilerAndFinish();
               });
             } else {
+              if (buildingId === null || buildingId === undefined) {
+                return fail('Buildings meters building missing', 'Meter has no abonent building assignment');
+              }
               db.query(`INSERT INTO BUILDINGS_METERS (ID, BUILDING_ID, GROUP_ID, METER_ID, CREATEDATE, APPARTS)
-                        VALUES (GEN_ID(BUILDINGS_METERS_GEN, 1), NULL, ?, ?, ?, NULL)`,
-                [d.serviceId, dbMeterId, createdate],
+                        VALUES (GEN_ID(BUILDINGS_METERS_GEN, 1), ?, ?, ?, ?, ?)`,
+                [buildingId, d.serviceId, dbMeterId, createdate, apparts],
                 (eIns) => {
                   if (eIns) return fail('Buildings meters insert error', eIns.message);
                   checkBoilerAndFinish();
@@ -958,12 +964,12 @@ app.post('/apparts', (req, res) => {
         EXISTS (
           SELECT 1
           FROM METERS M
-          INNER JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
-          INNER JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
+          LEFT JOIN BUILDINGS_METERS BM ON BM.METER_ID = M.ID
+          LEFT JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
           INNER JOIN RMETER_STATUS RS ON M.STATUS = RS.ID
           WHERE M.LS = A.G_LICSCHET
           AND RS.ID = 1
-          AND S.GROUP_ID IN (537, 555, 597)
+          AND (BM.METER_ID IS NULL OR S.GROUP_ID IS NULL OR S.GROUP_ID IN (537, 555, 597))
           AND M.CONTROLER_ID = CAST(? AS INTEGER)
         )
       )
