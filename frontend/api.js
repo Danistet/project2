@@ -502,9 +502,6 @@ window.alert = function(message) {
       .global-info-header strong {
         color: #000000;
       }
-      body {
-        padding-top: 110px !important;
-      }
     `;
     document.head.appendChild(style);
   }
@@ -518,6 +515,16 @@ window.alert = function(message) {
     <div><strong>Тип услуги:</strong> <span id="info-service">-</span></div>
     <div><strong>Место установки:</strong> <span id="info-location">-</span></div>
   `;
+  let baseBodyPaddingTop = null;
+  function updateHeaderOffset() {
+    if (!document.body) return;
+    if (baseBodyPaddingTop === null) {
+      baseBodyPaddingTop = getComputedStyle(document.body).paddingTop || '0px';
+    }
+    const isVisible = headerDiv.style.display !== 'none';
+    const offset = isVisible ? Math.ceil(headerDiv.getBoundingClientRect().height) + 12 : 0;
+    document.body.style.paddingTop = `calc(${baseBodyPaddingTop} + ${offset}px)`;
+  }
   function insertHeader() {
     const appContainer = document.getElementById('app');
     if (!appContainer) return false;
@@ -609,6 +616,7 @@ window.alert = function(message) {
     } else {
       container.style.display = 'none';
     }
+    updateHeaderOffset();
   }
   window.updateGlobalInfoHeader = updateGlobalInfoHeader;
   const relevantKeys = ['userAddress', 'activeMeter', 'selectedMeter', 'allMeters', 'meternum'];
@@ -649,4 +657,5 @@ window.alert = function(message) {
       updateGlobalInfoHeader();
     }
   });
+  window.addEventListener('resize', updateHeaderOffset);
 })();

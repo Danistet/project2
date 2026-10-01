@@ -72,7 +72,7 @@
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">ФИО</span>
-                  <input v-model="" type="text" class="edit-input" :disabled="saving">
+                  <input v-model="editData.fio" type="text" class="edit-input" :disabled="saving">
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Ответственный контролёр</span>
@@ -120,7 +120,7 @@
           const selectedAddressText = ref('');
           const selectedAddress = ref(null);
           const controllers = ref([]);
-          const editData = ref({ meterId: null, verifyDate: '', controllerId: null });
+          const editData = ref({ meterId: null, verifyDate: '', controllerId: null, fio: '' });
           const isStreetOpen = ref(false);
           const isHouseOpen = ref(false);
           const isListOpen = ref(false);
@@ -211,7 +211,7 @@
           const clearList = () => {
             selectedAddressText.value = '';
             selectedAddress.value = null;
-            editData.value = { meterId: null, verifyDate: '', controllerId: null };
+            editData.value = { meterId: null, verifyDate: '', controllerId: null, fio: '' };
             isListOpen.value = false;
             noReadingsMonths.value = 3;
           };
@@ -246,7 +246,7 @@
             filteredAddressList.value = [];
             selectedAddress.value = null;
             selectedAddressText.value = '';
-            editData.value = { meterId: null, verifyDate: '', controllerId: null };
+            editData.value = { meterId: null, verifyDate: '', controllerId: null, fio: '' };
           }
         };
 
@@ -267,7 +267,7 @@
               filteredAddressList.value = [];
               selectedAddress.value = null;
               selectedAddressText.value = '';
-              editData.value = { meterId: null, verifyDate: '', controllerId: null };
+              editData.value = { meterId: null, verifyDate: '', controllerId: null, fio: '' };
             }
           };
 
@@ -275,6 +275,7 @@
             selectedAddressText.value = addr.displayText;
             selectedAddress.value = addr;
             editData.value.meterId = addr.meterId;
+            editData.value.fio = addr.fio || '';
             editData.value.controllerId = (addr.controllerId !== undefined && addr.controllerId !== null) ? addr.controllerId : null;
             isListOpen.value = false;                     
             let vDate = addr.verifyDate;
@@ -313,9 +314,10 @@
               await updateVerifyDate(editData.value.meterId, editData.value.verifyDate);
               await apiRequest('/update-meter-controller', {
                 meterId: editData.value.meterId,
-                controllerId: editData.value.controllerId
+                controllerId: editData.value.controllerId,
+                fio: editData.value.fio
               });              
-              showAlert('Дата и контролёр обновлены', 'success');             
+              showAlert('Дата, ФИО и контролёр обновлены', 'success');
               await loadData();
               selectedAddress.value = null;
               selectedAddressText.value = '';

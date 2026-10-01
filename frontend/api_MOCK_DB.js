@@ -43,8 +43,8 @@
     { ID: 598, NAME: 'ХВС на ГВС (3,461) МКД с ГВС, центр. канал., ванны до 1700', GROUP_ID: 597, CALCTYPE: '0', UNIT: 'м3', CREATEDATE: '13.05.2026', SHORT_NAME: 'ХВС на ГВС', GROUP_NAME: 'ХВС на ГВС' }
   ],
   CONTROLLERS: [
-    { ID: 91, PHONE: '78888888888', CONTROLLER_PSWD: 'qwerty', TOKEN: 'LOCAL_TOKEN_91', AUTHDATE: 0, FIO: 'Контролерqwerty' },
-    { ID: 112, PHONE: '89000000000', CONTROLLER_PSWD: '1234', TOKEN: 'LOCAL_TOKEN_112', AUTHDATE: 0, FIO: 'Контролер1234' }
+    { ID: 91, PHONE: '78888888888', CONTROLLER_PSWD: 'qwerty', TOKEN: 'LOCAL_TOKEN_91', AUTHDATE: 0, FIO: 'Контролерqwerty', LOGIN: 'qwerty' },
+    { ID: 112, PHONE: '89000000000', CONTROLLER_PSWD: '1234', TOKEN: 'LOCAL_TOKEN_112', AUTHDATE: 0, FIO: 'Контролер1234', LOGIN: '1234' }
   ],
   BUILDINGS: [
     { ID: 1, STREET_ID: 1, HOUSE: '10', CORPS: '' },
@@ -667,16 +667,19 @@
 
   const routes = {
     '/auth': ({ body }) => {
+      const login = String(body.login || '').trim().toLowerCase();
       const password = String(body.userpswd || '').trim();
+      if (!login || !password) return httpResponse(400, { error: 'login and password required' });
       const controller = window.LOCAL_DB?.CONTROLLERS?.find(
-        c => String(c.CONTROLLER_PSWD ?? '').trim() === password
-      ) || (password === '111111111111111' ? {
+        c => String(c.LOGIN ?? '').trim().toLowerCase() === login && String(c.CONTROLLER_PSWD ?? '').trim() === password
+      ) || (login === 'controller112' && password === '111111111111111' ? {
         ID: 112,
         TOKEN: 'ceddbbafc86e4bf6d1b2cdb2f13b58579fbe93298508f3e4051ca0dbb1c67f1d',
-        CONTROLLER_PSWD: '111111111111111'
+        CONTROLLER_PSWD: '111111111111111',
+        LOGIN: 'controller112'
       } : null);
       if (!controller) {
-        return httpResponse(401, { error: 'wrong password' });
+        return httpResponse(401, { error: 'wrong login or password' });
       }
       controller.AUTHDATE = Date.now();
       if (!controller.TOKEN) {

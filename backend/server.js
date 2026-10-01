@@ -342,24 +342,36 @@ app.post('/all-streets', (req, res) => {
 });
 
 app.post('/auth', (req, res) => {
-  const { userpswd } = req.body; 
+  const { userpswd, login: rawLogin } = req.body;
+  const hasLogin = rawLogin !== undefined && rawLogin !== null;
+  const login = hasLogin ? String(rawLogin).trim() : '';
   if (!userpswd) {
     return res.status(400).json({ error: 'Missing password' });
+  }
+  if (hasLogin && !login) {
+    return res.status(400).json({ error: 'Missing login' });
   }
   firebird.attach(config, (err, db) => {
     if (err) {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'Database connection error' });
     }      
-    const authQuery = `SELECT ID, TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;  
-    db.query(authQuery, [userpswd], (err, authResult) => {
+    const authQuery = hasLogin
+      ? `SELECT ID, TOKEN, AUTHDATE FROM CONTROLLERS WHERE UPPER(TRIM(LOGIN)) = UPPER(?) AND CONTROLLER_PSWD = ?`
+      : `SELECT ID, TOKEN, AUTHDATE FROM CONTROLLERS WHERE CONTROLLER_PSWD = ?`;
+    const authParams = hasLogin ? [login, userpswd] : [userpswd];
+    const authWhere = hasLogin
+      ? `UPPER(TRIM(LOGIN)) = UPPER(?) AND CONTROLLER_PSWD = ?`
+      : `CONTROLLER_PSWD = ?`;
+    const authWhereParams = hasLogin ? [login, userpswd] : [userpswd];
+    db.query(authQuery, authParams, (err, authResult) => {
       if (err) {
         db.detach();
         return res.status(500).json({ error: 'Query error' });
       }
       if (authResult.length === 0) {
         db.detach();
-        return res.status(401).json({ error: 'wrong password'});
+        return res.status(401).json({ error: 'неправильный логин или пароль' });
       }      
       const { TOKEN: existingToken, AUTHDATE: existingAuthDate } = authResult[0];                  
       const meterQuery = `SELECT METER_NUM, MOUNT_DATE, VERIFY_DATE FROM METERS`;      
@@ -385,8 +397,8 @@ app.post('/auth', (req, res) => {
         if (now - existingAuthDate > minute) {
           const newToken = crypto.randomBytes(32).toString('hex');
           const newAuthDate = now;        
-          const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE CONTROLLER_PSWD = ?`;      
-          db.query(updateQuery, [newToken, newAuthDate, userpswd], (upderr) => {
+          const updateQuery = `UPDATE CONTROLLERS SET TOKEN = ?, AUTHDATE = ? WHERE ${authWhere}`;
+          db.query(updateQuery, [newToken, newAuthDate, ...authWhereParams], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error:', upderr);
@@ -395,8 +407,8 @@ app.post('/auth', (req, res) => {
             finishResponse(newToken, now, meterNum, mountDate, verifyDate, controllerId);
           });
         } else {
-          const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE CONTROLLER_PSWD = ?`;       
-          db.query(updateQuery, [now, userpswd], (upderr) => {
+          const updateQuery = `UPDATE CONTROLLERS SET AUTHDATE = ? WHERE ${authWhere}`;
+          db.query(updateQuery, [now, ...authWhereParams], (upderr) => {
             if (upderr) {
               db.detach();
               console.error('Update error', upderr);
@@ -516,6 +528,7 @@ app.post('/all-addresses', (req, res) => {
           meterId: r.METER_ID, controllerId: r.CONTROLER_ID, verifyDate: r.VERIFY_DATE, buildingsId: r.BUILDINGS_ID,
           streetId: r.STREET_ID, streetName, houseName,
           displayText: `${appartsPart}, ${r.CLIENT_NAME || 'ФИО не указано'}${r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : ''}`,
+          fio: r.CLIENT_NAME || '',
           lastIndDate
         };
       }));
@@ -524,7 +537,7 @@ app.post('/all-addresses', (req, res) => {
 });
 
 app.post('/update-meter-controller', (req, res) => {
-  const { meterId, controllerId } = req.body;
+  const { meterId, controllerId, fio } = req.body;
   if (!meterId) {
     return res.status(400).json({ error: 'meterId required' });
   }
@@ -533,16 +546,41 @@ app.post('/update-meter-controller', (req, res) => {
       console.error('DB connect error:', err);
       return res.status(500).json({ error: 'DB connection failed' });
     }
-    const updateQuery = `UPDATE METERS SET CONTROLER_ID = ? WHERE ID = ?`;
-    const safeControllerId = controllerId === undefined ? null : controllerId;
-    db.query(updateQuery, [safeControllerId, meterId], (err) => {
-      db.detach();
-      if (err) {
-        console.error('Update error:', err);
-        return res.status(500).json({ error: 'Update failed', details: err.message });
+    const updateController = () => {
+      const updateQuery = `UPDATE METERS SET CONTROLER_ID = ? WHERE ID = ?`;
+      const safeControllerId = controllerId === undefined ? null : controllerId;
+      db.query(updateQuery, [safeControllerId, meterId], (err) => {
+        db.detach();
+        if (err) {
+          console.error('Update error:', err);
+          return res.status(500).json({ error: 'Update failed', details: err.message });
+        }
+        res.json({ status: 'OK', message: 'Контролёр и ФИО обновлены' });
+      });
+    };
+    if (fio === undefined) return updateController();
+    db.query(
+      `SELECT FIRST 1 A.CLIENT_ID FROM METERS M LEFT JOIN ABONENTS A ON A.G_LICSCHET = M.LS WHERE M.ID = ?`,
+      [meterId],
+      (lookupError, result) => {
+        if (lookupError) {
+          db.detach();
+          return res.status(500).json({ error: 'Client lookup failed', details: lookupError.message });
+        }
+        const clientId = result?.[0]?.CLIENT_ID;
+        if (!clientId) {
+          db.detach();
+          return res.status(404).json({ error: 'Client not found for meter' });
+        }
+        db.query(`UPDATE CLIENTS SET NAME = ? WHERE ID = ?`, [String(fio).trim() || null, clientId], (updateError) => {
+          if (updateError) {
+            db.detach();
+            return res.status(500).json({ error: 'FIO update failed', details: updateError.message });
+          }
+          updateController();
+        });
       }
-      res.json({ status: 'OK', message: 'Контролёр обновлён' });
-    });
+    );
   });
 });
 

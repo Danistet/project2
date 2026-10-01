@@ -333,6 +333,7 @@ const { createApp, ref, watch, computed } = Vue;
 
 createApp({
   setup() {
+    const username = ref(localStorage.getItem('lastLogin') || '');
     const password = ref(localStorage.getItem('lastPassword') || '');
     const response = ref('');
     const error = ref('');
@@ -1412,7 +1413,9 @@ createApp({
 
     const login = async (e) => {
       error.value = ''; response.value = '';
+      const usernameValue = username.value.trim();
       const passwordValue = password.value.trim();
+      if (!usernameValue) { error.value = 'Логин обязателен'; return; }
       if (!passwordValue) { error.value = 'Пароль обязателен'; return; }
       if (passwordValue.length < 4) { error.value = 'Пароль минимум 4 символов'; return; }
       try {
@@ -1420,7 +1423,10 @@ createApp({
           const offlineDataStr = localStorage.getItem('offlineAuthData');
           if (offlineDataStr) {
             const offlineData = JSON.parse(offlineDataStr);
-            if (offlineData.password === passwordValue) {
+            if (
+              String(offlineData.login || '').trim().toLowerCase() === usernameValue.toLowerCase() &&
+              offlineData.password === passwordValue
+            ) {
               const authPayLoad = {
                 token: offlineData.token || 'offline-token',
                 authDate: Date.now(),
@@ -1429,11 +1435,12 @@ createApp({
               sessionStorage.setItem('authData', JSON.stringify(authPayLoad));
               localStorage.setItem('authData', JSON.stringify(authPayLoad));
               sessionStorage.setItem('controllerId', offlineData.controllerId);
+              localStorage.setItem('lastLogin', usernameValue);
               localStorage.setItem('lastPassword', passwordValue);                      
               window.location.href = 'ActWindow.html';
               return;
             } else {
-              error.value = 'Неверный пароль';
+              error.value = 'Неверный логин или пароль';
               return;
             }
           } else {
@@ -1441,7 +1448,7 @@ createApp({
             return;
           }
         }          
-        const result = await apiRequest('/auth', { userpswd: passwordValue });
+        const result = await apiRequest('/auth', { login: usernameValue, userpswd: passwordValue });
         const authPayLoad = {
           token: result.token,
           authDate: result.authDate,
@@ -1451,10 +1458,12 @@ createApp({
         localStorage.setItem('authData', JSON.stringify(authPayLoad));
         sessionStorage.setItem('controllerId', result.controllerId);
         localStorage.setItem('offlineAuthData', JSON.stringify({
+          login: usernameValue,
           password: passwordValue,
           token: result.token, 
           controllerId: result.controllerId
         }));
+        localStorage.setItem('lastLogin', usernameValue);
         localStorage.setItem('lastPassword', passwordValue);          
         sessionStorage.setItem('meternum', JSON.stringify({ meterNum: result.meterNum }));
         sessionStorage.setItem('mountdate', JSON.stringify({ mountDate: result.mountDate }));
@@ -1619,7 +1628,7 @@ createApp({
     });
 
     return { 
-      password, response, error, meternum, mountdate, verifydate,
+      username, password, response, error, meternum, mountdate, verifydate,
       streets, buildings, apparts, PHData, PH,
       selectedTownId, selectedStreetId, selectedBuildingId, selectedAppartId, 
       streetSearch, houseSearch, appartsSearch, showApparts, todayOnly,
