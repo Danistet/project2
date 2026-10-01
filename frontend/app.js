@@ -560,13 +560,19 @@ createApp({
           await syncPendingReadings();
           const stillPending = (await getPendingReadings()).some(record => record.id === recordId);
           if (stillPending) {
-            showAlert('Не удалось отправить показания. Они сохранены и будут отправлены при появлении связи.', 'info');
+            showAlert('Не удалось отправить показания. Они сохранены и будут отправлены при появлении связи.', 'info', () => {
+              window.location.href = 'main.html';
+            });
           } else {
-            showAlert('Показания и фото успешно переданы на сервер!', 'success');
+            showAlert('Показания и фото успешно переданы на сервер!', 'success', () => {
+              window.location.href = 'main.html';
+            });
           }
           startCooldown();
         } else {          
-          showAlert('Интернет отсутствует. Показания сохранены локально.', 'info');   
+          showAlert('Интернет отсутствует. Показания сохранены локально.', 'info', () => {
+            window.location.href = 'main.html';
+          });
           startCooldown();       
         }       
         const phElement = document.getElementById('PH');
@@ -1387,10 +1393,14 @@ createApp({
           if (recordId) {
             await deletePendingReading(recordId);
           }
-          showAlert(result.message || 'Отчет о нарушении успешно отправлен!', 'success');
+          showAlert(result.message || 'Отчет о нарушении успешно отправлен!', 'success', () => {
+            window.location.href = 'violationmain.html';
+          });
           startCooldown();
         } else {
-          showAlert('Интернет отсутствует, сохранено локально, ожидание сети', 'info');
+          showAlert('Интернет отсутствует, сохранено локально, ожидание сети', 'info', () => {
+            window.location.href = 'violationmain.html';
+          });
           startCooldown();
         }     
         document.getElementById('violationsForm')?.reset();

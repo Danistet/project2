@@ -405,7 +405,7 @@ function clearAllMeters() {
   sessionStorage.removeItem('allMeters');
 }
 
-function showAlert(message, type = 'info') {
+function showAlert(message, type = 'info', onClose) {
   const existingModal = document.getElementById('custom-alert-modal');
   if (existingModal) existingModal.remove();
   const overlay = document.createElement('div');
@@ -440,9 +440,15 @@ function showAlert(message, type = 'info') {
   `;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+  let isClosing = false;
   const close = () => {
+    if (isClosing) return;
+    isClosing = true;
     overlay.style.animation = 'fadeOut 0.2s ease';
-    setTimeout(() => overlay.remove(), 180);
+    setTimeout(() => {
+      overlay.remove();
+      if (typeof onClose === 'function') onClose();
+    }, 180);
   };
   const okBtn = modal.querySelector('#custom-alert-ok');
   okBtn.addEventListener('click', close);
