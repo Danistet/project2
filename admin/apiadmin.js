@@ -3,7 +3,7 @@
 //   : (window.location.protocol.startsWith('http') ? window.location.origin : 'http://10.151.16.1:3000');
 
 
-const REMOTE_SERVER_IP = '37.195.66.20';
+const REMOTE_SERVER_IP = '37.195.66.20'; //адрес сервера
 const PORT = '3000'; 
 let API_BASE;
 

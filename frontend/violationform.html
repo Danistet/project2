@@ -32,28 +32,43 @@
           <form novalidate id="violationsForm" style="width: 100%;">
             <div class="form-group">
               <label class="form-label">1. Механические повреждения</label>
-              <select class="form-input" id="violation1" style="text-align: left;">
-                <option value="" disabled selected>Выберите нарушение</option>
-                <option value="не плотное прилегание стекла индикатора">Не плотное прилегание стекла индикатора</option>
-                <option value="не предусмотренные изготовителем отверстия или трещины">Не предусмотренные отверстия или трещины</option>
-                <option value="нарушения контрольных пломб">Нарушения контрольных пломб</option>
-              </select>            
+              <div class="custom-select" data-custom-select>
+                <input type="hidden" id="violation1" value="">
+                <button type="button" class="form-input custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-value">Выберите нарушение</span><span class="custom-select-arrow">▼</span>
+                </button>
+                <div class="custom-select-dropdown" role="listbox" hidden>
+                  <button type="button" class="custom-select-option" role="option" data-value="не плотное прилегание стекла индикатора">Не плотное прилегание стекла индикатора</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="не предусмотренные изготовителем отверстия или трещины">Не предусмотренные изготовителем отверстия или трещины</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="нарушения контрольных пломб">Нарушения контрольных пломб</button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">2. Проблемы с отображением</label>
-              <select class="form-input" id="violation2" style="text-align: left;">
-                <option value="" disabled selected>Выберите нарушение</option>
-                <option value="не отображение прибором результатов измерений">Не отображение результатов измерений</option>
-                <option value="не указано">Не указано</option>
-              </select>            
+              <div class="custom-select" data-custom-select>
+                <input type="hidden" id="violation2" value="">
+                <button type="button" class="form-input custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-value">Выберите нарушение</span><span class="custom-select-arrow">▼</span>
+                </button>
+                <div class="custom-select-dropdown" role="listbox" hidden>
+                  <button type="button" class="custom-select-option" role="option" data-value="не отображение прибором результатов измерений">Не отображение результатов измерений</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="не указано">Не указано</button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">3. Поверка</label>
-              <select class="form-input" id="violation3" style="text-align: left;">
-                <option value="" disabled selected>Выберите нарушение</option>
-                <option value="истечение межповерочного интервала">Истечение межповерочного интервала</option>
-                <option value="не указано">Не указано</option>
-              </select>            
+              <div class="custom-select" data-custom-select>
+                <input type="hidden" id="violation3" value="">
+                <button type="button" class="form-input custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-value">Выберите нарушение</span><span class="custom-select-arrow">▼</span>
+                </button>
+                <div class="custom-select-dropdown" role="listbox" hidden>
+                  <button type="button" class="custom-select-option" role="option" data-value="истечение межповерочного интервала">Истечение межповерочного интервала</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="не указано">Не указано</button>
+                </div>
+              </div>
             </div>
           </form>
           <label class="form-label checkbox-label" style="margin-top: 16px;">            
@@ -63,21 +78,31 @@
           <form novalidate id="techcheckForm" style="display: none; width: 100%;">
             <div class="form-group">
               <label class="form-label">1. Ошибочная дата проверки</label>
-              <select class="form-input" id="techcheck1" style="text-align: left;">
-                <option value="" disabled selected>Выберите вариант</option>
-                <option value="Дата в будущем">Дата в будущем</option>
-                <option value="Дата не соответствует акту">Дата не соответствует акту</option>
-                <option value="Отметка о поверке отсутствует">Отметка о поверке отсутствует</option>
-              </select>            
+              <div class="custom-select" data-custom-select>
+                <input type="hidden" id="techcheck1" value="">
+                <button type="button" class="form-input custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-value">Выберите вариант</span><span class="custom-select-arrow">▼</span>
+                </button>
+                <div class="custom-select-dropdown" role="listbox" hidden>
+                  <button type="button" class="custom-select-option" role="option" data-value="Дата в будущем">Дата в будущем</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="Дата не соответствует акту">Дата не соответствует акту</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="Отметка о поверке отсутствует">Отметка о поверке отсутствует</button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">2. Серийный номер счетчика</label>
-              <select class="form-input" id="techcheck2" style="text-align: left;">
-                <option value="" disabled selected>Выберите вариант</option>
-                <option value="не совпадает с паспортом">Не совпадает с паспортом</option>
-                <option value="нечитаем">Нечитаем</option>
-                <option value="не указано">Не указано</option>
-              </select>            
+              <div class="custom-select" data-custom-select>
+                <input type="hidden" id="techcheck2" value="">
+                <button type="button" class="form-input custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-value">Выберите вариант</span><span class="custom-select-arrow">▼</span>
+                </button>
+                <div class="custom-select-dropdown" role="listbox" hidden>
+                  <button type="button" class="custom-select-option" role="option" data-value="не совпадает с паспортом">Не совпадает с паспортом</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="нечитаем">Нечитаем</button>
+                  <button type="button" class="custom-select-option" role="option" data-value="не указано">Не указано</button>
+                </div>
+              </div>
             </div>
           </form>
           <div class="form-group" style="width: 100%; margin-top: 16px;">
@@ -208,8 +233,68 @@
             if (!this.checked) {
               document.getElementById('techcheck1').value = "";
               document.getElementById('techcheck2').value = "";
+              window.resetCustomSelect('techcheck1');
+              window.resetCustomSelect('techcheck2');
             }
           });
+        }
+      });
+    </script>
+    <script>
+      const closeCustomSelect = (customSelect) => {
+        if (!customSelect) return;
+        customSelect.classList.remove('is-open');
+        customSelect.querySelector('.custom-select-trigger')?.setAttribute('aria-expanded', 'false');
+        const dropdown = customSelect.querySelector('.custom-select-dropdown');
+        if (dropdown) dropdown.hidden = true;
+      };
+
+      window.resetCustomSelect = (inputId) => {
+        const input = document.getElementById(inputId);
+        const customSelect = input?.closest('[data-custom-select]');
+        if (!customSelect) return;
+        input.value = '';
+        const valueLabel = customSelect.querySelector('.custom-select-value');
+        if (valueLabel) valueLabel.textContent = customSelect.dataset.placeholder || 'Выберите вариант';
+        customSelect.querySelector('.custom-select-trigger')?.classList.remove('has-value');
+      };
+
+      document.querySelectorAll('[data-custom-select]').forEach(customSelect => {
+        const form = customSelect.closest('form');
+        form?.addEventListener('reset', () => {
+          setTimeout(() => window.resetCustomSelect(customSelect.querySelector('input[type="hidden"]').id), 0);
+        });
+      });
+
+      document.addEventListener('click', event => {
+        const option = event.target.closest('.custom-select-option');
+        if (option) {
+          const customSelect = option.closest('[data-custom-select]');
+          const input = customSelect.querySelector('input[type="hidden"]');
+          input.value = option.dataset.value;
+          customSelect.querySelector('.custom-select-value').textContent = option.textContent.trim();
+          customSelect.querySelector('.custom-select-trigger').classList.add('has-value');
+          closeCustomSelect(customSelect);
+          return;
+        }
+
+        const trigger = event.target.closest('.custom-select-trigger');
+        const targetSelect = trigger?.closest('[data-custom-select]');
+        document.querySelectorAll('[data-custom-select].is-open').forEach(customSelect => {
+          if (customSelect !== targetSelect) closeCustomSelect(customSelect);
+        });
+        if (targetSelect) {
+          const dropdown = targetSelect.querySelector('.custom-select-dropdown');
+          const isOpening = dropdown.hidden;
+          dropdown.hidden = !isOpening;
+          targetSelect.classList.toggle('is-open', isOpening);
+          trigger.setAttribute('aria-expanded', String(isOpening));
+        }
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+          document.querySelectorAll('[data-custom-select].is-open').forEach(closeCustomSelect);
         }
       });
     </script>
@@ -435,6 +520,97 @@
     .form-input:focus {
       border-color: #2E8BC0;
       background-color: #F8FDFF;
+    }
+
+    .custom-select {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-select.is-open {
+      z-index: 20;
+    }
+
+    .custom-select-trigger {
+      width: 100%;
+      max-width: none;
+      min-height: 56px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #999999;
+      background: #FFFFFF;
+      font-size: 16px;
+      font-weight: 400;
+      text-align: left;
+    }
+
+    .custom-select-trigger.has-value {
+      color: #222222;
+    }
+
+    .custom-select-trigger:hover,
+    .custom-select-trigger:focus-visible {
+      background: #F8FDFF;
+      border-color: #2E8BC0;
+      outline: none;
+    }
+
+    .custom-select-arrow {
+      flex: none;
+      color: #45B0E1;
+      transition: transform 0.15s ease;
+    }
+
+    .custom-select.is-open .custom-select-arrow {
+      transform: rotate(180deg);
+    }
+
+    .custom-select-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 21;
+      max-height: 240px;
+      overflow-y: auto;
+      border: 2px solid #45B0E1;
+      border-top: 0;
+      background: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(69, 176, 225, 0.15);
+    }
+
+    .custom-select-dropdown[hidden] {
+      display: none;
+    }
+
+    .custom-select-option {
+      width: 100%;
+      max-width: none;
+      min-height: 48px;
+      padding: 12px 16px;
+      display: block;
+      border: 0;
+      border-bottom: 1px solid #F0F0F0;
+      background: #FFFFFF;
+      color: #222222;
+      font-size: 16px;
+      font-weight: 400;
+      text-align: left;
+      white-space: normal;
+    }
+
+    .custom-select-option:last-child {
+      border-bottom: 0;
+    }
+
+    .custom-select-option:hover,
+    .custom-select-option:focus-visible {
+      background: #F0F9FC;
+      color: #2E8BC0;
+      outline: none;
     }
 
     .button-group {
