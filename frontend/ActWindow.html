@@ -14,7 +14,7 @@
       <form @submit.prevent="saveVerifyDate" :style="{ opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto' }">
         <div class="top-actions" v-if="!showContinue">
           <button type="button" @click="logout" class="btn-secondary">Выход</button>
-          <button type="button" @click="viewAddresses" class="btn-secondary">Список адресов</button>
+          <button type="button" onclick="viewAddresses()" class="btn-secondary">Список адресов</button>
           <button type="button" @click="viewhistory" class="btn-secondary">История работ</button>
         </div>
         <div class="form-group">
@@ -94,7 +94,7 @@
           <span class="checkbox-text">Адреса без назначенной даты посещения</span>
         </label>
         <div class="form-group">
-          <label for="listInput" class="form-label">Список квартир</label>
+          <label for="listInput" class="form-label">Квартира</label>
           <div class="custom-datalist" :class="{ disabled: isLoading || !selectedBuildingId }">
             <div class="custom-datalist-input-wrapper">
               <input
@@ -326,6 +326,11 @@
           }
         };
       })();
+    </script>
+    <script>
+      function viewAddresses() {
+        window.location.href = 'addresslist.html';
+      }
     </script>
     <script>
       const { createApp, ref, onMounted, onUnmounted, watch, computed } = Vue;
@@ -793,10 +798,6 @@
 
           const viewhistory = () => {
             window.location.href = 'historywindow.html';
-          };
-
-          const viewAddresses = () => {
-            window.location.href = 'addresslist.html';
           };
 
           const handleOnline = async () => {

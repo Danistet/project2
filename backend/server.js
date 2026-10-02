@@ -428,14 +428,17 @@ app.post('/controller-addresses', (req, res) => {
   firebird.attach(config, (err, db) => {
     if (err) return res.status(500).json({ error: 'Database connection failed' });
     const query = `
-      SELECT M.ID AS METER_ID, M.CONTROLER_ID, M.VERIFY_DATE, A.APPARTS, A.LETTER, A.BUILDINGS_ID,
+      SELECT M.ID AS METER_ID, M.CONTROLER_ID, M.VERIFY_DATE, A.APPARTS, A.LETTER, A.BUILDINGS_ID, A.G_LICSCHET,
+        (SELECT FIRST 1 BM.GROUP_ID FROM BUILDINGS_METERS BM WHERE BM.METER_ID = M.ID) AS GROUP_ID,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME, CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(CTRL.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
         CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME, RS.ID AS STREET_ID,
         CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
         (SELECT MAX(MI.CREATEDATE) FROM METERS_IND MI WHERE TRIM(MI.METER_NUM) = TRIM(M.METER_NUM)) AS LAST_IND_DATE
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      LEFT JOIN CONTROLLERS CTRL ON CTRL.ID = M.CONTROLER_ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
       WHERE M.CONTROLER_ID = CAST(? AS INTEGER)
@@ -461,7 +464,13 @@ app.post('/controller-addresses', (req, res) => {
         return {
           meterId: r.METER_ID, 
           controllerId: r.CONTROLER_ID, 
+          controllerFio: r.CONTROLLER_FIO,
           verifyDate: r.VERIFY_DATE, 
+          groupId: r.GROUP_ID,
+          licschet: r.G_LICSCHET,
+          apparts: r.APPARTS,
+          letter: r.LETTER,
+          fio: r.CLIENT_NAME || '',
           buildingsId: r.BUILDINGS_ID,
           streetId: r.STREET_ID, 
           streetName, 
@@ -497,14 +506,17 @@ app.post('/all-addresses', (req, res) => {
     if (err) return res.status(500).json({ error: 'Database connection failed' });
     const query = `
       SELECT M.ID AS METER_ID, M.CONTROLER_ID, M.VERIFY_DATE, CAST(A.APPARTS AS VARCHAR(20) CHARACTER SET WIN1251) AS APPARTS,
-        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER, A.BUILDINGS_ID,
+        CAST(A.LETTER AS VARCHAR(5) CHARACTER SET WIN1251) AS LETTER, A.BUILDINGS_ID, A.G_LICSCHET,
+        (SELECT FIRST 1 BM.GROUP_ID FROM BUILDINGS_METERS BM WHERE BM.METER_ID = M.ID) AS GROUP_ID,
         CAST(C.NAME AS VARCHAR(200) CHARACTER SET WIN1251) AS CLIENT_NAME, CAST(C.PHONE AS VARCHAR(50) CHARACTER SET WIN1251) AS CLIENT_PHONE,
+        CAST(CTRL.FIO AS VARCHAR(200) CHARACTER SET WIN1251) AS CONTROLLER_FIO,
         CAST(RS.STREET_TYPE AS VARCHAR(50) CHARACTER SET WIN1251) AS STREET_TYPE, CAST(RS.STREET AS VARCHAR(100) CHARACTER SET WIN1251) AS STREET_NAME, RS.ID AS STREET_ID,
         CAST(B.HOUSE AS VARCHAR(10) CHARACTER SET WIN1251) AS HOUSE, CAST(B.CORPS AS VARCHAR(10) CHARACTER SET WIN1251) AS CORPS,
         (SELECT MAX(MI.CREATEDATE) FROM METERS_IND MI WHERE TRIM(MI.METER_NUM) = TRIM(M.METER_NUM)) AS LAST_IND_DATE
       FROM METERS M
       INNER JOIN ABONENTS A ON M.LS = A.G_LICSCHET
       LEFT JOIN CLIENTS C ON A.CLIENT_ID = C.ID
+      LEFT JOIN CONTROLLERS CTRL ON CTRL.ID = M.CONTROLER_ID
       INNER JOIN BUILDINGS B ON A.BUILDINGS_ID = B.ID
       INNER JOIN RSTREETS RS ON B.STREET_ID = RS.ID
       ORDER BY M.CONTROLER_ID DESC NULLS LAST, RS.STREET_TYPE, RS.STREET, B.HOUSE, A.APPARTS, A.LETTER
@@ -525,7 +537,8 @@ app.post('/all-addresses', (req, res) => {
           if (d && !isNaN(d.getTime())) lastIndDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
         return {
-          meterId: r.METER_ID, controllerId: r.CONTROLER_ID, verifyDate: r.VERIFY_DATE, buildingsId: r.BUILDINGS_ID,
+          meterId: r.METER_ID, controllerId: r.CONTROLER_ID, controllerFio: r.CONTROLLER_FIO, verifyDate: r.VERIFY_DATE, groupId: r.GROUP_ID,
+          licschet: r.G_LICSCHET, apparts: r.APPARTS, letter: r.LETTER, fio: r.CLIENT_NAME || '', buildingsId: r.BUILDINGS_ID,
           streetId: r.STREET_ID, streetName, houseName,
           displayText: `${appartsPart}, ${r.CLIENT_NAME || 'ФИО не указано'}${r.CLIENT_PHONE ? `, тел: ${r.CLIENT_PHONE}` : ''}`,
           fio: r.CLIENT_NAME || '',
@@ -1489,7 +1502,11 @@ app.post('/get-meter-details', (req, res) => {
       M.MANFDATE,
       M.MOUNT_DATE,
       M.VERIFY_DATE,
-      M.LS
+      M.LS,
+      (SELECT FIRST 1 CAST(S.GROUP_NAME AS VARCHAR(100) CHARACTER SET WIN1251)
+       FROM BUILDINGS_METERS BM
+       INNER JOIN SERVICES S ON S.GROUP_ID = BM.GROUP_ID
+       WHERE BM.METER_ID = M.ID) AS GROUP_NAME
       FROM METERS M
       WHERE M.ID = ?
     `;
@@ -1513,7 +1530,8 @@ app.post('/get-meter-details', (req, res) => {
         manfDate: result[0].MANFDATE,
         mountDate: result[0].MOUNT_DATE,
         verifyDate: result[0].VERIFY_DATE,
-        licschet: result[0].LS
+        licschet: result[0].LS,
+        groupName: result[0].GROUP_NAME
       });
     });
   });
