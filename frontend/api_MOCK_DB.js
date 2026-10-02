@@ -717,6 +717,8 @@
         if (!building) return;     
         const street = (window.LOCAL_DB?.RSTREETS || []).find(s => String(s.ID) === String(building.STREET_ID));
         if (!street) return;
+        const controller = (window.LOCAL_DB?.CONTROLLERS || []).find(c => String(c.ID) === String(meter.CONTROLER_ID));
+        const buildingMeter = (window.LOCAL_DB?.BUILDINGS_METERS || []).find(row => String(row.METER_ID) === String(meter.ID));
         let lastIndDate = null;
         const inds = (window.LOCAL_DB?.METERS_IND || []).filter(
           ind => String(ind.METER_ID).trim() === String(meter.METER_NUM).trim() && ind.CREATEDATE
@@ -741,17 +743,23 @@
         const namePart = client && client.NAME ? client.NAME : 'ФИО не указано';
         const phonePart = client && client.PHONE ? `, тел: ${client.PHONE}` : '';
         const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
-        const houseName = String(building.HOUSE || '').trim();
+        const houseName = `${building.HOUSE || ''}${building.CORPS ? ` ${building.CORPS}` : ''}`.trim();
         rows.push({
           meterId: meter.ID,
           controllerId: toNumber(meter.CONTROLER_ID),
+          controllerFio: controller?.FIO || '',
           verifyDate: meter.VERIFY_DATE,
+          licschet: meter.LS || meter.G_LICSCHET || abonent.G_LICSCHET || '',
+          apparts: abonent.APPARTS || '',
+          letter: abonent.LETTER || '',
+          fio: client?.NAME || '',
           buildingsId: building.ID,
           streetId: street.ID,
           streetName,
           houseName,
           displayText: `${appartsPart}, ${namePart}${phonePart}`,
           groupName: groupName,
+          groupId: buildingMeter?.GROUP_ID || getServiceByMeter(meter)?.GROUP_ID || null,
           lastIndDate: lastIndDate,
           _apparts: abonent.APPARTS || '',
           _letter: abonent.LETTER || ''
@@ -797,22 +805,30 @@
         }
         const serviceNames = getServiceNamesByMeter(meter);
         const groupName = serviceNames.join(', ');
+        const controller = (window.LOCAL_DB?.CONTROLLERS || []).find(c => String(c.ID) === String(meter.CONTROLER_ID));
+        const buildingMeter = (window.LOCAL_DB?.BUILDINGS_METERS || []).find(row => String(row.METER_ID) === String(meter.ID));
         const letterPart = abonent.LETTER ? ` ${abonent.LETTER}` : '';
         const appartsPart = abonent.APPARTS ? `кв. ${abonent.APPARTS}${letterPart}` : letterPart.trim();
         const namePart = client && client.NAME ? client.NAME : 'ФИО не указано';
         const phonePart = client && client.PHONE ? `, тел: ${client.PHONE}` : '';
         const streetName = `${street.STREET_TYPE || ''} ${street.STREET || ''}`.trim();
-        const houseName = String(building.HOUSE || '').trim();
+        const houseName = `${building.HOUSE || ''}${building.CORPS ? ` ${building.CORPS}` : ''}`.trim();
         rows.push({
           meterId: meter.ID,
           controllerId: toNumber(meter.CONTROLER_ID),
+          controllerFio: controller?.FIO || '',
           verifyDate: meter.VERIFY_DATE,
+          licschet: meter.LS || meter.G_LICSCHET || abonent.G_LICSCHET || '',
+          apparts: abonent.APPARTS || '',
+          letter: abonent.LETTER || '',
+          fio: client?.NAME || '',
           buildingsId: building.ID,
           streetId: street.ID,
           streetName,
           houseName,
           displayText: `${appartsPart}, ${namePart}${phonePart}`,
           groupName: groupName,
+          groupId: buildingMeter?.GROUP_ID || getServiceByMeter(meter)?.GROUP_ID || null,
         });
       }); 
       console.log(`Маршрут /all-addresses вернул ${rows.length} адресов (пропущено ${skippedCount} счетчиков)`);       
@@ -1089,9 +1105,9 @@
       }));
     },
 
-    '/apparts': ({ query }) => {
-      const buildingId = toNumber(query.buildingId);
-      const controllerId = toNumber(query.controllerId);
+    '/apparts': ({ body, query }) => {
+      const buildingId = toNumber(body.buildingId ?? query.buildingId);
+      const controllerId = toNumber(body.controllerId ?? query.controllerId);
       const abonents = (window.LOCAL_DB?.ABONENTS || []).filter(a =>
         toNumber(a.BUILDING_ID ?? a.BUILDINGS_ID) === buildingId
       );
@@ -1372,7 +1388,13 @@ function clearSession() {
 }
 
 async function clearSessionAndLogout() {
-  sessionStorage.clear(); 
+  const lastPassword = localStorage.getItem('lastPassword');
+  sessionStorage.clear();
+  localStorage.removeItem('authData');
+  localStorage.removeItem('offlineAuthData');
+  localStorage.removeItem('lastLogin');
+  localStorage.removeItem('currentAct');
+  if (lastPassword !== null) localStorage.setItem('lastPassword', lastPassword);
   try {
     if (typeof clearControllerPackage === 'function') {
       await clearControllerPackage();
@@ -1393,62 +1415,87 @@ async function clearSessionAndLogout() {
   window.location.href = 'index.html';
 }
 
+let pendingReadingsSyncPromise = null;
+let pendingReadingsSyncRequested = false;
+
 async function syncPendingReadings() {
   if (!navigator.onLine) return;
-  if (typeof getPendingReadings !== 'function') return;
-  const pending = await getPendingReadings();
-  if (pending.length === 0) return;
-  for (const record of pending) {
-    try {
-      const formData = new FormData();
-      const appendFiles = (filesData) => {
-        if (!filesData || filesData.length === 0) return;
-        filesData.forEach(f => {
-          let blob;
-          if (f.fileBuffer && f.fileBuffer instanceof ArrayBuffer) {
-            blob = new Blob([f.fileBuffer], { type: f.fileType || 'application/octet-stream' });
-          } else if (f.fileBase64) {
-            blob = base64ToBlob(f.fileBase64, f.fileType);
+  if (pendingReadingsSyncPromise) {
+    pendingReadingsSyncRequested = true;
+    return pendingReadingsSyncPromise.then(() =>
+      pendingReadingsSyncRequested ? syncPendingReadings() : undefined
+    );
+  }
+
+  pendingReadingsSyncPromise = (async () => {
+    do {
+      pendingReadingsSyncRequested = false;
+      if (typeof syncPendingMeterUpdates === 'function') await syncPendingMeterUpdates();
+      if (typeof syncPendingVerifyUpdates === 'function') await syncPendingVerifyUpdates();
+      if (typeof syncPendingBoilerStatuses === 'function') await syncPendingBoilerStatuses();
+      if (typeof getPendingReadings !== 'function') return;
+
+      const pending = (await getPendingReadings()).filter(record =>
+        !record.type || record.type === 'reading'
+      );
+      for (const record of pending) {
+        try {
+          const formData = new FormData();
+          const appendFiles = (filesData) => {
+            if (!filesData || filesData.length === 0) return;
+            filesData.forEach(f => {
+              let blob;
+              if (f.fileBuffer && f.fileBuffer instanceof ArrayBuffer) {
+                blob = new Blob([f.fileBuffer], { type: f.fileType || 'application/octet-stream' });
+              } else if (f.fileBase64) {
+                blob = base64ToBlob(f.fileBase64, f.fileType);
+              } else {
+                return;
+              }
+              formData.append('files', blob, f.fileName);
+            });
+          };
+          if (record.isViolation) {
+            formData.append('meterNum', record.meterNum);
+            formData.append('licschet', record.licschet);
+            formData.append('violations', record.violations);
+            if (record.actId !== null && record.actId !== undefined && String(record.actId).trim() !== '') {
+              formData.append('act_id', record.actId);
+            }
+            appendFiles(record.filesData);
+            const response = await fetch(`${API_BASE}/save-violation`, {
+              method: 'POST',
+              body: formData
+            });
+            if (response.ok) await deletePendingReading(record.id);
           } else {
-            return;
+            formData.append('ph', record.ph);
+            formData.append('meter_id', record.meter_id);
+            formData.append('licschet', record.licschet);
+            formData.append('abonent_name', record.abonent_name);
+            formData.append('description', record.description);
+            if (record.actId !== null && record.actId !== undefined && String(record.actId).trim() !== '') {
+              formData.append('act_id', record.actId);
+            }
+            if (record.controllerId) formData.append('controllerId', record.controllerId);
+            appendFiles(record.filesData);
+            const response = await fetch(`${API_BASE}/PH`, {
+              method: 'POST',
+              body: formData
+            });
+            if (response.ok) await deletePendingReading(record.id);
           }
-          formData.append('files', blob, f.fileName);
-        });
-      };    
-      if (record.isViolation) {
-        formData.append('meterNum', record.meterNum);
-        formData.append('licschet', record.licschet);
-        formData.append('violations', record.violations);
-        appendFiles(record.filesData);       
-        const response = await fetch(`${API_BASE}/save-violation`, {
-          method: 'POST', 
-          body: formData 
-        });
-        if (response.ok) {
-          await deletePendingReading(record.id);
-          console.log(`Нарушение ID ${record.id} синхронизировано`);
-        }
-      } else {
-        formData.append('ph', record.ph);
-        formData.append('meter_id', record.meter_id);
-        formData.append('licschet', record.licschet);
-        formData.append('abonent_name', record.abonent_name);
-        formData.append('description', record.description);
-        if (record.actId) formData.append('act_id', record.actId);
-        if (record.controllerId) formData.append('controllerId', record.controllerId);
-        appendFiles(record.filesData);       
-        const response = await fetch(`${API_BASE}/PH`, {
-          method: 'POST', 
-          body: formData 
-        });
-        if (response.ok) {
-          await deletePendingReading(record.id);
-          console.log(`Показания ID ${record.id} синхронизированы`);
+        } catch (err) {
+          console.error(`Ошибка синхронизации ${record.id}:`, err);
         }
       }
-    } catch (err) {
-      console.error(`Ошибка синхронизации ${record.id}:`, err);
-    }
+    } while (pendingReadingsSyncRequested && navigator.onLine);
+  })();
+
+  try {
+    await pendingReadingsSyncPromise;
+  } finally {
+    pendingReadingsSyncPromise = null;
   }
 }
 
@@ -1537,6 +1584,112 @@ function syncMeterSessionData(meterId, updates) {
   }
 }
 
+function openPendingUpdatesDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('MeterOfflineStorage', 4);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('pendingReadings')) {
+        db.createObjectStore('pendingReadings', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('controllerPackages')) {
+        db.createObjectStore('controllerPackages', { keyPath: 'controllerId' });
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+async function savePendingMeterUpdate(updateData) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['pendingReadings'], 'readwrite');
+    const request = transaction.objectStore('pendingReadings').add({
+      type: 'meterUpdate',
+      meterId: updateData.meterId,
+      updates: updateData.updates,
+      timestamp: Date.now()
+    });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getPendingMeterUpdates() {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(['pendingReadings'], 'readonly').objectStore('pendingReadings').getAll();
+    request.onsuccess = () => resolve((request.result || []).filter(record => record.type === 'meterUpdate'));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deletePendingMeterUpdate(id) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(['pendingReadings'], 'readwrite').objectStore('pendingReadings').delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function updateCachedMeterPackage(meterId, updates) {
+  const db = await openPendingUpdatesDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['controllerPackages'], 'readwrite');
+    const store = transaction.objectStore('controllerPackages');
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const fieldMap = {
+        meterNum: 'METER_NUM',
+        name: 'NAME',
+        seal: 'SEAL',
+        manfDate: 'MANFDATE',
+        mountDate: 'MOUNT_DATE',
+        verifyDate: 'VERIFY_DATE'
+      };
+      (request.result || []).forEach(pkg => {
+        const meter = pkg.meters?.find(item => String(item.ID) === String(meterId));
+        if (!meter) return;
+        Object.keys(fieldMap).forEach(key => {
+          if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            meter[fieldMap[key]] = updates[key];
+          }
+        });
+        pkg.savedAt = Date.now();
+        store.put(pkg);
+      });
+    };
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+async function syncPendingMeterUpdates() {
+  if (!navigator.onLine) return;
+  const updates = await getPendingMeterUpdates();
+  for (const update of updates) {
+    try {
+      await apiRequest('/update-meter', {
+        meterId: update.meterId,
+        meterNum: update.updates.meterNum || null,
+        name: update.updates.name || null,
+        seal: update.updates.seal || null,
+        manfDate: update.updates.manfDate || null,
+        mountDate: update.updates.mountDate || null,
+        verifyDate: update.updates.verifyDate || null
+      });
+      await updateCachedMeterPackage(update.meterId, update.updates);
+      await deletePendingMeterUpdate(update.id);
+    } catch (err) {
+      console.error(`Ошибка синхронизации обновления счётчика ID ${update.id}:`, err);
+    }
+  }
+}
+
 function clearActiveMeter() {
   sessionStorage.removeItem('activeMeter');
 }
@@ -1554,7 +1707,7 @@ function clearAllMeters() {
   sessionStorage.removeItem('allMeters');
 }
 
-function showAlert(message, type = 'info') {
+function showAlert(message, type = 'info', onClose) {
   const existingModal = document.getElementById('custom-alert-modal');
   if (existingModal) existingModal.remove();
   const overlay = document.createElement('div');
@@ -1589,9 +1742,15 @@ function showAlert(message, type = 'info') {
   `;
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+  let isClosing = false;
   const close = () => {
+    if (isClosing) return;
+    isClosing = true;
     overlay.style.animation = 'fadeOut 0.2s ease';
-    setTimeout(() => overlay.remove(), 180);
+    setTimeout(() => {
+      overlay.remove();
+      if (typeof onClose === 'function') onClose();
+    }, 180);
   };
   const okBtn = modal.querySelector('#custom-alert-ok');
   okBtn.addEventListener('click', close);
@@ -1651,9 +1810,6 @@ window.alert = function(message) {
       .global-info-header strong {
         color: #000000;
       }
-      body {
-        padding-top: 110px !important;
-      }
     `;
     document.head.appendChild(style);
   }
@@ -1667,6 +1823,16 @@ window.alert = function(message) {
     <div><strong>Тип услуги:</strong> <span id="info-service">-</span></div>
     <div><strong>Место установки:</strong> <span id="info-location">-</span></div>
   `;
+  let baseBodyPaddingTop = null;
+  function updateHeaderOffset() {
+    if (!document.body) return;
+    if (baseBodyPaddingTop === null) {
+      baseBodyPaddingTop = getComputedStyle(document.body).paddingTop || '0px';
+    }
+    const isVisible = headerDiv.style.display !== 'none';
+    const offset = isVisible ? Math.ceil(headerDiv.getBoundingClientRect().height) + 12 : 0;
+    document.body.style.paddingTop = `calc(${baseBodyPaddingTop} + ${offset}px)`;
+  }
   function insertHeader() {
     const appContainer = document.getElementById('app');
     if (!appContainer) return false;
@@ -1774,6 +1940,7 @@ window.alert = function(message) {
     } else {
       container.style.display = 'none';
     }
+    updateHeaderOffset();
   }
   window.updateGlobalInfoHeader = updateGlobalInfoHeader;
   const relevantKeys = ['userAddress', 'activeMeter', 'selectedMeter', 'allMeters', 'meternum'];
@@ -1814,4 +1981,5 @@ window.alert = function(message) {
       updateGlobalInfoHeader();
     }
   });
+  window.addEventListener('resize', updateHeaderOffset);
 })();

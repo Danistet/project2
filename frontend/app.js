@@ -308,6 +308,20 @@ function validateFileSize(file) {
   return true;
 }
 
+function getSelectedPhotoFiles() {
+  return ['fileInput', 'cameraInput'].flatMap(id => {
+    const input = document.getElementById(id);
+    return input?.files ? Array.from(input.files) : [];
+  });
+}
+
+function clearSelectedPhotoFiles() {
+  ['fileInput', 'cameraInput'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = '';
+  });
+}
+
 function base64ToBlob(base64, mimeType) {
   try {
     const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
@@ -498,10 +512,11 @@ createApp({
         const meter_id = meterData.meterNum;            
         if (!meter_id) { showAlert("Не найден серийный номер счётчика", 'error'); return; }                
         const fileInput = document.getElementById('fileInput');
-        const files = fileInput?.files;
+        const cameraInput = document.getElementById('cameraInput');
+        const files = getSelectedPhotoFiles();
         if (files && files.length > 5) {    
           showAlert('Можно выбрать не более 5 файлов.', 'error');
-          fileInput.value = '';
+          clearSelectedPhotoFiles();
           const clearBtn = document.getElementById('clearFileBtn');
           if (clearBtn) clearBtn.style.display = 'none';
           return;
@@ -518,7 +533,7 @@ createApp({
         if (files && files.length > 0) {
           for (let i = 0; i < files.length; i++) {
             if (!validateFileSize(files[i])) {
-              fileInput.value = '';
+              clearSelectedPhotoFiles();
               const clearBtn = document.getElementById('clearFileBtn');
               if (clearBtn) clearBtn.style.display = 'none';
               return;
@@ -586,6 +601,7 @@ createApp({
           const clearBtn = document.getElementById('clearFileBtn');
           if (clearBtn) clearBtn.style.display = 'none';
         }                     
+        if (cameraInput) cameraInput.value = '';
         const violationsForm = document.getElementById('violationsForm');
         if (violationsForm) {          
           const appartsCheck = document.getElementById('appartscheck');
@@ -1319,10 +1335,11 @@ createApp({
           return;
         }       
         const fileInput = document.getElementById('fileInput');
-        const files = fileInput?.files;
+        const cameraInput = document.getElementById('cameraInput');
+        const files = getSelectedPhotoFiles();
         if (files && files.length > 5) {
           showAlert('Можно выбрать не более 5 файлов.', 'info');
-          fileInput.value = '';
+          clearSelectedPhotoFiles();
           const preview = document.getElementById('previewContainer');
           if (preview) preview.innerHTML = '';
           const clearBtn = document.getElementById('clearFileBtn');
@@ -1334,7 +1351,7 @@ createApp({
         if (files && files.length > 0) {
           for (let i = 0; i < files.length; i++) {
             if (!validateFileSize(files[i])) {
-              fileInput.value = '';
+              clearSelectedPhotoFiles();
               const preview = document.getElementById('previewContainer');
               if (preview) preview.innerHTML = '';
               const clearBtn = document.getElementById('clearFileBtn');
@@ -1410,6 +1427,7 @@ createApp({
           fileInput.value = '';
           fileInput.classList.remove('file-selected');
         }
+        if (cameraInput) cameraInput.value = '';
         const preview = document.getElementById('previewContainer');
         if (preview) preview.innerHTML = '';
         const clearBtn = document.getElementById('clearFileBtn');
